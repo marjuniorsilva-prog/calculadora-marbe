@@ -3,120 +3,131 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema Marbe - v4.0</title>
+  <title>Sistema Marbe - Gestão de Orçamentos</title>
+  
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 
   <style>
-    :root { --primary: #2c7be5; --success: #28a745; --danger: #d9534f; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f7f6; margin: 0; padding: 10px; }
-    .container { max-width: 950px; background: #fff; padding: 20px; border-radius: 12px; margin: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+    :root { --primary: #2c7be5; --success: #28a745; --danger: #d9534f; --dark: #333; }
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f4f7f6; margin: 0; padding: 10px; }
+    .container { max-width: 1000px; background: #fff; padding: 25px; border-radius: 12px; margin: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
     
+    /* Menu Superior */
     .tabs { display: flex; gap: 5px; margin-bottom: 20px; border-bottom: 2px solid #eee; }
-    .tab-btn { flex: 1; padding: 15px; border: none; background: #eee; cursor: pointer; font-weight: bold; border-radius: 8px 8px 0 0; font-size: 14px; }
+    .tab-btn { flex: 1; padding: 15px; border: none; background: #eee; cursor: pointer; font-weight: bold; border-radius: 8px 8px 0 0; font-size: 14px; transition: 0.3s; }
     .tab-btn.active { background: var(--primary); color: white; }
 
     .content-section { display: none; }
     .content-section.active { display: block; }
 
+    /* Formulários */
     label { display: block; margin-top: 15px; font-weight: 600; font-size: 14px; color: #555; }
     input, select, textarea { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
-    
     .row { display: flex; gap: 10px; flex-wrap: wrap; }
     .row > div { flex: 1; min-width: 140px; }
     
-    .btn { width: 100%; padding: 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; color: white; font-size: 16px; }
+    /* Botões */
+    .btn { width: 100%; padding: 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; color: white; font-size: 16px; transition: 0.2s; }
     .btn-calc { background: var(--success); }
+    .btn-calc:hover { background: #218838; }
     
+    /* Tabela Comercial */
     .table-container { overflow-x: auto; margin-top: 20px; border-radius: 8px; border: 1px solid #eee; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 700px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 800px; }
     table th, table td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-    table th { background: #f8f9fa; color: var(--primary); }
-    
-    .input-table { padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 100%; box-sizing: border-box; }
+    table th { background: #f8f9fa; color: var(--primary); font-weight: bold; }
+    .input-table { padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 100%; font-size: 13px; }
+
+    /* Resultados e Config */
     .resumo-item { background: #eef9f0; padding: 15px; border-radius: 8px; text-align: center; margin-top: 15px; display: none; border: 1px solid #c3e6cb; }
     .config-card { background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 15px; }
+    
+    @media (max-width: 600px) {
+      .container { padding: 15px; border-radius: 0; }
+      .tab-btn { padding: 10px; font-size: 12px; }
+    }
   </style>
 </head>
 <body onload="inicializarSistema()">
 
 <div class="container">
   <div class="tabs">
-    <button class="tab-btn active" id="btn-tab-calc" onclick="switchTab('calc')">1. Calculadora</button>
-    <button class="tab-btn" id="btn-tab-cliente" onclick="switchTab('cliente')">2. Orçamento Final</button>
-    <button class="tab-btn" id="btn-tab-config" onclick="switchTab('config')">⚙ Preços</button>
+    <button class="tab-btn active" id="tab-calc" onclick="switchTab('calc')">1. Calculadora</button>
+    <button class="tab-btn" id="tab-cliente" onclick="switchTab('cliente')">2. Orçamento Final</button>
+    <button class="tab-btn" id="tab-config" onclick="switchTab('config')">⚙ Preços/Config</button>
   </div>
 
   <div id="sec-calc" class="content-section active">
-    <h2>Cálculo de Produção</h2>
+    <h2>Engenharia de Revestimento</h2>
     <div class="row">
-      <div><label>Diâmetro (mm)</label><input type="number" id="diametro" placeholder="Ex: 150"></div>
-      <div><label>Comprimento (mm)</label><input type="number" id="comprimento" placeholder="Ex: 1200"></div>
+      <div><label>Diâmetro do Núcleo (mm)</label><input type="number" id="diametro" placeholder="Ex: 700"></div>
+      <div><label>Comprimento (mm)</label><input type="number" id="comprimento" placeholder="Ex: 4500"></div>
     </div>
     <div class="row">
-      <div style="flex:2"><label>Material Selecionado</label><select id="borrachaSel"></select></div>
-      <div><label>Espessura (mm)</label><input type="number" id="espessura" placeholder="Ex: 45"></div>
+      <div style="flex:2"><label>Material (Borracha)</label><select id="borrachaSel"></select></div>
+      <div><label>Espessura Real (mm)</label><input type="number" id="espessura" placeholder="Ex: 45"></div>
     </div>
     <div class="row">
-      <div><label>Horas Trab.</label><input type="number" id="horas" value="10"></div>
+      <div><label>Horas Trab.</label><input type="number" id="horas" value="20"></div>
       <div><label>Ranhura?</label><select id="ranhura"><option value="0">Não</option><option value="300">Sim (+R$300)</option></select></div>
-      <div><label>Imposto</label><select id="impostoSel"><option value="0.045">4,5%</option><option value="0.065">6,5%</option></select></div>
+      <div><label>Imposto/Tipo</label><select id="impostoSel"><option value="0.045">Nova (4,5%)</option><option value="0.065">Reforma (6,5%)</option></select></div>
     </div>
-    <button class="btn btn-calc" onclick="calcularEPreparar()">CALCULAR PREÇO UNITÁRIO</button>
+    <button class="btn btn-calc" onclick="calcularTecnico()">CALCULAR UNITÁRIO</button>
     
     <div id="resumoCalculo" class="resumo-item"></div>
-    <button id="btnAddItem" class="btn" style="background:#6f42c1; display:none;" onclick="adicionarAoCarrinho()">ADICIONAR AO ORÇAMENTO (+)</button>
+    <button id="btnAddItem" class="btn" style="background:#6f42c1; display:none;" onclick="adicionarAoOrcamento()">ADICIONAR AO ORÇAMENTO (+)</button>
   </div>
 
   <div id="sec-cliente" class="content-section">
     <h2>Dados do Orçamento</h2>
     <div class="row">
-        <div style="flex:2"><label>CNPJ do Cliente</label><input type="text" id="cnpjCli" placeholder="Buscar CNPJ..." onblur="buscarCNPJ(this.value)"></div>
-        <div style="flex:3"><label>Razão Social / Nome</label><input type="text" id="razaoCli" placeholder="Nome da Empresa"></div>
+        <div style="flex:2"><label>CNPJ do Cliente</label><input type="text" id="cnpjCli" placeholder="00.000.000/0000-00" onblur="buscarCNPJ(this.value)"></div>
+        <div style="flex:3"><label>Razão Social / Cliente</label><input type="text" id="razaoCli" placeholder="Nome da Empresa"></div>
     </div>
     
     <div class="table-container">
       <table id="tabelaOrcamento">
         <thead>
           <tr>
-            <th>Descrição (Editável)</th>
+            <th style="width: 25%;">Descrição (Editável)</th>
             <th>Medidas</th>
-            <th>Espessura (Editável)</th>
+            <th style="width: 15%;">Espessura (Editável)</th>
             <th style="width: 80px;">Qtd</th>
-            <th>Unit. (R$)</th>
-            <th>Total (R$)</th>
-            <th>Remover</th>
+            <th>Unitário</th>
+            <th>Total</th>
+            <th>Ação</th>
           </tr>
         </thead>
         <tbody></tbody>
       </table>
     </div>
 
-    <label>Observações Gerais (Prazo, Frete, Pagamento)</label>
-    <textarea id="obsCli" rows="3" placeholder="Ex: Prazo de entrega 10 dias úteis. Frete por conta do cliente."></textarea>
+    <label>Observações Adicionais no PDF</label>
+    <textarea id="obsCli" rows="3" placeholder="Prazo de entrega, frete, validade..."></textarea>
     
     <div style="text-align:right; margin-top:20px;">
-        <h3 style="margin:0; color:#666;">VALOR TOTAL DO ORÇAMENTO:</h3>
+        <h3 style="margin:0; color:#666; font-size: 16px;">VALOR TOTAL:</h3>
         <span id="totalSoma" style="font-size:32px; font-weight:bold; color:var(--success);">R$ 0,00</span>
     </div>
     
-    <button class="btn" style="background:var(--danger); margin-top:20px; font-size:18px;" onclick="gerarPDF()">GERAR PDF PARA CLIENTE</button>
+    <button class="btn" style="background:var(--danger); margin-top:20px;" onclick="gerarPDF()">GERAR PDF PROFISSIONAL</button>
   </div>
 
   <div id="sec-config" class="content-section">
-    <h2>Configurações de Custos</h2>
+    <h2>Configurações de Valores</h2>
     <div class="config-card">
-      <label>Valor da Hora de Serviço (R$)</label>
+      <label>Valor da Hora de Produção (R$)</label>
       <input type="number" id="cfgValorHora" onchange="salvarConfig()">
     </div>
     <div class="config-card">
-      <label><strong>Tabela de Materiais (Preço KG)</strong></label>
+      <label><strong>Tabela de Preços (Borracha R$/KG)</strong></label>
       <div id="listaBorrachasConfig"></div>
       <hr>
       <label>Cadastrar Novo Material</label>
       <div class="row">
         <input type="text" id="newBNome" placeholder="Ex: Silicone">
-        <input type="number" id="newBPreco" placeholder="R$ KG">
+        <input type="number" id="newBPreco" placeholder="Preço KG">
         <button class="btn" style="background:var(--primary); width:auto; margin:5px" onclick="addMaterial()">+</button>
       </div>
     </div>
@@ -124,45 +135,55 @@
 </div>
 
 <script>
-  let DB = { valorHora: 50, borrachas: [ {nome: "Natural Preta", preco: 13}, {nome: "Natural Branca", preco: 30}, {nome: "Nitrílica", preco: 49} ] };
-  let itens = [];
-  let itemCalculado = null;
+  // Banco de Dados Local
+  let DB = { 
+    valorHora: 50, 
+    borrachas: [ 
+        {nome: "Borracha Natural Preta", preco: 13}, 
+        {nome: "Borracha Natural Branca", preco: 30}, 
+        {nome: "Borracha Nitrílica", preco: 49} 
+    ] 
+  };
+  let itensNoOrcamento = [];
+  let itemCalculadoTemporario = null;
 
   function inicializarSistema() {
-    const salvo = localStorage.getItem('marbe_db_v4');
+    const salvo = localStorage.getItem('marbe_sistema_v4');
     if(salvo) DB = JSON.parse(salvo);
-    atualizarTelas();
+    renderizarConfig();
   }
 
   function switchTab(tab) {
     document.querySelectorAll('.content-section, .tab-btn').forEach(el => el.classList.remove('active'));
     document.getElementById('sec-'+tab).classList.add('active');
-    document.getElementById('btn-tab-'+tab).classList.add('active');
+    document.getElementById('tab-'+tab).classList.add('active');
   }
 
-  function atualizarTelas() {
+  // Funções de Configuração
+  function renderizarConfig() {
     document.getElementById('cfgValorHora').value = DB.valorHora;
     const lista = document.getElementById('listaBorrachasConfig');
     lista.innerHTML = DB.borrachas.map((b, i) => `
       <div class="row" style="margin-bottom:5px">
         <input type="text" value="${b.nome}" readonly style="flex:2">
-        <input type="number" value="${b.preco}" onchange="editPreco(${i}, this.value)" style="flex:1">
-        <button onclick="removeMat(${i})" style="border:none; color:red; background:none; flex:0.2; cursor:pointer">✖</button>
+        <input type="number" value="${b.preco}" onchange="editPrecoInDB(${i}, this.value)" style="flex:1">
+        <button onclick="removeMatFromDB(${i})" style="border:none; color:red; background:none; cursor:pointer">✖</button>
       </div>
     `).join('');
     document.getElementById('borrachaSel').innerHTML = DB.borrachas.map(b => `<option value="${b.preco}">${b.nome}</option>`).join('');
   }
 
-  function editPreco(i, v) { DB.borrachas[i].preco = parseFloat(v); salvarConfig(); }
-  function removeMat(i) { DB.borrachas.splice(i,1); salvarConfig(); atualizarTelas(); }
+  function editPrecoInDB(i, v) { DB.borrachas[i].preco = parseFloat(v); salvarNoCache(); }
+  function removeMatFromDB(i) { DB.borrachas.splice(i,1); salvarNoCache(); renderizarConfig(); }
   function addMaterial() {
     const n = document.getElementById('newBNome').value;
     const p = document.getElementById('newBPreco').value;
-    if(n && p) { DB.borrachas.push({nome: n, preco: parseFloat(p)}); salvarConfig(); atualizarTelas(); document.getElementById('newBNome').value=""; document.getElementById('newBPreco').value=""; }
+    if(n && p) { DB.borrachas.push({nome: n, preco: parseFloat(p)}); salvarNoCache(); renderizarConfig(); document.getElementById('newBNome').value=""; document.getElementById('newBPreco').value=""; }
   }
-  function salvarConfig() { DB.valorHora = parseFloat(document.getElementById('cfgValorHora').value); localStorage.setItem('marbe_db_v4', JSON.stringify(DB)); }
+  function salvarNoCache() { DB.valorHora = parseFloat(document.getElementById('cfgValorHora').value); localStorage.setItem('marbe_sistema_v4', JSON.stringify(DB)); }
 
-  function calcularEPreparar() {
+  // Lógica da Calculadora
+  function calcularTecnico() {
     const d = parseFloat(document.getElementById('diametro').value);
     const l = parseFloat(document.getElementById('comprimento').value);
     const e = parseFloat(document.getElementById('espessura').value);
@@ -172,45 +193,58 @@
     const ranhura = parseFloat(document.getElementById('ranhura').value);
     const imp = parseFloat(document.getElementById('impostoSel').value);
 
-    if(!d || !l || !e) return alert("Preencha as medidas técnicos!");
+    if(!d || !l || !e) return alert("Preencha as medidas do cilindro!");
 
-    const peso = Math.ceil((Math.PI * (d + e) * l * e) * 1200 / 1000000000); 
-    const unitario = (((peso * precoKg) * 1.1 + (h * DB.valorHora) + ranhura) * 2.5) * (1 + imp);
+    // FÓRMULA PRECISA (Perímetro Médio)
+    const dMedio = d + e;
+    const volumeM3 = (Math.PI * dMedio * l * e) / 1000000000;
+    const pesoFinal = Math.ceil(volumeM3 * 1200); 
 
-    itemCalculado = { desc: "Revestimento em " + nomeB, med: d+"x"+l, esp: e + "mm", qtd: 1, vlr: unitario };
+    const custoMaterial = pesoFinal * precoKg;
+    const subtotal = ((custoMaterial * 1.1) + (h * DB.valorHora) + ranhura) * 2.5;
+    const unitarioFinal = subtotal * (1 + imp);
+
+    itemCalculadoTemporario = { 
+        desc: "Revestimento em " + nomeB, 
+        med: `${d} x ${l} mm`, 
+        esp: e + "mm", 
+        qtd: 1, 
+        vlr: unitarioFinal 
+    };
     
     const res = document.getElementById('resumoCalculo');
     res.style.display = "block";
-    res.innerHTML = `<strong>Sucesso!</strong> Peso Estimado: ${peso}kg | Preço Unitário: R$ ${unitario.toFixed(2)}`;
+    res.innerHTML = `<strong>Cálculo Concluído!</strong> Peso: ${pesoFinal}kg | Preço Unitário: R$ ${unitarioFinal.toFixed(2)}`;
     document.getElementById('btnAddItem').style.display = "block";
   }
 
-  function adicionarAoCarrinho() {
-    itens.push({...itemCalculado});
-    renderItens();
+  function adicionarAoOrcamento() {
+    itensNoOrcamento.push({...itemCalculadoTemporario});
+    renderizarTabelaComercial();
     switchTab('cliente');
     document.getElementById('resumoCalculo').style.display = "none";
     document.getElementById('btnAddItem').style.display = "none";
   }
 
-  function renderItens() {
+  function renderizarTabelaComercial() {
     const tbody = document.querySelector("#tabelaOrcamento tbody");
     tbody.innerHTML = "";
-    let total = 0;
-    itens.forEach((it, i) => {
-      total += it.vlr * it.qtd;
+    let totalSoma = 0;
+    itensNoOrcamento.forEach((it, i) => {
+      const subtotalLinha = it.vlr * it.qtd;
+      totalSoma += subtotalLinha;
       tbody.innerHTML += `
         <tr>
-          <td><input type="text" class="input-table" value="${it.desc}" onchange="itens[${i}].desc = this.value"></td>
+          <td><input type="text" class="input-table" value="${it.desc}" onchange="itensNoOrcamento[${i}].desc = this.value"></td>
           <td>${it.med}</td>
-          <td><input type="text" class="input-table" value="${it.esp}" onchange="itens[${i}].esp = this.value"></td>
-          <td><input type="number" class="input-table" value="${it.qtd}" min="1" onchange="itens[${i}].qtd = parseInt(this.value); renderItens()"></td>
-          <td>${it.vlr.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-          <td><strong>${(it.vlr * it.qtd).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong></td>
-          <td onclick="itens.splice(${i},1);renderItens()" style="color:red; cursor:pointer; text-align:center">✖</td>
+          <td><input type="text" class="input-table" value="${it.esp}" onchange="itensNoOrcamento[${i}].esp = this.value"></td>
+          <td><input type="number" class="input-table" value="${it.qtd}" min="1" onchange="itensNoOrcamento[${i}].qtd = parseInt(this.value); renderizarTabelaComercial()"></td>
+          <td>R$ ${it.vlr.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+          <td><strong>R$ ${subtotalLinha.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong></td>
+          <td onclick="itensNoOrcamento.splice(${i},1);renderizarTabelaComercial()" style="color:red; cursor:pointer; text-align:center">✖</td>
         </tr>`;
     });
-    document.getElementById('totalSoma').innerText = total.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+    document.getElementById('totalSoma').innerText = totalSoma.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
   }
 
   async function buscarCNPJ(v) {
@@ -219,4 +253,68 @@
       const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${v.replace(/\D/g,'')}`);
       const data = await res.json();
       document.getElementById('razaoCli').value = data.razao_social || "";
-    } catch (e) { console.log("Erro CNPJ"); }
+    } catch (e) { console.log("Erro na busca de CNPJ"); }
+  }
+
+  // GERAÇÃO DE PDF PROFISSIONAL
+  function gerarPDF() {
+    if(itensNoOrcamento.length === 0) return alert("Adicione itens primeiro!");
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // CABEÇALHO FORNECEDOR (MARBE)
+    doc.setFontSize(18); doc.setTextColor(44, 123, 229);
+    doc.setFont("helvetica", "bold");
+    doc.text("MARBE COMERCIO E SERVICOS", 20, 20);
+    
+    doc.setFontSize(9); doc.setTextColor(100);
+    doc.setFont("helvetica", "normal");
+    doc.text("CNPJ: 61.149.312/0001-56", 20, 26);
+    doc.text("Endereço: Rua São Carlos, 84 - Vila Mariana - Ribeirão Preto / SP", 20, 31);
+    doc.line(20, 34, 190, 34);
+    
+    // DADOS DO CLIENTE
+    doc.setFontSize(14); doc.setTextColor(0); doc.setFont("helvetica", "bold");
+    doc.text("ORÇAMENTO DE REVESTIMENTOS", 105, 45, { align: "center" });
+    
+    doc.setFontSize(10);
+    doc.text("DADOS DO CLIENTE:", 20, 55);
+    doc.setFont("helvetica", "normal");
+    doc.text("Razão Social: " + document.getElementById('razaoCli').value, 20, 61);
+    doc.text("CNPJ: " + document.getElementById('cnpjCli').value, 20, 66);
+    doc.text("Data: " + new Date().toLocaleDateString('pt-BR'), 150, 61);
+
+    const rows = itensNoOrcamento.map(i => [
+        i.desc, 
+        i.med, 
+        i.esp, 
+        i.qtd, 
+        i.vlr.toLocaleString('pt-BR', {minimumFractionDigits: 2}), 
+        (i.vlr * i.qtd).toLocaleString('pt-BR', {minimumFractionDigits: 2})
+    ]);
+
+    doc.autoTable({ 
+      startY: 75, 
+      head: [['Serviço', 'Medidas', 'Esp.', 'Qtd', 'Unitário (R$)', 'Total (R$)']], 
+      body: rows, 
+      headStyles: {fillColor:[44, 123, 229]},
+      theme: 'grid'
+    });
+    
+    const finalY = doc.lastAutoTable.finalY + 15;
+    doc.setFontSize(12); doc.setFont("helvetica", "bold");
+    doc.text("VALOR TOTAL: " + document.getElementById('totalSoma').innerText, 190, finalY, {align:'right'});
+    
+    const obs = document.getElementById('obsCli').value;
+    if(obs) {
+      doc.setFontSize(10); doc.setFont("helvetica", "bold");
+      doc.text("Observações:", 20, finalY + 10);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+      doc.text(obs, 20, finalY + 16, { maxWidth: 170 });
+    }
+
+    doc.save("Orcamento_Marbe.pdf");
+  }
+</script>
+</body>
+</html>
