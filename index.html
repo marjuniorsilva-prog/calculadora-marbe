@@ -30,7 +30,6 @@
     /* Botões */
     .btn { width: 100%; padding: 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; color: white; font-size: 16px; transition: 0.2s; }
     .btn-calc { background: var(--success); }
-    .btn-calc:hover { background: #218838; }
     
     /* Tabela Comercial */
     .table-container { overflow-x: auto; margin-top: 20px; border-radius: 8px; border: 1px solid #eee; }
@@ -39,14 +38,8 @@
     table th { background: #f8f9fa; color: var(--primary); font-weight: bold; }
     .input-table { padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 100%; font-size: 13px; }
 
-    /* Resultados e Config */
     .resumo-item { background: #eef9f0; padding: 15px; border-radius: 8px; text-align: center; margin-top: 15px; display: none; border: 1px solid #c3e6cb; }
     .config-card { background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 15px; }
-    
-    @media (max-width: 600px) {
-      .container { padding: 15px; border-radius: 0; }
-      .tab-btn { padding: 10px; font-size: 12px; }
-    }
   </style>
 </head>
 <body onload="inicializarSistema()">
@@ -59,7 +52,7 @@
   </div>
 
   <div id="sec-calc" class="content-section active">
-    <h2>Engenharia de Revestimento</h2>
+    <h2>Cálculo Técnico</h2>
     <div class="row">
       <div><label>Diâmetro do Núcleo (mm)</label><input type="number" id="diametro" placeholder="Ex: 700"></div>
       <div><label>Comprimento (mm)</label><input type="number" id="comprimento" placeholder="Ex: 4500"></div>
@@ -74,25 +67,24 @@
       <div><label>Imposto/Tipo</label><select id="impostoSel"><option value="0.045">Nova (4,5%)</option><option value="0.065">Reforma (6,5%)</option></select></div>
     </div>
     <button class="btn btn-calc" onclick="calcularTecnico()">CALCULAR UNITÁRIO</button>
-    
     <div id="resumoCalculo" class="resumo-item"></div>
     <button id="btnAddItem" class="btn" style="background:#6f42c1; display:none;" onclick="adicionarAoOrcamento()">ADICIONAR AO ORÇAMENTO (+)</button>
   </div>
 
   <div id="sec-cliente" class="content-section">
-    <h2>Dados do Orçamento</h2>
+    <h2>Dados do Orçamento Comercial</h2>
     <div class="row">
         <div style="flex:2"><label>CNPJ do Cliente</label><input type="text" id="cnpjCli" placeholder="00.000.000/0000-00" onblur="buscarCNPJ(this.value)"></div>
-        <div style="flex:3"><label>Razão Social / Cliente</label><input type="text" id="razaoCli" placeholder="Nome da Empresa"></div>
+        <div style="flex:3"><label>Razão Social do Cliente</label><input type="text" id="razaoCli" placeholder="Nome da Empresa do Cliente"></div>
     </div>
     
     <div class="table-container">
       <table id="tabelaOrcamento">
         <thead>
           <tr>
-            <th style="width: 25%;">Descrição (Editável)</th>
+            <th>Descrição (Editável)</th>
             <th>Medidas</th>
-            <th style="width: 15%;">Espessura (Editável)</th>
+            <th>Espessura (Editável)</th>
             <th style="width: 80px;">Qtd</th>
             <th>Unitário</th>
             <th>Total</th>
@@ -103,19 +95,18 @@
       </table>
     </div>
 
-    <label>Observações Adicionais no PDF</label>
-    <textarea id="obsCli" rows="3" placeholder="Prazo de entrega, frete, validade..."></textarea>
+    <label>Observações Adicionais</label>
+    <textarea id="obsCli" rows="3" placeholder="Prazo de entrega, frete, etc."></textarea>
     
     <div style="text-align:right; margin-top:20px;">
-        <h3 style="margin:0; color:#666; font-size: 16px;">VALOR TOTAL:</h3>
+        <h3 style="margin:0; color:#666;">VALOR TOTAL:</h3>
         <span id="totalSoma" style="font-size:32px; font-weight:bold; color:var(--success);">R$ 0,00</span>
     </div>
-    
     <button class="btn" style="background:var(--danger); margin-top:20px;" onclick="gerarPDF()">GERAR PDF PROFISSIONAL</button>
   </div>
 
   <div id="sec-config" class="content-section">
-    <h2>Configurações de Valores</h2>
+    <h2>Configurações Marbe</h2>
     <div class="config-card">
       <label>Valor da Hora de Produção (R$)</label>
       <input type="number" id="cfgValorHora" onchange="salvarConfig()">
@@ -126,7 +117,7 @@
       <hr>
       <label>Cadastrar Novo Material</label>
       <div class="row">
-        <input type="text" id="newBNome" placeholder="Ex: Silicone">
+        <input type="text" id="newBNome" placeholder="Nome Material">
         <input type="number" id="newBPreco" placeholder="Preço KG">
         <button class="btn" style="background:var(--primary); width:auto; margin:5px" onclick="addMaterial()">+</button>
       </div>
@@ -135,20 +126,12 @@
 </div>
 
 <script>
-  // Banco de Dados Local
-  let DB = { 
-    valorHora: 50, 
-    borrachas: [ 
-        {nome: "Borracha Natural Preta", preco: 13}, 
-        {nome: "Borracha Natural Branca", preco: 30}, 
-        {nome: "Borracha Nitrílica", preco: 49} 
-    ] 
-  };
+  let DB = { valorHora: 50, borrachas: [ {nome: "Borracha Natural Preta", preco: 13}, {nome: "Borracha Natural Branca", preco: 30}, {nome: "Borracha Nitrílica", preco: 49} ] };
   let itensNoOrcamento = [];
   let itemCalculadoTemporario = null;
 
   function inicializarSistema() {
-    const salvo = localStorage.getItem('marbe_sistema_v4');
+    const salvo = localStorage.getItem('marbe_sistema_final');
     if(salvo) DB = JSON.parse(salvo);
     renderizarConfig();
   }
@@ -159,11 +142,9 @@
     document.getElementById('tab-'+tab).classList.add('active');
   }
 
-  // Funções de Configuração
   function renderizarConfig() {
     document.getElementById('cfgValorHora').value = DB.valorHora;
-    const lista = document.getElementById('listaBorrachasConfig');
-    lista.innerHTML = DB.borrachas.map((b, i) => `
+    document.getElementById('listaBorrachasConfig').innerHTML = DB.borrachas.map((b, i) => `
       <div class="row" style="margin-bottom:5px">
         <input type="text" value="${b.nome}" readonly style="flex:2">
         <input type="number" value="${b.preco}" onchange="editPrecoInDB(${i}, this.value)" style="flex:1">
@@ -180,9 +161,8 @@
     const p = document.getElementById('newBPreco').value;
     if(n && p) { DB.borrachas.push({nome: n, preco: parseFloat(p)}); salvarNoCache(); renderizarConfig(); document.getElementById('newBNome').value=""; document.getElementById('newBPreco').value=""; }
   }
-  function salvarNoCache() { DB.valorHora = parseFloat(document.getElementById('cfgValorHora').value); localStorage.setItem('marbe_sistema_v4', JSON.stringify(DB)); }
+  function salvarNoCache() { DB.valorHora = parseFloat(document.getElementById('cfgValorHora').value); localStorage.setItem('marbe_sistema_final', JSON.stringify(DB)); }
 
-  // Lógica da Calculadora
   function calcularTecnico() {
     const d = parseFloat(document.getElementById('diametro').value);
     const l = parseFloat(document.getElementById('comprimento').value);
@@ -193,32 +173,23 @@
     const ranhura = parseFloat(document.getElementById('ranhura').value);
     const imp = parseFloat(document.getElementById('impostoSel').value);
 
-    if(!d || !l || !e) return alert("Preencha as medidas do cilindro!");
+    if(!d || !l || !e) return alert("Preencha as medidas!");
 
-    // FÓRMULA PRECISA (Perímetro Médio)
     const dMedio = d + e;
     const volumeM3 = (Math.PI * dMedio * l * e) / 1000000000;
     const pesoFinal = Math.ceil(volumeM3 * 1200); 
 
     const custoMaterial = pesoFinal * precoKg;
-    const subtotal = ((custoMaterial * 1.1) + (h * DB.valorHora) + ranhura) * 2.5;
-    const unitarioFinal = subtotal * (1 + imp);
+    const unitarioFinal = (((custoMaterial * 1.1) + (h * DB.valorHora) + ranhura) * 2.5) * (1 + imp);
 
-    itemCalculadoTemporario = { 
-        desc: "Revestimento em " + nomeB, 
-        med: `${d} x ${l} mm`, 
-        esp: e + "mm", 
-        qtd: 1, 
-        vlr: unitarioFinal 
-    };
+    itemCalculadoTemporario = { desc: "Revestimento em " + nomeB, med: `${d} x ${l} mm`, esp: e + "mm", qtd: 1, vlr: unitarioFinal };
     
-    const res = document.getElementById('resumoCalculo');
-    res.style.display = "block";
-    res.innerHTML = `<strong>Cálculo Concluído!</strong> Peso: ${pesoFinal}kg | Preço Unitário: R$ ${unitarioFinal.toFixed(2)}`;
+    document.getElementById('resumoCalculo').style.display = "block";
+    document.getElementById('resumoCalculo').innerHTML = `<strong>Sucesso!</strong> Peso: ${pesoFinal}kg | Unitário: R$ ${unitarioFinal.toFixed(2)}`;
     document.getElementById('btnAddItem').style.display = "block";
   }
 
-  function adicionarAoOrcamento() {
+  function adicionarAoCarrinho() {
     itensNoOrcamento.push({...itemCalculadoTemporario});
     renderizarTabelaComercial();
     switchTab('cliente');
@@ -231,17 +202,17 @@
     tbody.innerHTML = "";
     let totalSoma = 0;
     itensNoOrcamento.forEach((it, i) => {
-      const subtotalLinha = it.vlr * it.qtd;
-      totalSoma += subtotalLinha;
+      const sub = it.vlr * it.qtd;
+      totalSoma += sub;
       tbody.innerHTML += `
         <tr>
           <td><input type="text" class="input-table" value="${it.desc}" onchange="itensNoOrcamento[${i}].desc = this.value"></td>
           <td>${it.med}</td>
           <td><input type="text" class="input-table" value="${it.esp}" onchange="itensNoOrcamento[${i}].esp = this.value"></td>
           <td><input type="number" class="input-table" value="${it.qtd}" min="1" onchange="itensNoOrcamento[${i}].qtd = parseInt(this.value); renderizarTabelaComercial()"></td>
-          <td>R$ ${it.vlr.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-          <td><strong>R$ ${subtotalLinha.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong></td>
-          <td onclick="itensNoOrcamento.splice(${i},1);renderizarTabelaComercial()" style="color:red; cursor:pointer; text-align:center">✖</td>
+          <td>R$ ${it.vlr.toFixed(2)}</td>
+          <td><strong>R$ ${sub.toFixed(2)}</strong></td>
+          <td onclick="itensNoOrcamento.splice(${i},1);renderizarTabelaComercial()" style="color:red; cursor:pointer;">✖</td>
         </tr>`;
     });
     document.getElementById('totalSoma').innerText = totalSoma.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
@@ -253,30 +224,30 @@
       const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${v.replace(/\D/g,'')}`);
       const data = await res.json();
       document.getElementById('razaoCli').value = data.razao_social || "";
-    } catch (e) { console.log("Erro na busca de CNPJ"); }
+    } catch (e) { }
   }
 
-  // GERAÇÃO DE PDF PROFISSIONAL
+  // --- GERAÇÃO DO PDF PROFISSIONAL CORRIGIDA ---
   function gerarPDF() {
-    if(itensNoOrcamento.length === 0) return alert("Adicione itens primeiro!");
+    if(itensNoOrcamento.length === 0) return alert("Adicione itens!");
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
-    // CABEÇALHO FORNECEDOR (MARBE)
+    // 1. DADOS DO FORNECEDOR (MARBE) - Sempre no Topo
     doc.setFontSize(18); doc.setTextColor(44, 123, 229);
     doc.setFont("helvetica", "bold");
     doc.text("MARBE COMERCIO E SERVICOS", 20, 20);
     
-    doc.setFontSize(9); doc.setTextColor(100);
-    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9); doc.setTextColor(100); doc.setFont("helvetica", "normal");
     doc.text("CNPJ: 61.149.312/0001-56", 20, 26);
     doc.text("Endereço: Rua São Carlos, 84 - Vila Mariana - Ribeirão Preto / SP", 20, 31);
     doc.line(20, 34, 190, 34);
     
-    // DADOS DO CLIENTE
+    // 2. TÍTULO
     doc.setFontSize(14); doc.setTextColor(0); doc.setFont("helvetica", "bold");
     doc.text("ORÇAMENTO DE REVESTIMENTOS", 105, 45, { align: "center" });
     
+    // 3. DADOS DO CLIENTE (Abaixo do Título)
     doc.setFontSize(10);
     doc.text("DADOS DO CLIENTE:", 20, 55);
     doc.setFont("helvetica", "normal");
@@ -285,17 +256,14 @@
     doc.text("Data: " + new Date().toLocaleDateString('pt-BR'), 150, 61);
 
     const rows = itensNoOrcamento.map(i => [
-        i.desc, 
-        i.med, 
-        i.esp, 
-        i.qtd, 
-        i.vlr.toLocaleString('pt-BR', {minimumFractionDigits: 2}), 
-        (i.vlr * i.qtd).toLocaleString('pt-BR', {minimumFractionDigits: 2})
+        i.desc, i.med, i.esp, i.qtd, 
+        "R$ " + i.vlr.toLocaleString('pt-BR', {minimumFractionDigits: 2}), 
+        "R$ " + (i.vlr * i.qtd).toLocaleString('pt-BR', {minimumFractionDigits: 2})
     ]);
 
     doc.autoTable({ 
       startY: 75, 
-      head: [['Serviço', 'Medidas', 'Esp.', 'Qtd', 'Unitário (R$)', 'Total (R$)']], 
+      head: [['Descrição', 'Medidas', 'Esp.', 'Qtd', 'Unitário', 'Total']], 
       body: rows, 
       headStyles: {fillColor:[44, 123, 229]},
       theme: 'grid'
@@ -305,12 +273,10 @@
     doc.setFontSize(12); doc.setFont("helvetica", "bold");
     doc.text("VALOR TOTAL: " + document.getElementById('totalSoma').innerText, 190, finalY, {align:'right'});
     
-    const obs = document.getElementById('obsCli').value;
-    if(obs) {
-      doc.setFontSize(10); doc.setFont("helvetica", "bold");
-      doc.text("Observações:", 20, finalY + 10);
+    if(document.getElementById('obsCli').value) {
+      doc.setFontSize(10); doc.text("Observações:", 20, finalY + 10);
       doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-      doc.text(obs, 20, finalY + 16, { maxWidth: 170 });
+      doc.text(document.getElementById('obsCli').value, 20, finalY + 16, { maxWidth: 170 });
     }
 
     doc.save("Orcamento_Marbe.pdf");
