@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema Marbe - v5.0</title>
+  <title>Sistema Marbe - v6.0</title>
+  
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 
@@ -48,19 +49,19 @@
   </div>
 
   <div id="sec-calc" class="content-section active">
-    <h2>Cálculo Técnico</h2>
+    <h2>Cálculo Técnico Interno</h2>
     <div class="row">
       <div><label>Diâmetro Núcleo (mm)</label><input type="number" id="diametro"></div>
       <div><label>Comprimento (mm)</label><input type="number" id="comprimento"></div>
     </div>
     <div class="row">
-      <div style="flex:2"><label>Material</label><select id="borrachaSel"></select></div>
+      <div style="flex:2"><label>Material Selecionado</label><select id="borrachaSel"></select></div>
       <div><label>Espessura (mm)</label><input type="number" id="espessura"></div>
     </div>
     <div class="row">
       <div><label>Horas Trab.</label><input type="number" id="horas" value="10"></div>
       <div><label>Ranhura?</label><select id="ranhura"><option value="0">Não</option><option value="300">Sim (+R$300)</option></select></div>
-      <div><label>Imposto</label><select id="impostoSel"><option value="0.045">4,5%</option><option value="0.065">6,5%</option></select></div>
+      <div><label>Imposto/Tipo</label><select id="impostoSel"><option value="0.045">Nova (4,5%)</option><option value="0.065">Reforma (6,5%)</option></select></div>
     </div>
     <button class="btn btn-calc" onclick="calcularEPreparar()">CALCULAR UNITÁRIO</button>
     
@@ -71,8 +72,8 @@
   <div id="sec-cliente" class="content-section">
     <h2>Dados do Cliente</h2>
     <div class="row">
-        <div style="flex:2"><label>CNPJ Cliente</label><input type="text" id="cnpjCli" placeholder="Buscar CNPJ..." onblur="buscarCNPJ(this.value)"></div>
-        <div style="flex:3"><label>Razão Social Cliente</label><input type="text" id="razaoCli"></div>
+        <div style="flex:2"><label>CNPJ Cliente</label><input type="text" id="cnpjCli" placeholder="00.000.000/0000-00" onblur="buscarCNPJ(this.value)"></div>
+        <div style="flex:3"><label>Razão Social Cliente</label><input type="text" id="razaoCli" placeholder="Puxado automaticamente do Sintegra"></div>
     </div>
     
     <div class="table-container">
@@ -92,8 +93,8 @@
       </table>
     </div>
 
-    <label>Observações</label>
-    <textarea id="obsCli" rows="3" placeholder="Prazo, frete, garantia..."></textarea>
+    <label>Observações Gerais</label>
+    <textarea id="obsCli" rows="3" placeholder="Prazo, garantia, condições de pagamento..."></textarea>
     
     <div style="text-align:right; margin-top:20px;">
         <h3 style="margin:0; color:#666;">TOTAL DO ORÇAMENTO:</h3>
@@ -104,17 +105,17 @@
   </div>
 
   <div id="sec-config" class="content-section">
-    <h2>Configurações</h2>
+    <h2>Configurações de Produção</h2>
     <div class="config-card">
       <label>Valor da Hora (R$)</label>
       <input type="number" id="cfgValorHora" onchange="salvarConfig()">
     </div>
     <div id="listaBorrachasConfig"></div>
     <hr>
-    <label>Novo Material</label>
+    <label>Cadastrar Novo Material</label>
     <div class="row">
-      <input type="text" id="newBNome" placeholder="Nome">
-      <input type="number" id="newBPreco" placeholder="Preço KG">
+      <input type="text" id="newBNome" placeholder="Ex: Silicone">
+      <input type="number" id="newBPreco" placeholder="Preço R$/KG">
       <button class="btn" style="background:var(--primary); width:auto; margin:5px" onclick="addMaterial()">+</button>
     </div>
   </div>
@@ -126,7 +127,7 @@
   let itemCalculado = null;
 
   function inicializarSistema() {
-    const salvo = localStorage.getItem('marbe_v5');
+    const salvo = localStorage.getItem('marbe_v6_db');
     if(salvo) DB = JSON.parse(salvo);
     atualizarTelas();
   }
@@ -156,7 +157,7 @@
 
   function salvarConfig() { 
     DB.valorHora = parseFloat(document.getElementById('cfgValorHora').value);
-    localStorage.setItem('marbe_v5', JSON.stringify(DB)); 
+    localStorage.setItem('marbe_v6_db', JSON.stringify(DB)); 
   }
 
   function calcularEPreparar() {
@@ -166,12 +167,14 @@
     const precoKg = parseFloat(document.getElementById('borrachaSel').value);
     const nomeB = document.getElementById('borrachaSel').options[document.getElementById('borrachaSel').selectedIndex].text;
     
+    if (isNaN(d) || isNaN(l) || isNaN(e)) return alert("Preencha as medidas técnicas!");
+
     const peso = Math.ceil((Math.PI * (d + e) * l * e) * 1200 / 1000000000); 
     const unitario = (((peso * precoKg) * 1.1 + (parseFloat(document.getElementById('horas').value) * DB.valorHora) + parseFloat(document.getElementById('ranhura').value)) * 2.5) * (1 + parseFloat(document.getElementById('impostoSel').value));
 
     itemCalculado = { desc: "Revestimento em " + nomeB, med: d+"x"+l+"mm", esp: e+"mm", qtd: 1, vlr: unitario };
     document.getElementById('resumoCalculo').style.display = "block";
-    document.getElementById('resumoCalculo').innerHTML = `Peso: ${peso}kg | Unitário: R$ ${unitario.toFixed(2)}`;
+    document.getElementById('resumoCalculo').innerHTML = `<strong>Sucesso!</strong> Peso: ${peso}kg | Unitário: R$ ${unitario.toFixed(2)}`;
     document.getElementById('btnAddItem').style.display = "block";
   }
 
@@ -188,66 +191,98 @@
     tbody.innerHTML = "";
     let total = 0;
     itens.forEach((it, i) => {
-      total += it.vlr * it.qtd;
+      const sub = it.vlr * it.qtd;
+      total += sub;
       tbody.innerHTML += `<tr>
           <td><input type="text" class="input-table" value="${it.desc}" onchange="itens[${i}].desc=this.value"></td>
           <td>${it.med}</td>
           <td><input type="text" class="input-table" value="${it.esp}" onchange="itens[${i}].esp=this.value"></td>
-          <td><input type="number" class="input-table" value="${it.qtd}" onchange="itens[${i}].qtd=parseInt(this.value); renderItens()"></td>
-          <td>${it.vlr.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
-          <td><strong>${(it.vlr*it.qtd).toLocaleString('pt-BR',{minimumFractionDigits:2})}</strong></td>
-          <td onclick="itens.splice(${i},1);renderItens()">✖</td>
+          <td><input type="number" class="input-table" value="${it.qtd}" min="1" onchange="itens[${i}].qtd=parseInt(this.value); renderItens()"></td>
+          <td>R$ ${it.vlr.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
+          <td><strong>R$ ${sub.toLocaleString('pt-BR',{minimumFractionDigits:2})}</strong></td>
+          <td onclick="itens.splice(${i},1);renderItens()" style="color:red; cursor:pointer">✖</td>
         </tr>`;
     });
     document.getElementById('totalSoma').innerText = total.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
   }
 
   async function buscarCNPJ(v) {
-    if(v.replace(/\D/g,'').length!==14) return;
-    const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${v.replace(/\D/g,'')}`);
-    const data = await res.json();
-    document.getElementById('razaoCli').value = data.razao_social || "";
+    const limpo = v.replace(/\D/g,'');
+    if(limpo.length!==14) return;
+    try {
+      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${limpo}`);
+      const data = await res.json();
+      document.getElementById('razaoCli').value = data.razao_social || "";
+    } catch (e) { console.log("Erro ao buscar CNPJ"); }
   }
 
   function gerarPDF() {
+    if(itens.length === 0) return alert("Adicione itens ao orçamento!");
+    
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
-    // CABEÇALHO PROFISSIONAL - MARBE (FORNECEDOR)
-    doc.setFontSize(18); doc.setTextColor(44, 123, 229); doc.setFont("helvetica", "bold");
-    doc.text("S B Comercio de Borrachas e Servicos LTDA", 20, 20);
-    doc.setFontSize(9); doc.setTextColor(100); doc.setFont("helvetica", "normal");
+    // Configurações de Cabeçalho Profissional - MARBE
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(44, 123, 229);
+    doc.text("MARBE COMERCIO E SERVICOS", 20, 20);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(80);
     doc.text("CNPJ: 61.149.312/0001-56", 20, 26);
     doc.text("Endereço: Rua São Carlos, 84 - Vila Mariana - Ribeirão Preto / SP", 20, 31);
     doc.line(20, 34, 190, 34);
 
-    // TÍTULO
-    doc.setFontSize(14); doc.setTextColor(0); doc.setFont("helvetica", "bold");
+    // Título do Orçamento
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(0);
     doc.text("ORÇAMENTO DE REVESTIMENTOS", 105, 45, { align: "center" });
 
-    // SEÇÃO DO CLIENTE (DADOS DO SINTEGRA/BUSCA)
-    doc.setFontSize(10); doc.setFont("helvetica", "bold");
+    // Dados Completos do Cliente
+    doc.setFontSize(10);
     doc.text("DADOS DO CLIENTE:", 20, 55);
     doc.setFont("helvetica", "normal");
     doc.text("Razão Social: " + document.getElementById('razaoCli').value, 20, 61);
     doc.text("CNPJ: " + document.getElementById('cnpjCli').value, 20, 67);
     doc.text("Data de Emissão: " + new Date().toLocaleDateString('pt-BR'), 145, 61);
 
-    // TABELA
-    const rows = itens.map(i => [i.desc, i.med, i.esp, i.qtd, "R$ " + i.vlr.toLocaleString('pt-BR',{minimumFractionDigits:2}), "R$ " + (i.vlr*i.qtd).toLocaleString('pt-BR',{minimumFractionDigits:2})]);
-    doc.autoTable({ startY: 75, head: [['Descrição', 'Medidas', 'Esp.', 'Qtd', 'Unitário', 'Total']], body: rows, headStyles: {fillColor:[44, 123, 229]}, theme: 'grid' });
+    // Tabela de Serviços
+    const body = itens.map(i => [
+      i.desc,
+      i.med,
+      String(i.esp).includes('mm') ? i.esp : i.esp + 'mm',
+      i.qtd,
+      "R$ " + i.vlr.toLocaleString('pt-BR',{minimumFractionDigits:2}),
+      "R$ " + (i.vlr*i.qtd).toLocaleString('pt-BR',{minimumFractionDigits:2})
+    ]);
+
+    doc.autoTable({
+      startY: 75,
+      head: [['Descrição do Serviço', 'Medidas', 'Esp.', 'Qtd', 'Unitário', 'Total']],
+      body: body,
+      headStyles: { fillColor: [44, 123, 229] },
+      theme: 'grid',
+      styles: { fontSize: 9 }
+    });
 
     const fY = doc.lastAutoTable.finalY + 15;
-    doc.setFontSize(12); doc.setFont("helvetica", "bold");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
     doc.text("VALOR TOTAL: " + document.getElementById('totalSoma').innerText, 190, fY, {align:'right'});
     
     if(document.getElementById('obsCli').value) {
-      doc.setFontSize(9); doc.setFont("helvetica", "normal");
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
       doc.text("Observações: " + document.getElementById('obsCli').value, 20, fY + 10, {maxWidth: 170});
     }
-    doc.save("Orcamento_Marbe.pdf");
+
+    // Salva o arquivo sem caracteres especiais no nome
+    const nomeLimpo = (document.getElementById('razaoCli').value || "Orcamento").split(' ')[0].replace(/[^a-zA-Z0-9]/g, "");
+    doc.save(`Orcamento_${nomeLimpo}.pdf`);
   }
 </script>
 </body>
 </html>
-
