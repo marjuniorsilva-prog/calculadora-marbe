@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema Marbe v31.9 - Oficial Completo</title>
+  <title>Sistema Marbe v31.11 - Fluxo Completo</title>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -21,16 +21,15 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    window.marbeDB = { os: 330, vendas: [], financeiro: [], custos: {vh: 50, mats: []} };
+    window.marbeDB = { os: 330, orçamentos: [], pedidos: [], financeiro: [], custos: {vh: 50, mats: []} };
 
-    const dbRef = ref(db, 'sistema/');
-    onValue(dbRef, (snapshot) => {
+    onValue(ref(db, 'sistema/'), (snapshot) => {
       const data = snapshot.val();
       if (data) { 
           window.marbeDB = data; 
-          if(!window.marbeDB.vendas) window.marbeDB.vendas = [];
+          if(!window.marbeDB.orçamentos) window.marbeDB.orçamentos = [];
+          if(!window.marbeDB.pedidos) window.marbeDB.pedidos = [];
           if(!window.marbeDB.financeiro) window.marbeDB.financeiro = [];
-          if(!window.marbeDB.custos.mats) window.marbeDB.custos.mats = [];
           updateUI(); 
       }
     });
@@ -40,8 +39,8 @@
     window.compartilharWhatsApp = async (blob, osNum, cliente, tipo) => {
         const file = new File([blob], `${osNum}.pdf`, { type: 'application/pdf' });
         if (navigator.share) {
-            try { await navigator.share({ files: [file], title: `OS ${osNum}`, text: `${tipo} OS ${osNum} - ${cliente}` });
-            } catch (err) { console.log("Compartilhamento cancelado"); }
+            try { await navigator.share({ files: [file], title: `OS ${osNum}`, text: `${tipo} OS ${osNum}` });
+            } catch (err) { console.log("Erro share"); }
         }
     };
   </script>
@@ -50,7 +49,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
   
   <style>
-    :root { --primary: #2c7be5; --success: #28a745; --danger: #d9534f; --info: #17a2b8; }
+    :root { --primary: #2c7be5; --success: #28a745; --danger: #d9534f; --info: #17a2b8; --dark: #333; }
     body { font-family: sans-serif; background: #f4f7f6; margin: 0; padding: 5px; }
     .container { max-width: 1000px; background: #fff; padding: 15px; border-radius: 8px; margin: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
     .tabs { display: flex; gap: 3px; margin-bottom: 15px; flex-wrap: wrap; }
@@ -58,13 +57,13 @@
     .tab-btn.active { background: var(--primary); color: white; }
     .section { display: none; }
     .section.active { display: block; }
-    label { display: block; margin-top: 10px; font-weight: bold; font-size: 12px; }
-    input, select, textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box; }
-    .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; color: white; }
+    label { display: block; margin-top: 10px; font-weight: bold; font-size: 11px; }
+    input, select, textarea { width: 100%; padding: 8px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; box-sizing: border-box; }
+    .btn { width: 100%; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 8px; color: white; }
     table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
-    table th, table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-    .card-list { background: #fff; border: 1px solid #ddd; padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 5px solid #ccc; }
-    .editable-cell { background: #fffbe6; border: 1px solid #ffd666 !important; }
+    table th, table td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+    .card-list { background: #fff; border: 1px solid #ddd; padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 5px solid #ccc; position: relative; }
+    .badge { padding: 3px 6px; border-radius: 4px; font-size: 10px; color: white; float: right; }
   </style>
 </head>
 <body>
@@ -72,9 +71,9 @@
 <div class="container">
   <div class="tabs">
     <button class="tab-btn active" onclick="tab('calc')">Cálculo</button>
-    <button class="tab-btn" onclick="tab('orc')">Orçamento</button>
-    <button class="tab-btn" onclick="tab('pedidos')" style="background:#555; color:white;">Pedidos</button>
-    <button class="tab-btn" onclick="tab('boletos')" style="background:var(--success); color:white;">Boletos</button>
+    <button class="tab-btn" onclick="tab('orc_list')">Orçamentos</button>
+    <button class="tab-btn" onclick="tab('pedidos')" style="background:var(--dark); color:white;">Pedidos/NF</button>
+    <button class="tab-btn" onclick="tab('financeiro')" style="background:var(--success); color:white;">Boletos</button>
     <button class="tab-btn" onclick="tab('cfg')">Custos</button>
   </div>
 
@@ -89,154 +88,163 @@
     </div>
     <label>Material</label><select id="matSelect"></select>
     <label>Tipo</label><select id="tipoServ"><option value="0.045">PEÇA NOVA</option><option value="0.065">REFORMA</option></select>
-    <button class="btn" style="background:var(--success)" onclick="calcular()">CALCULAR PREÇO</button>
-    <div id="resCalc" style="display:none; padding:10px; background:#eef9f0; margin-top:10px; border-radius:8px; text-align:center;"></div>
-    <button id="addBtn" class="btn" style="background:var(--primary); display:none;" onclick="addCarrinho()">ADICIONAR AO PEDIDO</button>
+    
+    <label>CNPJ Cliente</label><input type="text" id="cnpj" onblur="buscaCNPJ(this.value)">
+    <label>Razão Social</label><input type="text" id="razao">
+
+    <button class="btn" style="background:var(--success)" onclick="calcular()">CALCULAR E ADICIONAR</button>
+    
+    <div id="resCalc" style="display:none; padding:10px; background:#eef9f0; margin-top:10px; border-radius:8px;"></div>
+    
+    <hr>
+    <h4>Itens do Orçamento Atual</h4>
+    <table id="tabelaAtual"><thead><tr><th>Item</th><th>Medidas</th><th>Qtd</th><th>Total</th><th>X</th></tr></thead><tbody id="corpoAtual"></tbody></table>
+    
+    <label>Prazo Entrega</label><input type="text" id="prazo" value="10 DIAS ÚTEIS">
+    <label>Pagamento</label><textarea id="pagamento">50% + BOLETO 28DD.</textarea>
+    
+    <button class="btn" style="background:var(--primary)" onclick="salvarOrcamento()">SALVAR ORÇAMENTO (OS <span id="osDisplay"></span>)</button>
   </div>
 
-  <div id="orc" class="section">
-    <div style="display:grid; grid-template-columns: 80px 1fr; gap:10px;">
-      <div><label>OS</label><input type="number" id="osNum" readonly style="background:#eee"></div>
-      <div><label>CNPJ Cliente</label><input type="text" id="cnpj" onblur="buscaCNPJ(this.value)"></div>
-    </div>
-    <label>Razão Social</label><input type="text" id="razao">
-    <table>
-        <thead><tr><th>Descrição (Editar)</th><th>Medidas</th><th>Qtd</th><th>Unit.</th><th>Total</th><th>X</th></tr></thead>
-        <tbody id="corpoOrc"></tbody>
-    </table>
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-        <div><label>Frete</label><select id="frete"><option>POR CONTA DO CLIENTE</option><option>POR CONTA DA EMPRESA</option></select></div>
-        <div><label>Garantia</label><input type="text" id="garantia" value="90 DIAS"></div>
-    </div>
-    <label>Prazo de Entrega</label><input type="text" id="prazo" value="10 DIAS ÚTEIS">
-    <label>Pagamento</label><textarea id="pagamento" rows="2">50% + BOLETO 28DD APOS FATURAMENTO.</textarea>
-    <h3 style="text-align:right">Total: <span id="totalOrc">R$ 0,00</span></h3>
-    <button class="btn" style="background:var(--danger)" onclick="gerarPDF('CLIENTE')">GERAR E ENVIAR PDF CLIENTE</button>
-    <button class="btn" style="background:#333" onclick="finalizar()">FINALIZAR PEDIDO (SALVAR)</button>
+  <div id="orc_list" class="section">
+      <h3>Orçamentos em Aberto</h3>
+      <div id="listaOrcamentos"></div>
   </div>
 
   <div id="pedidos" class="section">
-      <h4 style="margin:0 0 10px 0">Lista de Pedidos Salvos</h4>
-      <div id="listaHist"></div>
+      <h3>Pedidos Fechados (Aguardando NF)</h3>
+      <div id="listaPedidos"></div>
   </div>
 
-  <div id="boletos" class="section">
-      <h4 style="margin:0 0 10px 0">Controle de Pagamentos (Boletos)</h4>
+  <div id="financeiro" class="section">
+      <h3>Contas a Receber</h3>
       <div id="listaBoletos"></div>
   </div>
 
-  <div id="cfg" class="section">
-    <div id="listaCustos"></div>
-    <div style="background:#eee; padding:15px; border-radius:8px; margin-top:15px;">
-        <label>Novo Material</label>
-        <input type="text" id="matNome" placeholder="Borracha">
+  <div id="cfg" class="section"><div id="listaCustos"></div>
+    <div style="background:#eee; padding:10px; border-radius:8px; margin-top:10px;">
+        <input type="text" id="matNome" placeholder="Material">
         <input type="number" id="matPreco" placeholder="Preço KG">
-        <button class="btn" style="background:var(--success)" onclick="addMaterial()">CADASTRAR MATERIAL</button>
+        <button class="btn" style="background:var(--success)" onclick="addMaterial()">CADASTRAR</button>
     </div>
   </div>
 </div>
 
 <script>
-  let itens = []; let tItem = null;
-
+  let itensTemp = [];
   function tab(id) {
     document.querySelectorAll('.section, .tab-btn').forEach(e => e.classList.remove('active'));
     document.getElementById(id).classList.add('active');
   }
 
   function updateUI() {
-    document.getElementById('osNum').value = window.marbeDB.os;
+    document.getElementById('osDisplay').innerText = window.marbeDB.os;
     document.getElementById('matSelect').innerHTML = (window.marbeDB.custos.mats || []).map(m => `<option value="${m.p}">${m.n}</option>`).join('');
-    renderCustos(); renderReceber(); renderHist();
+    renderOrcamentos(); renderPedidos(); renderBoletos(); renderCustos();
   }
 
   function calcular() {
     const d=parseFloat(document.getElementById('d').value), l=parseFloat(document.getElementById('l').value), e=parseFloat(document.getElementById('e').value), pk=parseFloat(document.getElementById('matSelect').value), h=parseFloat(document.getElementById('h').value), imp=parseFloat(document.getElementById('tipoServ').value);
     const peso = Math.ceil((Math.PI*(d+e)*l*e)*1200/1000000000);
     const unit = (((peso*pk*1.1)+(h*window.marbeDB.custos.vh))*2.5)*(1+imp);
-    tItem = { n: "Revestimento "+document.getElementById('matSelect').options[document.getElementById('matSelect').selectedIndex].text, med: d+"x"+l+"mm", e: e+"mm", q: 1, v: unit, kg: peso, h: h };
-    document.getElementById('resCalc').style.display="block";
-    document.getElementById('resCalc').innerHTML = `Unit: R$ ${unit.toFixed(2)} | Peso: ${peso}kg`;
-    document.getElementById('addBtn').style.display="block";
+    itensTemp.push({ n: "Revestimento "+document.getElementById('matSelect').options[document.getElementById('matSelect').selectedIndex].text, med: d+"x"+l+"mm", e: e+"mm", q: 1, v: unit, h: h });
+    renderTabelaAtual();
   }
 
-  function addCarrinho() { itens.push({...tItem}); renderCarrinho(); tab('orc'); }
-  
-  function renderCarrinho() {
-    let tot = 0;
-    document.getElementById('corpoOrc').innerHTML = itens.map((it, idx) => {
-        tot += it.v * it.q;
-        return `<tr>
-            <td><input type="text" class="editable-cell" style="width:100%" value="${it.n}" onchange="itens[${idx}].n=this.value"></td>
-            <td><input type="text" class="editable-cell" style="width:80px" value="${it.med}" onchange="itens[${idx}].med=this.value"></td>
-            <td><input type="number" style="width:50px" value="${it.q}" onchange="itens[${idx}].q=this.value; renderCarrinho()"></td>
-            <td>${it.v.toFixed(2)}</td>
-            <td>${(it.v*it.q).toFixed(2)}</td>
-            <td onclick="itens.splice(${idx},1); renderCarrinho()">X</td>
-        </tr>`;
-    }).join('');
-    document.getElementById('totalOrc').innerText = "R$ " + tot.toFixed(2);
+  function renderTabelaAtual() {
+    document.getElementById('corpoAtual').innerHTML = itensTemp.map((it, i) => `<tr><td>${it.n}</td><td>${it.med}</td><td>${it.q}</td><td>${(it.v*it.q).toFixed(2)}</td><td onclick="itensTemp.splice(${i},1);renderTabelaAtual()">X</td></tr>`).join('');
   }
 
-  function finalizar() {
-    if(!window.marbeDB.vendas) window.marbeDB.vendas = [];
-    if(!window.marbeDB.financeiro) window.marbeDB.financeiro = [];
-    const venda = { os: window.marbeDB.os, cliente: document.getElementById('razao').value, total: parseFloat(document.getElementById('totalOrc').innerText.replace("R$ ","")), itens: [...itens], frete: document.getElementById('frete').value, garantia: document.getElementById('garantia').value, prazo: document.getElementById('prazo').value, pagamento: document.getElementById('pagamento').value };
-    window.marbeDB.vendas.push(venda);
-    window.marbeDB.financeiro.push({ os: window.marbeDB.os, cliente: venda.cliente, valor: venda.total, pago: false });
-    window.marbeDB.os++; window.salvarNuvem(); alert("Pedido Salvo!"); itens=[]; renderCarrinho(); tab('pedidos');
+  function salvarOrcamento() {
+    if(!itensTemp.length) return alert("Adicione itens!");
+    const orc = { os: window.marbeDB.os, cliente: document.getElementById('razao').value, itens: [...itensTemp], prazo: document.getElementById('prazo').value, pagamento: document.getElementById('pagamento').value, total: itensTemp.reduce((a,b)=>a+(b.v*b.q),0) };
+    window.marbeDB.orçamentos.push(orc);
+    window.marbeDB.os++;
+    window.salvarNuvem();
+    itensTemp = []; renderTabelaAtual();
+    alert("Orçamento salvo na aba Orçamentos!");
   }
 
-  function gerarPDF(tipo, manualData = null) {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    const d = manualData || { os: document.getElementById('osNum').value, cliente: document.getElementById('razao').value, itens: [...itens], total: document.getElementById('totalOrc').innerText, prazo: document.getElementById('prazo').value, garantia: document.getElementById('garantia').value, frete: document.getElementById('frete').value, pagamento: document.getElementById('pagamento').value };
-    doc.setFontSize(14); doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 20, 20);
-    doc.setFontSize(10); doc.text(`${tipo === 'CLIENTE' ? 'ORÇAMENTO' : 'PRODUÇÃO'} - OS: ${d.os} | CLIENTE: ${d.cliente}`, 20, 30);
-    let head = [['Descrição', 'Medidas', 'Qtd', 'Unit', 'Total']];
-    let body = d.itens.map(i => [i.n, i.med, i.q, i.v.toFixed(2), (i.v*i.q).toFixed(2)]);
-    if(tipo === 'FUNCIONARIO') {
-        head = [['Descrição', 'Medidas', 'Camada', 'Qtd', 'H']];
-        body = d.itens.map(i => [i.n, i.med, i.e, i.q, i.h+"h"]);
-    }
-    doc.autoTable({ startY: 40, head: head, body: body });
-    if(tipo === 'CLIENTE') {
-        const fY = doc.lastAutoTable.finalY + 10;
-        doc.setFont("helvetica", "bold"); doc.text(`TOTAL: ${d.total}`, 190, fY, {align:'right'});
-        doc.setFontSize(9); doc.setFont("helvetica", "normal");
-        doc.text(`PRAZO: ${d.prazo}`, 20, fY + 10);
-        doc.text(`GARANTIA: ${d.garantia}`, 20, fY + 16);
-        doc.text(`FRETE: ${d.frete}`, 20, fY + 22);
-        doc.text(`PAGAMENTO: ${d.pagamento}`, 20, fY + 28, {maxWidth: 170});
-    }
-    const pdfBlob = doc.output('blob');
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(pdfBlob); link.download = `${d.os}.pdf`; link.click();
-    if(confirm("Compartilhar no WhatsApp?")) window.compartilharWhatsApp(pdfBlob, d.os, d.cliente, tipo);
-  }
-
-  function renderReceber() {
-    document.getElementById('listaBoletos').innerHTML = (window.marbeDB.financeiro || []).map((f, i) => `
-      <div class="card-list" style="border-left-color: ${f.pago ? 'green' : 'red'}">
-        <strong>${f.cliente}</strong> (OS: ${f.os})<br>R$ ${f.valor.toFixed(2)}
-        ${f.pago ? '<b style="float:right;color:green">BAIXADO</b>' : `<button onclick="window.marbeDB.financeiro[${i}].pago=true; window.salvarNuvem();" style="float:right; background:green; color:white; border:none; padding:5px; border-radius:4px;">Baixar</button>`}
+  function renderOrcamentos() {
+    document.getElementById('listaOrcamentos').innerHTML = window.marbeDB.orçamentos.map((o, i) => `
+      <div class="card-list">
+        <strong>OS: ${o.os} - ${o.cliente}</strong><br>Total: R$ ${o.total.toFixed(2)}
+        <button class="btn" style="background:var(--info)" onclick="gerarPDF('CLIENTE', ${i}, 'orc')">PDF Cliente</button>
+        <button class="btn" style="background:var(--dark)" onclick="gerarPDF('FUNCIONARIO', ${i}, 'orc')">PDF Produção</button>
+        <button class="btn" style="background:var(--success)" onclick="fecharPedido(${i})">FECHAR PEDIDO (VENDIDO)</button>
       </div>`).join('');
   }
 
-  function renderHist() {
-    document.getElementById('listaHist').innerHTML = (window.marbeDB.vendas || []).slice().reverse().map((v, i) => {
-        const idx = window.marbeDB.vendas.length - 1 - i;
-        return `<div class="card-list">
-            <strong>${v.cliente}</strong> (OS: ${v.os}) - R$ ${v.total.toFixed(2)}<br>
-            <button onclick="reimprimir(${idx}, 'CLIENTE')" style="background:#444; color:white; padding:5px; border:none; margin-top:5px;">PDF Cliente</button>
-            <button onclick="reimprimir(${idx}, 'FUNCIONARIO')" style="background:var(--info); color:white; padding:5px; border:none; margin-top:5px;">PDF Produção</button>
-        </div>`;
-    }).join('');
+  function fecharPedido(i) {
+    const orc = window.marbeDB.orçamentos.splice(i, 1)[0];
+    window.marbeDB.pedidos.push(orc);
+    window.salvarNuvem();
+    tab('pedidos');
   }
 
-  function reimprimir(i, t) {
-    const v = window.marbeDB.vendas[i];
-    gerarPDF(t, { os: v.os, cliente: v.cliente, itens: v.itens, total: "R$ "+v.total.toFixed(2), prazo: v.prazo, garantia: v.garantia, frete: v.frete, pagamento: v.pagamento });
+  function renderPedidos() {
+    document.getElementById('listaPedidos').innerHTML = window.marbeDB.pedidos.map((p, i) => `
+      <div class="card-list">
+        <strong>OS: ${p.os} - ${p.cliente}</strong><br>
+        <input type="text" id="nf_${i}" placeholder="Nº da Nota Fiscal">
+        <input type="number" id="parc_${i}" placeholder="Qtd Parcelas" style="width:48%">
+        <input type="date" id="data_${i}" style="width:48%">
+        <button class="btn" style="background:var(--primary)" onclick="faturar(${i})">FATURAR E GERAR BOLETOS</button>
+      </div>`).join('');
+  }
+
+  function faturar(i) {
+    const nf = document.getElementById(`nf_${i}`).value;
+    const qtd = parseInt(document.getElementById(`parc_${i}`).value);
+    const dataBase = new Date(document.getElementById(`data_${i}`).value);
+    
+    if(!nf || !qtd || isNaN(dataBase)) return alert("Preencha NF, Parcelas e Data!");
+    
+    const p = window.marbeDB.pedidos[i];
+    const valorParc = p.total / qtd;
+
+    for(let j=0; j<qtd; j++) {
+        let venc = new Date(dataBase);
+        venc.setMonth(venc.getMonth() + j);
+        window.marbeDB.financeiro.push({ os: p.os, nf: nf, cliente: p.cliente, valor: valorParc, venc: venc.toLocaleDateString(), pago: false });
+    }
+    
+    window.marbeDB.pedidos.splice(i, 1);
+    window.salvarNuvem();
+    tab('financeiro');
+  }
+
+  function renderBoletos() {
+    document.getElementById('listaBoletos').innerHTML = window.marbeDB.financeiro.map((f, i) => `
+      <div class="card-list" style="border-left-color:${f.pago?'green':'red'}">
+        <strong>${f.cliente}</strong> (OS: ${f.os} | NF: ${f.nf})<br>Venc: ${f.venc} - R$ ${f.valor.toFixed(2)}
+        ${f.pago ? '' : `<button onclick="window.marbeDB.financeiro[${i}].pago=true;window.salvarNuvem()" style="float:right;background:green;color:white;border:none;padding:5px;border-radius:4px">Baixar</button>`}
+      </div>`).join('');
+  }
+
+  function gerarPDF(tipo, index, base) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const d = window.marbeDB[base === 'orc' ? 'orçamentos' : 'pedidos'][index];
+    
+    doc.setFontSize(14); doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 20, 20);
+    
+    if(tipo === 'FUNCIONARIO') {
+        doc.text(`VIA PRODUÇÃO - OS: ${d.os}`, 20, 30);
+        doc.autoTable({ startY: 40, head: [['Item', 'Medidas', 'Camada', 'Qtd']], body: d.itens.map(i => [i.n, i.med, i.e, i.q]) });
+    } else {
+        doc.text(`ORÇAMENTO - OS: ${d.os} | CLIENTE: ${d.cliente}`, 20, 30);
+        doc.autoTable({ startY: 40, head: [['Item', 'Medidas', 'Qtd', 'Unit', 'Total']], body: d.itens.map(i => [i.n, i.med, i.q, i.v.toFixed(2), (i.v*i.q).toFixed(2)]) });
+        const fY = doc.lastAutoTable.finalY + 10;
+        doc.text(`TOTAL: R$ ${d.total.toFixed(2)}`, 190, fY, {align:'right'});
+        doc.setFontSize(9);
+        doc.text(`PRAZO: ${d.prazo} | PAGTO: ${d.pagamento}`, 20, fY + 10);
+    }
+    
+    const blob = doc.output('blob');
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a'); link.href = url; link.download = `${d.os}.pdf`; link.click();
+    if(confirm("Enviar via WhatsApp?")) window.compartilharWhatsApp(blob, d.os, d.cliente, tipo);
   }
 
   function renderCustos() {
@@ -251,11 +259,7 @@
   function addMaterial() {
     const n = document.getElementById('matNome').value;
     const p = parseFloat(document.getElementById('matPreco').value);
-    if(n && p) { 
-        if(!window.marbeDB.custos.mats) window.marbeDB.custos.mats = [];
-        window.marbeDB.custos.mats.push({n, p}); window.salvarNuvem(); 
-        document.getElementById('matNome').value=""; document.getElementById('matPreco').value=""; 
-    }
+    if(n && p) { window.marbeDB.custos.mats.push({n, p}); window.salvarNuvem(); document.getElementById('matNome').value=""; document.getElementById('matPreco').value=""; }
   }
 
   async function buscaCNPJ(v) { 
