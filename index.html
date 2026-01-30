@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema Marbe v31.21 - Final Oficial</title>
+  <title>Sistema Marbe v31.22 - Download Direto</title>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -36,11 +36,12 @@
 
     window.salvarNuvem = function() { set(ref(db, 'sistema/'), window.marbeDB); };
 
-    // Função para compartilhar com nome automático
-    window.compartilharArquivo = async (blob, osNum) => {
+    // FUNÇÃO DE DOWNLOAD E COMPARTILHAMENTO CORRIGIDA
+    window.gerarArquivoFinal = async (blob, osNum) => {
         const nomeArquivo = `${osNum}.pdf`;
         const file = new File([blob], nomeArquivo, { type: 'application/pdf' });
 
+        // Tenta compartilhar primeiro (Funciona no celular/App)
         if (navigator.share && navigator.canShare({ files: [file] })) {
             try {
                 await navigator.share({
@@ -48,17 +49,21 @@
                     title: `OS ${osNum}`,
                     text: `Documento Marbe`
                 });
-            } catch (err) { baixarArquivo(blob, nomeArquivo); }
-        } else {
-            baixarArquivo(blob, nomeArquivo);
+                return;
+            } catch (err) { console.log("Share cancelado, tentando download..."); }
         }
-    };
 
-    function baixarArquivo(blob, nome) {
-        const url = URL.createObjectURL(blob);
+        // Se o share falhar ou estiver no Navegador (PC), faz o download direto
+        const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = nome; a.click();
-    }
+        a.style.display = 'none';
+        a.href = url;
+        a.download = nomeArquivo;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    };
   </script>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -104,7 +109,7 @@
     </div>
     <label>Material</label><select id="matSelect"></select>
     <label>Tipo</label><select id="tipoServ"><option value="0.045">PEÇA NOVA</option><option value="0.065">REFORMA</option></select>
-    <button class="btn" style="background:var(--success)" onclick="calcular()">CALCULAR E ADICIONAR</button>
+    <button class="btn" style="background:var(--success)" onclick="calcular()">ADICIONAR ITEM</button>
   </div>
 
   <div id="orc" class="section">
@@ -188,7 +193,7 @@
         doc.text(`ORCAMENTO - OS: ${d.os} | CLIENTE: ${clean(d.cliente)}`, 20, 30);
         doc.autoTable({ startY: 40, head: [['DESCRICAO', 'MEDIDAS', 'QTD', 'TOTAL']], body: d.itens.map(i => [clean(i.n), i.med, i.q, (i.v*i.q).toFixed(2)]) });
     }
-    window.compartilharArquivo(doc.output('blob'), d.os);
+    window.gerarArquivoFinal(doc.output('blob'), d.os);
   }
 
   function fecharPedido(i) {
@@ -214,7 +219,7 @@
     if(!nf || !qtd) return alert("Erro");
     const p = window.marbeDB.pedidos[i];
     for(let j=0; j<qtd; j++) {
-        let v = new Date(data); v.setMonth(v.getMonth() + j);
+        let v = new Date(data); v.setMonth(venc.getMonth() + j);
         window.marbeDB.financeiro.push({ os: p.os, nf: nf, cliente: p.cliente, valor: p.total/qtd, venc: v.toLocaleDateString(), pago: false });
     }
     window.marbeDB.pedidos.splice(i, 1); window.salvarNuvem(); tab('financeiro');
