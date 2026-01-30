@@ -3,28 +3,43 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema Marbe v9.0</title>
+  <title>Sistema Marbe v11.0 - Dashboard</title>
+  
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    :root { --primary: #2c7be5; --success: #28a745; --danger: #d9534f; }
+    :root { --primary: #2c7be5; --success: #28a745; --danger: #d9534f; --info: #17a2b8; }
     body { font-family: sans-serif; background: #f4f7f6; margin: 0; padding: 10px; }
-    .container { max-width: 950px; background: #fff; padding: 20px; border-radius: 12px; margin: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-    .tabs { display: flex; gap: 5px; margin-bottom: 20px; }
-    .tab-btn { flex: 1; padding: 12px; border: none; background: #ddd; cursor: pointer; font-weight: bold; border-radius: 8px; }
+    .container { max-width: 1000px; background: #fff; padding: 20px; border-radius: 12px; margin: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+    
+    .tabs { display: flex; gap: 5px; margin-bottom: 20px; flex-wrap: wrap; }
+    .tab-btn { flex: 1; padding: 12px; border: none; background: #ddd; cursor: pointer; font-weight: bold; border-radius: 8px; font-size: 12px; min-width: 90px; }
     .tab-btn.active { background: var(--primary); color: white; }
+    
     .content-section { display: none; }
     .content-section.active { display: block; }
-    label { display: block; margin-top: 12px; font-weight: bold; color: #444; }
+
+    label { display: block; margin-top: 12px; font-weight: bold; color: #444; font-size: 14px; }
     input, select, textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+    
     .row { display: flex; gap: 10px; flex-wrap: wrap; }
     .row > div { flex: 1; min-width: 140px; }
+    
     .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; color: white; font-size: 16px; }
-    .table-container { overflow-x: auto; margin-top: 15px; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    
+    /* Dashboard Styles */
+    .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+    .dash-card { background: #fff; padding: 15px; border-radius: 10px; border-left: 5px solid var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.05); text-align: center; }
+    .dash-card h4 { margin: 0; color: #666; font-size: 13px; }
+    .dash-card p { margin: 10px 0 0; font-size: 20px; font-weight: bold; color: #333; }
+    .chart-container { position: relative; height: 300px; width: 100%; margin-bottom: 30px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 15px; }
     table th, table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-    .input-table { padding: 5px; border: 1px solid #ccc; width: 100%; }
+    table th { background: #f8f9fa; color: var(--primary); }
+    .hist-card { border: 1px solid #ddd; padding: 12px; border-radius: 8px; margin-bottom: 10px; background: #fafafa; display: flex; justify-content: space-between; align-items: center; }
   </style>
 </head>
 <body onload="inicializarSistema()">
@@ -34,6 +49,8 @@
     <button class="tab-btn active" onclick="switchTab('calc')">Calculadora</button>
     <button class="tab-btn" onclick="switchTab('cliente')">Orcamento</button>
     <button class="tab-btn" onclick="switchTab('config')">Precos</button>
+    <button class="tab-btn" onclick="switchTab('hist')">Historico</button>
+    <button class="tab-btn" onclick="switchTab('dash')" style="background: var(--info); color: white;">Dashboard</button>
   </div>
 
   <div id="sec-calc" class="content-section active">
@@ -60,51 +77,58 @@
         <div><label>Ordem Servico (OS)</label><input type="number" id="numOS" readonly style="background:#eee"></div>
         <div><label>CNPJ Cliente</label><input type="text" id="cnpjCli" onblur="buscarCNPJ(this.value)"></div>
     </div>
-    <label>Razao Social Cliente</label>
-    <input type="text" id="razaoCli">
-    
+    <label>Razao Social Cliente</label><input type="text" id="razaoCli">
     <div class="table-container">
       <table>
-        <thead>
-          <tr>
-            <th>Descricao</th>
-            <th>Medidas</th>
-            <th>Espessura</th>
-            <th>Qtd</th>
-            <th>Unitario</th>
-            <th>Subtotal</th>
-            <th>X</th>
-          </tr>
-        </thead>
+        <thead><tr><th>Descricao</th><th>Medidas</th><th>Espessura</th><th>Qtd</th><th>Unitario</th><th>Total</th><th>X</th></tr></thead>
         <tbody id="corpoTabela"></tbody>
       </table>
     </div>
     <textarea id="obs" placeholder="Observacoes" style="margin-top:10px"></textarea>
     <h3 style="text-align:right">Total Final: <span id="totalTxt">R$ 0,00</span></h3>
-    
     <button class="btn" style="background:var(--danger)" onclick="gerarPDF('CLIENTE')">GERAR PDF PARA CLIENTE</button>
-    <button class="btn" style="background:#333;" onclick="gerarPDF('PRODUCAO')">GERAR PDF PRODUCAO (MESMA OS)</button>
+    <button class="btn" style="background:#333;" onclick="gerarPDF('PRODUCAO')">GERAR PDF PRODUCAO</button>
   </div>
 
   <div id="sec-config" class="content-section">
-    <label>Valor Hora Producao (R$)</label>
-    <input type="number" id="cfgHora" onchange="salvar()">
+    <label>Valor Hora Producao (R$)</label><input type="number" id="cfgHora" onchange="salvar()">
     <div id="listaB"></div>
     <button class="btn" style="background:var(--primary)" onclick="addMat()">+ Novo Material</button>
+  </div>
+
+  <div id="sec-hist" class="content-section">
+    <h2>Historico de Pedidos</h2>
+    <div id="listaHistorico"></div>
+    <button class="btn" style="background:var(--danger); font-size: 12px; width: auto;" onclick="limparHistorico()">Limpar Tudo</button>
+  </div>
+
+  <div id="sec-dash" class="content-section">
+    <h2>Painel de Desempenho (Vendas Finalizadas)</h2>
+    <div class="dash-grid">
+      <div class="dash-card"><h4>Faturamento Total</h4><p id="dashFat">R$ 0,00</p></div>
+      <div class="dash-card" style="border-left-color: var(--success);"><h4>Lucro Estimado</h4><p id="dashLucro">R$ 0,00</p></div>
+      <div class="dash-card" style="border-left-color: var(--info);"><h4>Borracha Utilizada</h4><p id="dashKG">0 kg</p></div>
+    </div>
+    
+    <div class="row">
+      <div class="chart-container">
+        <canvas id="chartMateriais"></canvas>
+      </div>
+      <div class="chart-container">
+        <canvas id="chartVendas"></canvas>
+      </div>
+    </div>
   </div>
 </div>
 
 <script>
-  let DB = { 
-    vHora: 50, 
-    os: 330, 
-    mats: [{n: "Natural Preta", p: 13}, {n: "Natural Branca", p: 30}, {n: "Nitrilica", p: 49}] 
-  };
+  let DB = { vHora: 50, os: 330, mats: [{n: "Natural Preta", p: 13}, {n: "Natural Branca", p: 30}, {n: "Nitrilica", p: 49}], historico: [] };
   let itens = [];
   let temp = null;
+  let myChart1 = null, myChart2 = null;
 
   function inicializarSistema() {
-    const s = localStorage.getItem('marbe_v9');
+    const s = localStorage.getItem('marbe_v11');
     if(s) DB = JSON.parse(s);
     if(!DB.os) DB.os = 330;
     document.getElementById('numOS').value = DB.os;
@@ -115,6 +139,54 @@
     document.querySelectorAll('.content-section, .tab-btn').forEach(e => e.classList.remove('active'));
     document.getElementById('sec-'+t).classList.add('active');
     event.currentTarget.classList.add('active');
+    if(t === 'hist') renderHistorico();
+    if(t === 'dash') renderDashboard();
+  }
+
+  function renderDashboard() {
+    let fat = 0, lucro = 0, kg = 0;
+    let matMap = {};
+
+    DB.historico.forEach(h => {
+      fat += h.total;
+      h.itens.forEach(i => {
+        kg += (parseFloat(i.pesoKg) * parseInt(i.q));
+        matMap[i.material] = (matMap[i.material] || 0) + (parseFloat(i.pesoKg) * parseInt(i.q));
+        
+        // Lucro Bruto: Faturamento do item - Custo da Borracha - Mao de Obra - Imposto
+        // Nota: O Markup e de 2.5x, o lucro esta embutido ai.
+        const imposto = h.total * 0.05; // Estimativa media
+        lucro += (h.total - i.custoTotalProducao - imposto);
+      });
+    });
+
+    document.getElementById('dashFat').innerText = "R$ " + fat.toFixed(2);
+    document.getElementById('dashLucro').innerText = "R$ " + lucro.toFixed(2);
+    document.getElementById('dashKG').innerText = kg.toFixed(1) + " kg";
+
+    // Gráficos
+    if(myChart1) myChart1.destroy();
+    if(myChart2) myChart2.destroy();
+
+    const ctx1 = document.getElementById('chartMateriais').getContext('2d');
+    myChart1 = new Chart(ctx1, {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(matMap),
+        datasets: [{ data: Object.values(matMap), backgroundColor: ['#2c7be5','#28a745','#f6c23e','#e74a3b','#36b9cc'] }]
+      },
+      options: { plugins: { title: { display: true, text: 'Consumo de Borracha por Tipo (KG)' } }, maintainAspectRatio: false }
+    });
+
+    const ctx2 = document.getElementById('chartVendas').getContext('2d');
+    myChart2 = new Chart(ctx2, {
+      type: 'bar',
+      data: {
+        labels: ['Faturamento', 'Lucro Estimado'],
+        datasets: [{ label: 'Valores em R$', data: [fat, lucro], backgroundColor: ['#2c7be5', '#28a745'] }]
+      },
+      options: { plugins: { title: { display: true, text: 'Faturamento vs Lucro' } }, maintainAspectRatio: false }
+    });
   }
 
   function renderConfig() {
@@ -128,14 +200,18 @@
       </div>`).join('');
   }
 
-  function addMat() {
-    const n = prompt("Nome Material:"); const p = prompt("Preco de Custo (R$/KG):");
-    if(n && p) { DB.mats.push({n, p: parseFloat(p)}); salvar(); renderConfig(); }
-  }
-
-  function salvar() { 
-    DB.vHora = parseFloat(document.getElementById('cfgHora').value);
-    localStorage.setItem('marbe_v9', JSON.stringify(DB)); 
+  function renderHistorico() {
+    const container = document.getElementById('listaHistorico');
+    if(DB.historico.length === 0) { container.innerHTML = "<p>Nenhum pedido.</p>"; return; }
+    container.innerHTML = DB.historico.slice().reverse().map((h, i) => `
+      <div class="hist-card">
+        <div><strong>OS: ${h.os}</strong> - ${h.cliente}<br><small>${h.data} - R$ ${h.total.toFixed(2)}</small></div>
+        <div>
+          <button onclick="regerarPDF(${DB.historico.length - 1 - i}, 'CLIENTE')" style="background:var(--success); color:white; border:none; padding:8px; border-radius:4px;">CLI</button>
+          <button onclick="regerarPDF(${DB.historico.length - 1 - i}, 'PRODUCAO')" style="background:#333; color:white; border:none; padding:8px; border-radius:4px;">PROD</button>
+          <button onclick="removerDoHistorico(${DB.historico.length - 1 - i})" style="background:var(--danger); color:white; border:none; padding:8px; border-radius:4px;">X</button>
+        </div>
+      </div>`).join('');
   }
 
   function calcular() {
@@ -144,39 +220,24 @@
     const e = parseFloat(document.getElementById('espessura').value);
     const pKg = parseFloat(document.getElementById('borrachaSel').value);
     const nB = document.getElementById('borrachaSel').options[document.getElementById('borrachaSel').selectedIndex].text;
-    
-    // Volume e Peso
-    const dMedio = d + e;
-    const volumeM3 = (Math.PI * dMedio * l * e) / 1000000000;
-    const pesoFinal = Math.ceil(volumeM3 * 1200); 
+    const h = parseFloat(document.getElementById('horas').value);
+    const ranhura = parseFloat(document.getElementById('ranhura').value);
+    const imp = parseFloat(document.getElementById('impostoSel').value);
 
-    const custoBorracha = pesoFinal * pKg;
-    const vlr = (((custoBorracha * 1.1) + (parseFloat(document.getElementById('horas').value) * DB.vHora) + parseFloat(document.getElementById('ranhura').value)) * 2.5) * (1 + parseFloat(document.getElementById('impostoSel').value));
+    const pesoFinal = Math.ceil((Math.PI * (d + e) * l * e) * 1200 / 1000000000); 
+    const custoProd = (pesoFinal * pKg * 1.1) + (h * DB.vHora) + ranhura;
+    const vlr = (custoProd * 2.5) * (1 + imp);
 
-    temp = { 
-        d: "Revestimento em " + nB, 
-        m: d+"x"+l+"mm", 
-        e: e+"mm", 
-        q: 1, 
-        v: vlr,
-        pesoKg: pesoFinal,
-        custoBorracha: pKg,
-        material: nB
-    };
+    temp = { d: "Revestimento em " + nB, m: d+"x"+l+"mm", e: e+"mm", q: 1, v: vlr, pesoKg: pesoFinal, custoBorracha: pKg, material: nB, custoTotalProducao: custoProd };
     document.getElementById('resumo').style.display = "block";
-    document.getElementById('resumo').innerHTML = "Unitario Cliente: R$ " + vlr.toFixed(2);
+    document.getElementById('resumo').innerHTML = "Unitario: R$ " + vlr.toFixed(2);
     document.getElementById('addBtn').style.display = "block";
   }
 
-  function adicionar() {
-    itens.push({...temp});
-    renderTabela();
-    switchTab('cliente');
-  }
+  function adicionar() { itens.push({...temp}); renderTabela(); switchTab('cliente'); }
 
   function renderTabela() {
-    const b = document.getElementById('corpoTabela'); b.innerHTML = "";
-    let t = 0;
+    const b = document.getElementById('corpoTabela'); b.innerHTML = ""; let t = 0;
     itens.forEach((it, i) => {
       t += it.v * it.q;
       b.innerHTML += `<tr>
@@ -184,81 +245,60 @@
         <td>${it.m}</td>
         <td><input class="input-table" value="${it.e}" onchange="itens[${i}].e=this.value"></td>
         <td><input type="number" class="input-table" value="${it.q}" onchange="itens[${i}].q=this.value; renderTabela()"></td>
-        <td>${it.v.toFixed(2)}</td>
-        <td>${(it.v*it.q).toFixed(2)}</td>
-        <td onclick="itens.splice(${i},1); renderTabela()" style="color:red;cursor:pointer">X</td>
+        <td>${it.v.toFixed(2)}</td><td>${(it.v*it.q).toFixed(2)}</td>
+        <td onclick="itens.splice(${i},1); renderTabela()">X</td>
       </tr>`;
     });
     document.getElementById('totalTxt').innerText = "R$ " + t.toFixed(2);
   }
 
-  async function buscarCNPJ(v) {
-    const r = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${v.replace(/\D/g,'')}`);
-    const d = await r.json(); document.getElementById('razaoCli').value = d.razao_social || "";
+  function gerarPDF(tipo) {
+    const dataAtual = new Date().toLocaleDateString('pt-BR');
+    const totalV = parseFloat(document.getElementById('totalTxt').innerText.replace("R$ ",""));
+    const dadosPedido = { os: DB.os, data: dataAtual, cliente: document.getElementById('razaoCli').value, cnpj: document.getElementById('cnpjCli').value, itens: JSON.parse(JSON.stringify(itens)), total: totalV, obs: document.getElementById('obs').value };
+
+    efetuarGeracaoPDF(dadosPedido, tipo);
+
+    if(tipo === 'CLIENTE') {
+      DB.historico.push(dadosPedido);
+      DB.os++; salvar();
+      document.getElementById('numOS').value = DB.os;
+    }
   }
 
-  function gerarPDF(tipo) {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    const dataAtual = new Date().toLocaleDateString('pt-BR');
-    
-    // CABECALHO MARBE (Sem acentos para evitar erros no APK)
-    doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.setTextColor(40);
+  function regerarPDF(index, tipo) { efetuarGeracaoPDF(DB.historico[index], tipo); }
+
+  function efetuarGeracaoPDF(p, tipo) {
+    const { jsPDF } = window.jspdf; const doc = new jsPDF();
+    doc.setFont("helvetica", "bold"); doc.setFontSize(16);
     doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 20, 20);
     doc.setFontSize(9); doc.setFont("helvetica", "normal");
     doc.text("CNPJ: 61.149.312/0001-56", 20, 26);
     doc.text("Endereco: Rua Sao Carlos, 84 - Vila Mariana - Ribeirao Preto / SP", 20, 31);
     doc.line(20, 34, 190, 34);
-
-    // OS E DATA (Sincronizados)
     doc.setFontSize(10); doc.setFont("helvetica", "bold");
-    doc.text("ORDEM DE SERVICO (OS): " + DB.os, 20, 42);
-    doc.text("DATA: " + dataAtual, 140, 42);
+    doc.text("ORDEM DE SERVICO (OS): " + p.os, 20, 42);
+    doc.text("DATA: " + p.data, 140, 42);
     doc.line(20, 45, 190, 45);
-
-    // CLIENTE
-    doc.setFontSize(11); doc.text("DADOS DO CLIENTE", 20, 52);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-    doc.text("Razao Social: " + document.getElementById('razaoCli').value, 20, 58);
-    doc.text("CNPJ: " + document.getElementById('cnpjCli').value, 20, 64);
+    doc.setFontSize(10); doc.text("Razao Social: " + p.cliente, 20, 58);
+    doc.text("CNPJ: " + p.cnpj, 20, 64);
 
     if(tipo === 'CLIENTE') {
-        const body = itens.map(i => [i.d, i.m, i.e, i.q, "R$ " + i.v.toFixed(2), "R$ " + (i.v*i.q).toFixed(2)]);
-        doc.autoTable({
-            startY: 70, head: [['Descricao', 'Medidas', 'Esp.', 'Qtd', 'Unit.', 'Total']], body,
-            headStyles: { fillColor: [44, 123, 229] }, theme: 'grid'
-        });
-        const fY = doc.lastAutoTable.finalY + 10;
-        doc.setFont("helvetica", "bold"); doc.text("VALOR TOTAL: " + document.getElementById('totalTxt').innerText, 190, fY, {align:'right'});
-        if(document.getElementById('obs').value) {
-            doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-            doc.text("Obs: " + document.getElementById('obs').value, 20, fY + 10);
-        }
-        // Incrementa OS apenas no PDF do Cliente (Finaliza o ciclo)
-        DB.os++; salvar(); 
-        document.getElementById('numOS').value = DB.os;
+        const body = p.itens.map(i => [i.d, i.m, i.e, i.q, "R$ " + i.v.toFixed(2), "R$ " + (i.v*i.q).toFixed(2)]);
+        doc.autoTable({ startY: 70, head: [['Descricao', 'Medidas', 'Esp.', 'Qtd', 'Unit.', 'Total']], body, theme: 'grid' });
+        doc.setFont("helvetica", "bold"); doc.text("TOTAL: R$ " + p.total.toFixed(2), 190, doc.lastAutoTable.finalY + 10, {align:'right'});
     } else {
-        // PDF DE PRODUCAO (Interno) - Usa a MESMA OS que esta na tela
-        doc.setFont("helvetica", "bold"); doc.text("RELATORIO INTERNO DE PRODUCAO E COMPRAS", 105, 75, {align:'center'});
-        
-        const bodyProd = itens.map(i => {
-            const kgCompra = (i.pesoKg * 1.2).toFixed(2);
-            const custoCompraTotal = (kgCompra * i.custoBorracha).toFixed(2);
-            return [i.material, i.m, i.pesoKg + "kg", kgCompra + "kg", "R$ " + i.custoBorracha, "R$ " + custoCompraTotal];
-        });
-
-        doc.autoTable({
-            startY: 85, 
-            head: [['Material', 'Medidas', 'Peso Liq.', 'Compra (+20%)', 'Custo KG', 'Custo Total']], 
-            body: bodyProd,
-            headStyles: { fillColor: [51, 51, 51] }, theme: 'grid'
-        });
-        const fYp = doc.lastAutoTable.finalY + 10;
-        doc.setFontSize(9); doc.text("* Documento interno. Nao entregar ao cliente.", 20, fYp);
+        const bodyP = p.itens.map(i => [i.material, i.m, i.pesoKg+"kg", (i.pesoKg*1.2).toFixed(2)+"kg", "R$ "+i.custoBorracha]);
+        doc.autoTable({ startY: 75, head: [['Material', 'Medidas', 'Peso Liq.', 'Compra (+20%)', 'Custo KG']], body: bodyP, theme: 'grid' });
     }
-
-    doc.save(tipo + "_OS_" + (tipo === 'CLIENTE' ? (DB.os-1) : DB.os) + ".pdf");
+    doc.save(tipo + "_OS_" + p.os + ".pdf");
   }
+
+  function addMat() { const n = prompt("Nome:"); const p = prompt("Preco:"); if(n && p) { DB.mats.push({n, p: parseFloat(p)}); salvar(); renderConfig(); } }
+  function salvar() { DB.vHora = parseFloat(document.getElementById('cfgHora').value || 50); localStorage.setItem('marbe_v11', JSON.stringify(DB)); }
+  function removerDoHistorico(index) { if(confirm("Excluir?")) { DB.historico.splice(index, 1); salvar(); renderHistorico(); } }
+  function limparHistorico() { if(confirm("Limpar?")) { DB.historico = []; salvar(); renderHistorico(); } }
+  async function buscarCNPJ(v) { const r = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${v.replace(/\D/g,'')}`); const d = await r.json(); document.getElementById('razaoCli').value = d.razao_social || ""; }
 </script>
 </body>
 </html>
