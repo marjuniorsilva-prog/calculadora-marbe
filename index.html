@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema Marbe v26.0 - Final</title>
+  <title>Sistema Marbe v27.0 - Final</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
   <style>
@@ -21,8 +21,7 @@
     table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
     table th, table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
     .input-table { width: 100%; padding: 5px; border: 1px solid var(--primary); border-radius: 3px; font-size: 12px; background: #fff; }
-    .card-material { background: #f8f9fa; padding: 10px; border-radius: 6px; margin-bottom: 5px; border: 1px solid #ddd; display: flex; gap: 5px; align-items: center; }
-    .card-hist { background: #fff; border: 1px solid #ddd; padding: 12px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .card-list { background: #fff; border: 1px solid #ddd; padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 5px solid #ccc; }
   </style>
 </head>
 <body onload="init()">
@@ -86,23 +85,24 @@
   </div>
 
   <div id="hist" class="section">
-    <h3>Historico de Pedidos (Reimpressao)</h3>
+    <h3>Historico de Orçamentos</h3>
     <div id="listaHist"></div>
   </div>
 
-  <div id="entrega" class="section"><div id="listaEntrega"></div></div>
-  <div id="receber" class="section"><div id="listaBoletos"></div></div>
+  <div id="entrega" class="section">
+    <h3>Pedidos para Entregar (NF)</h3>
+    <div id="listaEntrega"></div>
+  </div>
+
+  <div id="receber" class="section">
+    <h3>Contas a Receber</h3>
+    <div id="listaBoletos"></div>
+  </div>
 
   <div id="cfg" class="section">
-    <h3>Tabela de Materiais (Custo)</h3>
-    <label>Valor Hora Producao (R$)</label>
-    <input type="number" id="cfgVh" onchange="salvarPrecos()">
-    <div id="listaMatsCfg" style="margin-top:10px; max-height: 350px; overflow-y: auto;"></div>
-    <div style="background: #e9ecef; padding: 10px; border-radius: 8px; margin-top: 15px;">
-        <input type="text" id="novoNome" placeholder="Nome da Borracha">
-        <input type="number" id="novoPreco" placeholder="Preco KG">
-        <button class="btn" style="background:var(--primary)" onclick="addMat()">SALVAR MATERIAL</button>
-    </div>
+    <label>Valor Hora Producao (R$)</label><input type="number" id="cfgVh" onchange="salvarPrecos()">
+    <div id="listaMatsCfg"></div>
+    <button class="btn" style="background:var(--primary)" onclick="addMat()">+ Adicionar Material</button>
   </div>
 </div>
 
@@ -112,9 +112,9 @@
   let itens = []; let tItem = null;
 
   function init() {
-    let p = localStorage.getItem('marbe_p_v26');
+    let p = localStorage.getItem('marbe_p_v27');
     if(p) PRECOS = JSON.parse(p);
-    let s = localStorage.getItem('marbe_d_v26');
+    let s = localStorage.getItem('marbe_d_v27');
     if(s) SISTEMA = JSON.parse(s);
     document.getElementById('osAtual').value = SISTEMA.os;
     renderCfg();
@@ -150,9 +150,9 @@
     if(!d || !l || !e) return alert("Preencha as medidas!");
     const peso = Math.ceil((Math.PI * (d + e) * l * e) * 1200 / 1000000000);
     const unit = (((peso * pk * 1.1) + (h * PRECOS.vh)) * 2.5) * (1 + imp);
-    tItem = { n: "Revestimento em " + document.getElementById('matSelect').options[document.getElementById('matSelect').selectedIndex].text, med: d+"x"+l+"mm", e: e+"mm", q: 1, v: unit, kg: peso, custoK: pk, horas: h, endereco: document.getElementById('endereco').value || "" };
+    tItem = { n: "Revestimento em " + document.getElementById('matSelect').options[document.getElementById('matSelect').selectedIndex].text, med: d+"x"+l+"mm", e: e+"mm", q: 1, v: unit, kg: peso, custoK: pk, horas: h, endereco: document.getElementById('endereco').value };
     document.getElementById('resCalc').style.display="block";
-    document.getElementById('resCalc').innerHTML = `Peso: ${peso}kg | Unitario: R$ ${unit.toFixed(2)}`;
+    document.getElementById('resCalc').innerHTML = `Peso: ${peso}kg | Preco: R$ ${unit.toFixed(2)}`;
     document.getElementById('addBtn').style.display="block";
   }
 
@@ -162,13 +162,7 @@
     tbody.innerHTML = ""; let tot = 0;
     itens.forEach((it, idx) => {
       tot += it.v * it.q;
-      tbody.innerHTML += `<tr>
-          <td><input type="text" class="input-table" value="${it.n}" onchange="itens[${idx}].n=this.value"></td>
-          <td><input type="text" class="input-table" value="${it.e}" onchange="itens[${idx}].e=this.value"></td>
-          <td><input type="number" class="input-table" value="${it.q}" onchange="itens[${idx}].q=this.value; renderCarrinho()"></td>
-          <td>${it.v.toFixed(2)}</td><td>${(it.v * it.q).toFixed(2)}</td>
-          <td onclick="itens.splice(${idx},1); renderCarrinho()" style="color:red; cursor:pointer;">X</td>
-        </tr>`;
+      tbody.innerHTML += `<tr><td><input type="text" class="input-table" value="${it.n}" onchange="itens[${idx}].n=this.value"></td><td><input type="text" class="input-table" value="${it.e}" onchange="itens[${idx}].e=this.value"></td><td><input type="number" class="input-table" value="${it.q}" onchange="itens[${idx}].q=this.value; renderCarrinho()"></td><td>${it.v.toFixed(2)}</td><td>${(it.v * it.q).toFixed(2)}</td><td onclick="itens.splice(${idx},1); renderCarrinho()" style="color:red; cursor:pointer;">X</td></tr>`;
     });
     document.getElementById('totalOrc').innerText = "R$ " + tot.toFixed(2);
   }
@@ -181,12 +175,9 @@
     doc.text("Endereco: Rua Sao Carlos, 84 - Vila Mariana - Ribeirao Preto / SP", 20, 31);
     doc.line(20, 34, 190, 34);
     doc.setFontSize(10); doc.text("OS: " + p.os + " | Cliente: " + p.cliente, 20, 42);
-    doc.text("Endereco Cliente: " + (p.endereco || ""), 20, 48);
-
     if(tipo === 'CLIENTE') {
         const rows = p.itens.map(i => [i.n, i.med, i.e, i.q, i.v.toFixed(2), (i.v*i.q).toFixed(2)]);
         doc.autoTable({ startY: 55, head: [['Descricao', 'Medidas', 'Camada', 'Qtd', 'Unit.', 'Total']], body: rows });
-        doc.setFont("helvetica", "bold"); doc.text("TOTAL: R$ " + p.total.toFixed(2), 190, doc.lastAutoTable.finalY + 10, {align:'right'});
     } else {
         const rowsP = p.itens.map(i => [i.n, i.med, i.kg+"kg", (i.kg*1.2).toFixed(2)+"kg", i.horas+"h"]);
         doc.autoTable({ startY: 55, head: [['Material', 'Medidas', 'Peso Liq.', 'Compra+20%', 'Horas']], body: rowsP });
@@ -195,8 +186,8 @@
   }
 
   function gerarPDF(tipo) {
-    const dados = { os: SISTEMA.os, cliente: document.getElementById('razao').value, endereco: document.getElementById('endereco').value, total: parseFloat(document.getElementById('totalOrc').innerText.replace("R$ ","")), itens: JSON.parse(JSON.stringify(itens)) };
-    efetuarPDF(dados, tipo);
+    const d = { os: SISTEMA.os, cliente: document.getElementById('razao').value, endereco: document.getElementById('endereco').value, total: parseFloat(document.getElementById('totalOrc').innerText.replace("R$ ","")), itens: JSON.parse(JSON.stringify(itens)) };
+    efetuarPDF(d, tipo);
   }
 
   function finalizarPedido() {
@@ -204,16 +195,16 @@
     SISTEMA.os++; salvarDados(); itens = []; renderCarrinho(); document.getElementById('osAtual').value = SISTEMA.os; tab('calc');
   }
 
+  // --- RENDEREIZAÇÃO DAS LISTAS COM NOME DO CLIENTE EM DESTAQUE ---
   function renderHist() {
     document.getElementById('listaHist').innerHTML = SISTEMA.vendas.slice().reverse().map((v, i) => {
         const idx = SISTEMA.vendas.length - 1 - i;
-        return `
-        <div class="card-hist">
-            <strong>OS: ${v.os}</strong> - ${v.cliente}<br>
-            <small>Valor: R$ ${v.total.toFixed(2)}</small>
+        return `<div class="card-list" style="border-left-color: ${v.confirmado ? 'var(--success)' : '#ccc'}">
+            <strong style="font-size:14px;">${v.cliente}</strong><br>
+            OS: ${v.os} | Total: R$ ${v.total.toFixed(2)}<br>
             <div style="margin-top:8px;">
-                <button onclick="regerarPDF(${idx}, 'CLIENTE')" style="background:var(--danger); border:none; color:white; padding:5px; border-radius:4px; font-size:11px;">PDF CLIENTE</button>
-                <button onclick="regerarPDF(${idx}, 'PRODUCAO')" style="background:var(--info); border:none; color:white; padding:5px; border-radius:4px; font-size:11px;">PDF PRODUCAO</button>
+                <button onclick="regerarPDF(${idx}, 'CLIENTE')" style="background:var(--danger); border:none; color:white; padding:5px; border-radius:4px; font-size:11px;">PDF CLI</button>
+                <button onclick="regerarPDF(${idx}, 'PRODUCAO')" style="background:var(--info); border:none; color:white; padding:5px; border-radius:4px; font-size:11px;">PDF PROD</button>
                 ${!v.confirmado ? `<button onclick="confirmar(${idx})" style="background:var(--success); border:none; color:white; padding:5px; border-radius:4px; font-size:11px;">Vendido</button>` : ''}
                 <button onclick="excluirOS(${idx})" style="background:#666; border:none; color:white; padding:5px; border-radius:4px; font-size:11px;">X</button>
             </div>
@@ -221,18 +212,38 @@
     }).join('');
   }
 
-  function regerarPDF(idx, tipo) { efetuarPDF(SISTEMA.vendas[idx], tipo); }
-  function excluirOS(idx) { if(confirm("Excluir esta OS do historico?")) { SISTEMA.vendas.splice(idx,1); salvarDados(); renderHist(); } }
+  function renderEntrega() {
+    const vends = SISTEMA.vendas.filter(v => v.confirmado && !v.entregue);
+    document.getElementById('listaEntrega').innerHTML = vends.map(v => `
+      <div class="card-list" style="border-left-color: var(--info);">
+        <strong style="font-size:14px;">${v.cliente}</strong> (OS: ${v.os})<br>
+        <div style="margin-top:10px;">
+            <input type="text" id="nf_${v.os}" placeholder="NF" style="width:40%; display:inline;">
+            <input type="number" id="parc_${v.os}" placeholder="Parc." style="width:25%; display:inline;">
+            <button onclick="lancarNF(${v.os})" style="background:var(--info); color:white; border:none; padding:8px; border-radius:4px;">OK</button>
+        </div>
+      </div>`).join('');
+  }
 
-  // Restante das funções (Entrega, Receber, Config) seguem o padrão blindado
+  function renderReceber() {
+    document.getElementById('listaBoletos').innerHTML = SISTEMA.financeiro.map((f, i) => `
+      <div class="card-list" style="border-left-color: ${f.pago ? 'var(--success)' : 'var(--danger)'}">
+        <strong style="font-size:14px;">${f.cliente}</strong> (OS: ${f.os})<br>
+        R$ ${f.valor.toFixed(2)} (${f.parc}) | NF: ${f.nf}<br>
+        Venc: <input type="date" value="${f.venc}" onchange="SISTEMA.financeiro[${i}].venc=this.value; salvarDados()" style="width:auto;">
+        ${!f.pago ? `<button onclick="baixar(${i})" style="background:var(--success); border:none; color:white; padding:8px; border-radius:4px; float:right;">BAIXAR</button>` : '<b style="color:green; float:right;">PAGO</b>'}
+      </div>`).join('');
+  }
+
   function confirmar(i) { SISTEMA.vendas[i].confirmado = true; salvarDados(); renderHist(); }
-  function renderEntrega() { const vends = SISTEMA.vendas.filter(v => v.confirmado && !v.entregue); document.getElementById('listaEntrega').innerHTML = vends.map(v => `<div class="card">OS: ${v.os}<br><input type="text" id="nf_${v.os}" placeholder="NF"><input type="number" id="parc_${v.os}" placeholder="Parc."><button onclick="lancarNF(${v.os})">Lancar</button></div>`).join(''); }
   function lancarNF(os) { const nf=document.getElementById('nf_'+os).value; const q=parseInt(document.getElementById('parc_'+os).value); if(!nf||!q) return; let v=SISTEMA.vendas.find(x=>x.os===os); v.entregue=true; v.nf=nf; for(let i=1;i<=q;i++){SISTEMA.financeiro.push({os,cliente:v.cliente,nf,parc:i+"/"+q,valor:v.total/q,venc:"",pago:false});} salvarDados(); tab('receber'); }
-  function renderReceber() { document.getElementById('listaBoletos').innerHTML = SISTEMA.financeiro.map((f, i) => `<div class="card"><strong>${f.cliente}</strong><br>R$ ${f.valor.toFixed(2)} | Venc: <input type="date" value="${f.venc}" onchange="SISTEMA.financeiro[${i}].venc=this.value; salvarDados()"> <button onclick="SISTEMA.financeiro[${i}].pago=true; salvarDados(); renderReceber()">Baixar</button></div>`).join(''); }
-  function renderCfg() { document.getElementById('cfgVh').value = PRECOS.vh; document.getElementById('matSelect').innerHTML = PRECOS.mats.map(m => `<option value="${m.p}">${m.n}</option>`).join(''); const l = document.getElementById('listaMatsCfg'); l.innerHTML = PRECOS.mats.map((m, i) => `<div class="card-material"><input type="text" value="${m.n}" style="flex:2" onchange="PRECOS.mats[${i}].n=this.value; salvarPrecos()"><input type="number" value="${m.p}" style="flex:1" onchange="PRECOS.mats[${i}].p=parseFloat(this.value); salvarPrecos()"><button onclick="PRECOS.mats.splice(${i},1); salvarPrecos(); renderCfg()" style="background:red; color:white; border:none; padding:5px;">X</button></div>`).join(''); }
-  function addMat() { const n=document.getElementById('novoNome').value; const p=parseFloat(document.getElementById('novoPreco').value); if(n&&p){PRECOS.mats.push({n,p}); document.getElementById('novoNome').value=""; document.getElementById('novoPreco').value=""; salvarPrecos(); renderCfg();} }
-  function salvarPrecos() { PRECOS.vh = parseFloat(document.getElementById('cfgVh').value); localStorage.setItem('marbe_p_v26', JSON.stringify(PRECOS)); }
-  function salvarDados() { localStorage.setItem('marbe_d_v26', JSON.stringify(SISTEMA)); }
+  function baixar(i) { SISTEMA.financeiro[i].pago=true; salvarDados(); renderReceber(); }
+  function regerarPDF(idx, tipo) { efetuarPDF(SISTEMA.vendas[idx], tipo); }
+  function excluirOS(idx) { if(confirm("Excluir?")) { SISTEMA.vendas.splice(idx,1); salvarDados(); renderHist(); } }
+  function renderCfg() { document.getElementById('cfgVh').value = PRECOS.vh; document.getElementById('matSelect').innerHTML = PRECOS.mats.map(m => `<option value="${m.p}">${m.n}</option>`).join(''); document.getElementById('listaMatsCfg').innerHTML = PRECOS.mats.map((m, i) => `<div style="display:flex; gap:5px; margin-top:5px"><input type="text" value="${m.n}" style="flex:2" onchange="PRECOS.mats[${i}].n=this.value; salvarPrecos()"><input type="number" value="${m.p}" style="flex:1" onchange="PRECOS.mats[${i}].p=parseFloat(this.value); salvarPrecos()"><button onclick="PRECOS.mats.splice(${i},1); salvarPrecos(); renderCfg()" style="background:red; color:white; border:none; padding:5px;">X</button></div>`).join(''); }
+  function addMat() { const n=prompt("Nome:"); const p=prompt("Preco:"); if(n&&p){PRECOS.mats.push({n,p:parseFloat(p)}); salvarPrecos(); renderCfg();} }
+  function salvarPrecos() { PRECOS.vh = parseFloat(document.getElementById('cfgVh').value); localStorage.setItem('marbe_p_v27', JSON.stringify(PRECOS)); }
+  function salvarDados() { localStorage.setItem('marbe_d_v27', JSON.stringify(SISTEMA)); }
 </script>
 </body>
 </html>
