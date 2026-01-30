@@ -211,4 +211,75 @@
         doc.text(`DATA: ${dataAtual}`, 160, 23);
         doc.text(`CLIENTE: ${clean(d.cliente)}`, 20, 30);
         doc.text(`CNPJ: ${d.cnpj || "---"}`, 20, 35);
-        doc.text
+        doc.text(`ENDERECO: ${clean(d.endereco)}`, 20, 40);
+        doc.autoTable({ startY: 45, head: [['DESCRICAO', 'MEDIDAS', 'QTD', 'TOTAL']], body: d.itens.map(i => [clean(i.n), i.med, i.q, (i.v*i.q).toFixed(2)]) });
+        const fY = doc.lastAutoTable.finalY + 8;
+        doc.setFontSize(10); doc.text(`TOTAL: R$ ${d.total.toFixed(2)}`, 190, fY, {align:'right'});
+        doc.setFontSize(8); doc.text(`FRETE: ${clean(d.frete)} | PRAZO: ${clean(d.prazo)}`, 20, fY + 8);
+        doc.text(`PAGAMENTO: ${clean(d.pagamento)}`, 20, fY + 13);
+    }
+    window.baixarPDF(doc.output('blob'), d.os);
+  }
+
+  function fecharPedido(i) {
+    const orc = window.marbeDB.orçamentos.splice(i, 1)[0];
+    if(!window.marbeDB.pedidos) window.marbeDB.pedidos = [];
+    window.marbeDB.pedidos.push(orc); window.salvarNuvem(); tab('pedidos');
+  }
+
+  function renderPedidos() {
+    document.getElementById('listaPedidos').innerHTML = (window.marbeDB.pedidos || []).map((p, i) => `
+      <div class="card-list">
+        <strong>OS: ${p.os} - ${p.cliente}</strong><br>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
+            <input type="text" id="nf_${i}" placeholder="NF">
+            <input type="number" id="parc_${i}" placeholder="Qtd Parc.">
+        </div>
+        <input type="date" id="data_${i}">
+        <button class="btn" style="background:var(--primary)" onclick="faturar(${i})">FATURAR AGORA</button>
+      </div>`).join('');
+  }
+
+  function faturar(i) {
+    const nf = document.getElementById(`nf_${i}`).value;
+    const qtd = parseInt(document.getElementById(`parc_${i}`).value);
+    const dt = document.getElementById(`data_${i}`).value;
+    if(!nf || !qtd || !dt) return alert("Preencha NF, Parcelas e Data!");
+    
+    const p = window.marbeDB.pedidos[i];
+    const valorParcela = p.total / qtd;
+    const dataBase = new Date(dt + "T12:00:00");
+
+    for(let j=0; j < qtd; j++) {
+        let v = new Date(dataBase);
+        v.setMonth(v.getMonth() + j);
+        window.marbeDB.financeiro.push({ 
+            os: p.os, nf: nf, cliente: p.cliente, 
+            valor: valorParcela, venc: v.toLocaleDateString('pt-BR'), pago: false 
+        });
+    }
+    window.marbeDB.pedidos.splice(i, 1);
+    window.salvarNuvem(); 
+    tab('financeiro');
+  }
+
+  function renderBoletos() {
+    document.getElementById('listaBoletos').innerHTML = (window.marbeDB.financeiro || []).map((f, i) => `
+      <div class="card-list" style="border-left-color:${f.pago?'green':'red'}">
+        <strong>${f.cliente}</strong><br>OS: ${f.os} | NF: ${f.nf} | R$ ${f.valor.toFixed(2)} | Venc: ${f.venc}
+        ${f.pago ? '' : `<button class="btn" style="background:green; width:auto; display:inline-block; padding:5px; margin:0; float:right" onclick="window.marbeDB.financeiro[${i}].pago=true; window.salvarNuvem();">Baixar</button>`}
+      </div>`).join('');
+  }
+
+  function renderCustos() {
+    document.getElementById('listaCustos').innerHTML = (window.marbeDB.custos.mats || []).map((m, i) => `<div style="display:flex; gap:10px; margin-bottom:5px;"><input type="text" value="${m.n}" readonly style="flex:2"><input type="number" value="${m.p}" readonly style="flex:1"><button onclick="window.marbeDB.custos.mats.splice(${i},1); window.salvarNuvem()" style="background:red; color:white; border:none; padding:5px; border-radius:4px;">X</button></div>`).join('');
+  }
+
+  function addMaterial() {
+    const n = document.getElementById('matNome').value;
+    const p = parseFloat(document.getElementById('matPreco').value);
+    if(n && p) { window.marbeDB.custos.mats.push({n, p}); window.salvarNuvem(); document.getElementById('matNome').value=""; document.getElementById('matPreco').value=""; }
+  }
+</script>
+</body>
+</html>
