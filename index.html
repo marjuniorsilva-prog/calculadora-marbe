@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema Marbe v31.12 - Orçamento Editável</title>
+  <title>Sistema Marbe v31.13 - Fluxo Organizado</title>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -71,10 +71,10 @@
 <div class="container">
   <div class="tabs">
     <button class="tab-btn active" onclick="tab('calc')">Cálculo</button>
-    <button class="tab-btn" onclick="tab('orc_list')">Orçamentos</button>
+    <button class="tab-btn" onclick="tab('orc')">Orçamento</button>
+    <button class="tab-btn" onclick="tab('historico')">Histórico</button>
     <button class="tab-btn" onclick="tab('pedidos')" style="background:var(--dark); color:white;">Pedidos/NF</button>
     <button class="tab-btn" onclick="tab('financeiro')" style="background:var(--success); color:white;">Boletos</button>
-    <button class="tab-btn" onclick="tab('cfg')">Custos</button>
   </div>
 
   <div id="calc" class="section active">
@@ -88,25 +88,16 @@
     </div>
     <label>Material</label><select id="matSelect"></select>
     <label>Tipo</label><select id="tipoServ"><option value="0.045">PEÇA NOVA</option><option value="0.065">REFORMA</option></select>
-    
-    <button class="btn" style="background:var(--success)" onclick="calcular()">CALCULAR E LISTAR ABAIXO</button>
-    
-    <hr>
+    <button class="btn" style="background:var(--success)" onclick="calcular()">CALCULAR E ADICIONAR AO ORÇAMENTO</button>
+  </div>
+
+  <div id="orc" class="section">
     <label>CNPJ Cliente</label><input type="text" id="cnpj" onblur="buscaCNPJ(this.value)">
     <label>Razão Social</label><input type="text" id="razao">
 
-    <h4>Itens do Orçamento (Editável)</h4>
+    <h4>Itens do Orçamento</h4>
     <table>
-        <thead>
-            <tr>
-                <th>Descrição</th>
-                <th style="width:80px">Medidas</th>
-                <th style="width:50px">Cam.</th>
-                <th style="width:40px">Qtd</th>
-                <th style="width:80px">Unit.</th>
-                <th>X</th>
-            </tr>
-        </thead>
+        <thead><tr><th>Descrição</th><th>Medidas</th><th>Cam.</th><th>Qtd</th><th>Unit.</th><th>X</th></tr></thead>
         <tbody id="corpoAtual"></tbody>
     </table>
     
@@ -120,24 +111,18 @@
     <button class="btn" style="background:var(--primary)" onclick="salvarOrcamento()">SALVAR ORÇAMENTO (OS <span id="osDisplay"></span>)</button>
   </div>
 
-  <div id="orc_list" class="section">
+  <div id="historico" class="section">
+      <h3>Histórico de Orçamentos</h3>
       <div id="listaOrcamentos"></div>
   </div>
 
   <div id="pedidos" class="section">
+      <h3>Pedidos para Faturamento</h3>
       <div id="listaPedidos"></div>
   </div>
 
   <div id="financeiro" class="section">
       <div id="listaBoletos"></div>
-  </div>
-
-  <div id="cfg" class="section"><div id="listaCustos"></div>
-    <div style="background:#eee; padding:10px; border-radius:8px; margin-top:10px;">
-        <input type="text" id="matNome" placeholder="Material">
-        <input type="number" id="matPreco" placeholder="Preço KG">
-        <button class="btn" style="background:var(--success)" onclick="addMaterial()">CADASTRAR</button>
-    </div>
   </div>
 </div>
 
@@ -152,7 +137,7 @@
   function updateUI() {
     document.getElementById('osDisplay').innerText = window.marbeDB.os;
     document.getElementById('matSelect').innerHTML = (window.marbeDB.custos.mats || []).map(m => `<option value="${m.p}">${m.n}</option>`).join('');
-    renderOrcamentos(); renderPedidos(); renderBoletos(); renderCustos();
+    renderOrcamentos(); renderPedidos(); renderBoletos();
   }
 
   function calcular() {
@@ -160,15 +145,9 @@
     const peso = Math.ceil((Math.PI*(parseFloat(d)+parseFloat(e))*parseFloat(l)*parseFloat(e))*1200/1000000000);
     const unit = (((peso*pk*1.1)+(h*window.marbeDB.custos.vh))*2.5)*(1+imp);
     
-    itensTemp.push({ 
-        n: "Revestimento " + document.getElementById('matSelect').options[document.getElementById('matSelect').selectedIndex].text, 
-        med: d + "x" + l + "mm", 
-        e: e + "mm", 
-        q: 1, 
-        v: unit, 
-        h: h 
-    });
+    itensTemp.push({ n: "Revestimento " + document.getElementById('matSelect').options[document.getElementById('matSelect').selectedIndex].text, med: d + "x" + l + "mm", e: e + "mm", q: 1, v: unit, h: h });
     renderTabelaAtual();
+    tab('orc');
   }
 
   function renderTabelaAtual() {
@@ -202,8 +181,8 @@
     window.marbeDB.os++;
     window.salvarNuvem();
     itensTemp = []; renderTabelaAtual();
-    alert("Orçamento salvo!");
-    tab('orc_list');
+    alert("Salvo no Histórico!");
+    tab('historico');
   }
 
   function renderOrcamentos() {
@@ -234,7 +213,7 @@
             <input type="number" id="parc_${i}" placeholder="Parcelas">
         </div>
         <input type="date" id="data_${i}">
-        <button class="btn" style="background:var(--primary)" onclick="faturar(${i})">FATURAR E GERAR BOLETOS</button>
+        <button class="btn" style="background:var(--primary)" onclick="faturar(${i})">FATURAR</button>
       </div>`).join('');
   }
 
@@ -242,7 +221,7 @@
     const nf = document.getElementById(`nf_${i}`).value;
     const qtd = parseInt(document.getElementById(`parc_${i}`).value);
     const dataBase = new Date(document.getElementById(`data_${i}`).value);
-    if(!nf || !qtd || isNaN(dataBase)) return alert("Dados incompletos!");
+    if(!nf || !qtd || isNaN(dataBase)) return alert("Preencha NF e Parcelas!");
     const p = window.marbeDB.pedidos[i];
     const valorParc = p.total / qtd;
     for(let j=0; j<qtd; j++) {
@@ -275,29 +254,12 @@
         doc.autoTable({ startY: 40, head: [['Descrição', 'Medidas', 'Qtd', 'Unit', 'Total']], body: d.itens.map(i => [i.n, i.med, i.q, i.v.toFixed(2), (i.v*i.q).toFixed(2)]) });
         const fY = doc.lastAutoTable.finalY + 10;
         doc.text(`TOTAL: R$ ${d.total.toFixed(2)}`, 190, fY, {align:'right'});
-        doc.setFontSize(9);
-        doc.text(`PRAZO: ${d.prazo} | GARANTIA: ${d.garantia}`, 20, fY + 10);
+        doc.setFontSize(9); doc.text(`PRAZO: ${d.prazo} | GARANTIA: ${d.garantia}`, 20, fY + 10);
         doc.text(`PAGTO: ${d.pagamento}`, 20, fY + 16);
     }
     const blob = doc.output('blob');
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a'); link.href = url; link.download = `${d.os}.pdf`; link.click();
+    const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `${d.os}.pdf`; link.click();
     if(confirm("Enviar via WhatsApp?")) window.compartilharWhatsApp(blob, d.os, tipo);
-  }
-
-  function renderCustos() {
-    document.getElementById('listaCustos').innerHTML = (window.marbeDB.custos.mats || []).map((m, i) => `
-      <div style="display:flex; gap:10px; margin-bottom:5px;">
-        <input type="text" value="${m.n}" readonly style="flex:2">
-        <input type="number" value="${m.p}" readonly style="flex:1">
-        <button onclick="window.marbeDB.custos.mats.splice(${i},1); window.salvarNuvem()" style="background:red; color:white; border:none; padding:5px;">X</button>
-      </div>`).join('');
-  }
-
-  function addMaterial() {
-    const n = document.getElementById('matNome').value;
-    const p = parseFloat(document.getElementById('matPreco').value);
-    if(n && p) { window.marbeDB.custos.mats.push({n, p}); window.salvarNuvem(); document.getElementById('matNome').value=""; document.getElementById('matPreco').value=""; }
   }
 
   async function buscaCNPJ(v) { 
