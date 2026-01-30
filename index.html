@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema Marbe v31.5 - Produção + Zap</title>
+  <title>Sistema Marbe v31.6 - Oficial</title>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyATu_V6e1shKRpgBOkX1lw2beyzUEZUCo0",
@@ -21,15 +21,26 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
+    
+    // Estrutura inicial padrão
     window.marbeDB = { os: 330, vendas: [], financeiro: [], custos: {vh: 50, mats: []} };
 
     const dbRef = ref(db, 'sistema/');
     onValue(dbRef, (snapshot) => {
       const data = snapshot.val();
-      if (data) { window.marbeDB = data; updateUI(); }
+      if (data) { 
+          window.marbeDB = data; 
+          if(!window.marbeDB.custos.mats) window.marbeDB.custos.mats = [];
+          updateUI(); 
+      } else {
+          // Se o banco estiver vazio, ele cria a estrutura inicial
+          window.salvarNuvem();
+      }
     });
 
-    window.salvarNuvem = function() { set(ref(db, 'sistema/'), window.marbeDB); };
+    window.salvarNuvem = function() { 
+        set(ref(db, 'sistema/'), window.marbeDB).catch(err => alert("Erro ao salvar: " + err.message));
+    };
 
     window.compartilharWhatsApp = async (blob, osNum, cliente, tipo) => {
         const file = new File([blob], `${osNum}.pdf`, { type: 'application/pdf' });
@@ -73,11 +84,11 @@
 
   <div id="calc" class="section active">
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-      <div><label>Diametro (mm)</label><input type="number" id="d"></div>
-      <div><label>Comprimento (mm)</label><input type="number" id="l"></div>
+      <div><label>Diametro (mm)</label><input type="number" id="d" placeholder="0"></div>
+      <div><label>Comprimento (mm)</label><input type="number" id="l" placeholder="0"></div>
     </div>
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-      <div><label>Camada (mm)</label><input type="number" id="e"></div>
+      <div><label>Camada (mm)</label><input type="number" id="e" placeholder="0"></div>
       <div><label>Horas Trab.</label><input type="number" id="h" value="10"></div>
     </div>
     <label>Material</label><select id="matSelect"></select>
@@ -107,12 +118,13 @@
 
   <div id="hist" class="section"><div id="listaHist"></div></div>
   <div id="receber" class="section"><div id="listaBoletos"></div></div>
-  <div id="cfg" class="section"><div id="listaCustos"></div>
-    <div style="background:#eee; padding:15px; border-radius:8px; margin-top:15px;">
-        <input type="text" id="matNome" placeholder="Borracha">
-        <input type="number" id="matPreco" placeholder="Preço KG">
-        <button class="btn" style="background:var(--success)" onclick="addMaterial()">SALVAR</button>
-    </div>
+  <div id="cfg" class="section">
+      <div id="listaCustos"></div>
+      <div style="background:#eee; padding:15px; border-radius:8px; margin-top:15px;">
+          <input type="text" id="matNome" placeholder="Nome da Borracha">
+          <input type="number" id="matPreco" placeholder="Preço do KG">
+          <button class="btn" style="background:var(--success)" onclick="addMaterial()">CADASTRAR MATERIAL</button>
+      </div>
   </div>
 </div>
 
@@ -132,6 +144,7 @@
 
   function calcular() {
     const d=parseFloat(document.getElementById('d').value), l=parseFloat(document.getElementById('l').value), e=parseFloat(document.getElementById('e').value), pk=parseFloat(document.getElementById('matSelect').value), h=parseFloat(document.getElementById('h').value), imp=parseFloat(document.getElementById('tipoServ').value);
+    if(isNaN(pk)) return alert("Cadastre um material primeiro na aba Custos!");
     const peso = Math.ceil((Math.PI*(d+e)*l*e)*1200/1000000000);
     const unit = (((peso*pk*1.1)+(h*window.marbeDB.custos.vh))*2.5)*(1+imp);
     tItem = { n: "Revestimento "+document.getElementById('matSelect').options[document.getElementById('matSelect').selectedIndex].text, med: d+"x"+l+"mm", e: e+"mm", q: 1, v: unit, kg: peso, h: h };
@@ -152,9 +165,11 @@
   }
 
   function finalizar() {
+    if(!window.marbeDB.vendas) window.marbeDB.vendas = [];
+    if(!window.marbeDB.financeiro) window.marbeDB.financeiro = [];
     window.marbeDB.vendas.push({ os: window.marbeDB.os, cliente: document.getElementById('razao').value, total: parseFloat(document.getElementById('totalOrc').innerText.replace("R$ ","")), itens: [...itens], frete: document.getElementById('frete').value, garantia: document.getElementById('garantia').value, prazo: document.getElementById('prazo').value, pagamento: document.getElementById('pagamento').value });
     window.marbeDB.financeiro.push({ os: window.marbeDB.os, cliente: document.getElementById('razao').value, valor: parseFloat(document.getElementById('totalOrc').innerText.replace("R$ ","")), pago: false });
-    window.marbeDB.os++; window.salvarNuvem(); alert("Salvo na Nuvem!"); itens=[]; renderCarrinho(); tab('calc');
+    window.marbeDB.os++; window.salvarNuvem(); alert("Finalizado!"); itens=[]; renderCarrinho(); tab('calc');
   }
 
   function gerarPDF(tipo, manualData = null) {
