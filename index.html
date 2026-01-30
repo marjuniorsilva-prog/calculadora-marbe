@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema Marbe v31.2 - COMPLETO</title>
+  <title>Sistema Marbe v31.3 - Cloud Sync</title>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
+    // Configuração Correta (marbeapp-e2db8)
     const firebaseConfig = {
       apiKey: "AIzaSyATu_V6e1shKRpgBOkX1lw2beyzUEZUCo0",
       authDomain: "marbeapp-e2db8.firebaseapp.com",
@@ -39,16 +40,16 @@
 
     window.compartilharWhatsApp = async (blob, osNum, cliente) => {
         const file = new File([blob], `${osNum}.pdf`, { type: 'application/pdf' });
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        if (navigator.share) {
             try {
                 await navigator.share({
                     files: [file],
                     title: `OS ${osNum} - Marbe`,
                     text: `Olá, segue Orçamento da OS ${osNum} - ${cliente}`
                 });
-            } catch (err) { alert("Compartilhamento cancelado."); }
+            } catch (err) { console.log("Erro ao compartilhar"); }
         } else {
-            alert("Seu navegador não suporta envio de arquivos. O arquivo foi baixado no seu celular.");
+            alert("O arquivo foi baixado. Agora você pode enviá-lo pelo WhatsApp.");
         }
     };
   </script>
@@ -97,7 +98,7 @@
     <label>Material</label><select id="matSelect"></select>
     <label>Tipo</label><select id="tipoServ"><option value="0.045">PECA NOVA</option><option value="0.065">REFORMA</option></select>
     <button class="btn" style="background:var(--success)" onclick="calcular()">CALCULAR PRECO</button>
-    <div id="resCalc" style="display:none; padding:10px; background:#eef9f0; margin-top:10px; border-radius:8px; text-align:center; border: 1px solid #c3e6cb;"></div>
+    <div id="resCalc" style="display:none; padding:10px; background:#eef9f0; margin-top:10px; border-radius:8px; text-align:center;"></div>
     <button id="addBtn" class="btn" style="background:var(--primary); display:none;" onclick="addCarrinho()">ADICIONAR AO PEDIDO</button>
   </div>
 
@@ -119,16 +120,16 @@
     <button class="btn" style="background:#333" onclick="finalizar()">FINALIZAR PEDIDO</button>
   </div>
 
-  <div id="hist" class="section"><h3>Historico</h3><div id="listaHist"></div></div>
-  <div id="receber" class="section"><h3>Contas a Receber</h3><div id="listaBoletos"></div></div>
+  <div id="hist" class="section"><div id="listaHist"></div></div>
+  <div id="receber" class="section"><div id="listaBoletos"></div></div>
   
   <div id="cfg" class="section">
-    <h3>Tabela de Custos</h3>
+    <h3>Custos e Materiais</h3>
     <div id="listaCustos"></div>
     <div style="background:#eee; padding:15px; border-radius:8px; margin-top:15px;">
         <label>Nova Borracha</label><input type="text" id="matNome">
         <label>Preco KG</label><input type="number" id="matPreco">
-        <button class="btn" style="background:var(--success)" onclick="addMaterial()">SALVAR NOVO PRODUTo</button>
+        <button class="btn" style="background:var(--success)" onclick="addMaterial()">SALVAR NOVO PRODUTO</button>
     </div>
   </div>
 </div>
@@ -158,6 +159,7 @@
   }
 
   function addCarrinho() { itens.push({...tItem}); renderCarrinho(); tab('orc'); }
+  
   function renderCarrinho() {
     let tot = 0;
     document.getElementById('corpoOrc').innerHTML = itens.map((it, idx) => {
@@ -169,17 +171,17 @@
 
   function finalizar() {
     window.marbeDB.vendas.push({ os: window.marbeDB.os, cliente: document.getElementById('razao').value, total: parseFloat(document.getElementById('totalOrc').innerText.replace("R$ ","")), itens: [...itens], pago: false });
-    // Gera boleto automático para o financeiro
     window.marbeDB.financeiro.push({ os: window.marbeDB.os, cliente: document.getElementById('razao').value, valor: parseFloat(document.getElementById('totalOrc').innerText.replace("R$ ","")), pago: false });
     window.marbeDB.os++;
     window.salvarNuvem();
     itens = []; renderCarrinho(); tab('calc');
+    alert("Pedido finalizado e salvo na nuvem!");
   }
 
-  function gerarPDF(tipo, dadosManual = null) {
+  function gerarPDF(tipo, manualData = null) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-    const d = dadosManual || { os: document.getElementById('osNum').value, cliente: document.getElementById('razao').value, itens: [...itens], total: document.getElementById('totalOrc').innerText };
+    const d = manualData || { os: document.getElementById('osNum').value, cliente: document.getElementById('razao').value, itens: [...itens], total: document.getElementById('totalOrc').innerText };
     
     doc.setFontSize(14); doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 20, 20);
     doc.setFontSize(10); doc.text(`OS: ${d.os} | CLIENTE: ${d.cliente}`, 20, 30);
@@ -188,13 +190,15 @@
     let body = d.itens.map(i => [i.n, i.med, i.q, i.v.toFixed(2), (i.v*i.q).toFixed(2)]);
     
     if(tipo === 'FUNCIONARIO') {
-        head = [['Item', 'Medidas', 'Camada', 'Qtd', 'Horas']];
+        head = [['Item', 'Medidas', 'Camada', 'Qtd', 'H']];
         body = d.itens.map(i => [i.n, i.med, i.e, i.q, i.h+"h"]);
     }
 
     doc.autoTable({ startY: 40, head: head, body: body });
     const pdfBlob = doc.output('blob');
     const pdfUrl = URL.createObjectURL(pdfBlob);
+    
+    // Download automático com nome da OS
     const link = document.createElement('a');
     link.href = pdfUrl; link.download = `${d.os}.pdf`; link.click();
     
@@ -232,4 +236,11 @@
       <div style="display:flex; gap:10px; margin-bottom:5px;">
         <input type="text" value="${m.n}" readonly style="flex:2">
         <input type="number" value="${m.p}" readonly style="flex:1">
-        <button onclick="window.marbeDB.custos.mats.splice(${i},1); window.salvarNuvem
+        <button onclick="window.marbeDB.custos.mats.splice(${i},1); window.salvarNuvem()" style="background:red; color:white; border:none; padding:5px;">X</button>
+      </div>`).join('');
+  }
+
+  function addMaterial() {
+    const n = document.getElementById('matNome').value;
+    const p = parseFloat(document.getElementById('matPreco').value);
+    if(n && p) { window.marbe
