@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema Marbe v17.0</title>
+  <title>Sistema Marbe v18.0 - Estavel</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -34,7 +34,7 @@
     <button class="tab-btn" onclick="tab('orc')">Orcam.</button>
     <button class="tab-btn" onclick="tab('hist')">Historico</button>
     <button class="tab-btn" onclick="tab('dash')">Dashboard</button>
-    <button class="tab-btn" onclick="tab('cfg')">⚙</button>
+    <button class="tab-btn" onclick="tab('cfg')">Precos Custo</button>
   </div>
 
   <div id="calc" class="section active">
@@ -59,47 +59,47 @@
       <div><label>OS</label><input type="number" id="numOS" readonly></div>
       <div><label>CNPJ</label><input type="text" id="cnpj" onblur="buscaCNPJ(this.value)"></div>
     </div>
-    <label>Cliente</label><input type="text" id="razao">
+    <label>Razao Social Cliente</label><input type="text" id="razao">
     <div id="itensOrc" style="margin-top:10px"></div>
     <h3 style="text-align:right">Total: <span id="totalOrc">R$ 0,00</span></h3>
     <button class="btn" style="background:var(--danger)" onclick="gerarPDF('CLIENTE')">GERAR PDF CLIENTE</button>
   </div>
 
   <div id="hist" class="section">
-    <h3>Vendas e Status</h3>
+    <h3>Vendas Registradas</h3>
     <div id="listaHist"></div>
   </div>
 
   <div id="dash" class="section">
-    <h3>Resumo de Materiais Vendidos</h3>
+    <h3>Relatorio de Materiais Vendidos</h3>
     <div class="dash-grid">
       <div class="dash-card"><h4>Faturamento</h4><p id="dFat">R$ 0,00</p></div>
-      <div class="dash-card"><h4>Borracha (KG)</h4><p id="dKg">0 kg</p></div>
+      <div class="dash-card"><h4>Total KG</h4><p id="dKg">0 kg</p></div>
     </div>
-    
     <div class="card">
-      <strong>Necessidade de Compra (Total Vendido)</strong>
+      <strong>Necessidade de Compra (Baseado em Vendas Confirmadas)</strong>
       <table id="tabMateriaisDash">
-        <thead><tr><th>Material</th><th>Total KG</th><th>Custo Estimado</th></tr></thead>
+        <thead><tr><th>Borracha</th><th>Peso Vendido (KG)</th><th>Custo Total</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
-    <canvas id="chartMats" style="max-height: 250px;"></canvas>
   </div>
 
   <div id="cfg" class="section">
-    <label>Valor Hora</label><input type="number" id="cfgVh" onchange="salvar()">
+    <h3>Tabela de Materiais (Preco de Custo)</h3>
+    <label>Valor Hora Producao (R$)</label><input type="number" id="cfgVh" onchange="salvar()">
     <div id="listaMatsCfg"></div>
-    <button class="btn" style="background:var(--primary)" onclick="addMat()">+ Novo Material</button>
+    <button class="btn" style="background:var(--primary)" onclick="addMat()">+ Novo Material na Tabela</button>
   </div>
 </div>
 
 <script>
+  // Inicialização com proteção de dados
   let DB = { vh: 50, os: 330, mats: [{n:"Natural Preta", p:13}, {n:"Nitrilica", p:49}], vendas: [] };
-  let carrinho = []; let tItem = null; let chart = null;
+  let carrinho = []; let tItem = null;
 
   function init() {
-    let s = localStorage.getItem('marbe_v17');
+    let s = localStorage.getItem('marbe_v18_final');
     if(s) DB = JSON.parse(s);
     document.getElementById('numOS').value = DB.os;
     renderCfg();
@@ -113,6 +113,7 @@
     if(id === 'dash') renderDash();
   }
 
+  // --- CALCULADORA ---
   function calcular() {
     const d = parseFloat(document.getElementById('d').value);
     const l = parseFloat(document.getElementById('l').value);
@@ -121,6 +122,8 @@
     const h = parseFloat(document.getElementById('h').value);
     const imp = parseFloat(document.getElementById('tipoServ').value);
     
+    if(!d || !l || !e) return alert("Preencha as medidas!");
+
     const peso = Math.ceil((Math.PI * (d + e) * l * e) * 1200 / 1000000000);
     const unit = (((peso * pk * 1.1) + (h * DB.vh)) * 2.5) * (1 + imp);
 
@@ -129,7 +132,7 @@
         med: d+"x"+l, e: e+"mm", q: 1, v: unit, kg: peso, custoK: pk 
     };
     document.getElementById('resCalc').style.display="block";
-    document.getElementById('resCalc').innerHTML = `Preco: R$ ${unit.toFixed(2)} | Peso: ${peso}kg`;
+    document.getElementById('resCalc').innerHTML = `Unitario: R$ ${unit.toFixed(2)} | Peso: ${peso}kg`;
     document.getElementById('addBtn').style.display="block";
   }
 
@@ -144,85 +147,78 @@
     document.getElementById('totalOrc').innerText = "R$ " + tot.toFixed(2);
   }
 
+  // --- HISTÓRICO ---
   function renderHist() {
     document.getElementById('listaHist').innerHTML = DB.vendas.slice().reverse().map((v, i) => {
         const idx = DB.vendas.length - 1 - i;
         return `<div class="card">
             OS: ${v.os} | ${v.cliente} | R$ ${v.total.toFixed(2)}<br>
-            ${!v.vendaConfirmada ? `<button onclick="confirmar(${idx})">Confirmar Venda</button>` : `<b style="color:green">VENDA REALIZADA</b>`}
+            ${!v.confirmada ? `<button onclick="confirmar(${idx})" style="background:var(--success); color:white; border:none; padding:5px; border-radius:4px; margin-top:5px;">Confirmar Venda</button>` : `<b style="color:green">VENDA CONFIRMADA</b>`}
         </div>`;
     }).join('');
   }
 
-  function confirmar(i) { DB.vendas[i].vendaConfirmada = true; salvar(); renderHist(); }
+  function confirmar(i) { DB.vendas[i].confirmada = true; salvar(); renderHist(); }
 
-  // --- DASHBOARD: SOMA DE KG E VALORES ---
+  // --- DASHBOARD ---
   function renderDash() {
     let fat = 0, kgTotal = 0;
     let resumo = {};
 
-    // Filtra apenas vendas confirmadas
-    DB.vendas.filter(v => v.vendaConfirmada).forEach(v => {
+    DB.vendas.filter(v => v.confirmada).forEach(v => {
       fat += v.total;
       v.itens.forEach(it => {
-        let pesoTotalItem = it.kg * it.q;
-        kgTotal += pesoTotalItem;
+        let pesoItem = it.kg * it.q;
+        kgTotal += pesoItem;
         if(!resumo[it.n]) resumo[it.n] = { kg: 0, custo: 0 };
-        resumo[it.n].kg += pesoTotalItem;
-        resumo[it.n].custo += (pesoTotalItem * it.custoK);
+        resumo[it.n].kg += pesoItem;
+        resumo[it.n].custo += (pesoItem * it.custoK);
       });
     });
 
     document.getElementById('dFat').innerText = "R$ " + fat.toFixed(2);
     document.getElementById('dKg').innerText = kgTotal.toFixed(1) + " kg";
-
     const tbody = document.querySelector('#tabMateriaisDash tbody');
-    tbody.innerHTML = Object.keys(resumo).map(m => `
-      <tr><td>${m}</td><td>${resumo[m].kg.toFixed(1)} kg</td><td>R$ ${resumo[m].custo.toFixed(2)}</td></tr>
-    `).join('');
-
-    if(chart) chart.destroy();
-    chart = new Chart(document.getElementById('chartMats'), {
-      type: 'doughnut',
-      data: {
-        labels: Object.keys(resumo),
-        datasets: [{ data: Object.values(resumo).map(r => r.kg), backgroundColor: ['#2c7be5','#28a745','#f6c23e','#e74a3b'] }]
-      }
-    });
+    tbody.innerHTML = Object.keys(resumo).map(m => `<tr><td>${m}</td><td>${resumo[m].kg.toFixed(1)} kg</td><td>R$ ${resumo[m].custo.toFixed(2)}</td></tr>`).join('');
   }
 
+  // --- PDF ---
   function gerarPDF(tipo) {
     const { jsPDF } = window.jspdf; const doc = new jsPDF();
     const os = DB.os;
-    doc.text("MARBE COMERCIO E SERVICOS", 20, 20);
-    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold"); doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 20, 20);
+    doc.setFontSize(9); doc.setFont("helvetica", "normal");
     doc.text("CNPJ: 61.149.312/0001-56", 20, 26);
     doc.text("OS: "+os+" | Cliente: "+document.getElementById('razao').value, 20, 32);
-    
     const rows = carrinho.map(i => [i.n, i.med, i.e, i.q, i.v.toFixed(2), (i.v*i.q).toFixed(2)]);
     doc.autoTable({ startY: 40, head: [['Descricao', 'Medida', 'Esp', 'Qtd', 'Unit', 'Total']], body: rows });
     
-    DB.vendas.push({ os, cliente: document.getElementById('razao').value, total: parseFloat(document.getElementById('totalOrc').innerText.replace("R$ ","")), vendaConfirmada: false, itens: [...carrinho] });
+    DB.vendas.push({ os, cliente: document.getElementById('razao').value, total: parseFloat(document.getElementById('totalOrc').innerText.replace("R$ ","")), confirmada: false, itens: [...carrinho] });
     DB.os++; salvar(); doc.save("OS_"+os+".pdf");
   }
 
+  // --- CONFIG (MATERIAIS E PREÇOS) ---
   function renderCfg() {
     document.getElementById('cfgVh').value = DB.vh;
     document.getElementById('matSelect').innerHTML = DB.mats.map(m => `<option value="${m.p}">${m.n}</option>`).join('');
     document.getElementById('listaMatsCfg').innerHTML = DB.mats.map((m, i) => `
         <div style="display:flex; gap:5px; margin-top:5px">
             <input type="text" value="${m.n}" readonly style="flex:2">
-            <input type="number" value="${m.p}" onchange="DB.mats[${i}].p=this.value; salvar()">
+            <input type="number" value="${m.p}" onchange="DB.mats[${i}].p=parseFloat(this.value); salvar()">
             <button onclick="DB.mats.splice(${i},1); salvar(); renderCfg()">X</button>
         </div>`).join('');
   }
 
   function addMat() {
-    const n = prompt("Nome:"); const p = prompt("Preco:");
+    const n = prompt("Nome do Material:"); const p = prompt("Preco de Custo por KG:");
     if(n && p) { DB.mats.push({n, p: parseFloat(p)}); salvar(); renderCfg(); }
   }
 
-  function salvar() { localStorage.setItem('marbe_v17', JSON.stringify(DB)); }
+  function salvar() { 
+    DB.vh = parseFloat(document.getElementById('cfgVh').value);
+    localStorage.setItem('marbe_v18_final', JSON.stringify(DB)); 
+  }
+
   async function buscaCNPJ(v) {
     const r = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${v.replace(/\D/g,'')}`);
     const d = await r.json(); document.getElementById('razao').value = d.razao_social || "";
