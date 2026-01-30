@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema Marbe v31.15 - Produção +20%</title>
+  <title>Sistema Marbe v31.17 - Correção Total</title>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -37,19 +37,22 @@
     window.salvarNuvem = function() { set(ref(db, 'sistema/'), window.marbeDB); };
 
     window.compartilharArquivo = async (blob, osNum, tipo) => {
-        const file = new File([blob], `${osNum}.pdf`, { type: 'application/pdf' });
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        const nomeArquivo = `OS_${osNum}.pdf`;
+        const file = new File([blob], nomeArquivo, { type: 'application/pdf' });
+        
+        if (navigator.share && navigator.canShare({ files: [file] })) {
             try {
                 await navigator.share({
                     files: [file],
                     title: `OS ${osNum}`,
                     text: `Segue ${tipo} da OS ${osNum} - Marbe`
                 });
-            } catch (err) { console.log("Erro ao compartilhar"); }
+            } catch (err) { console.log("Compartilhamento cancelado"); }
         } else {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url; a.download = `${osNum}.pdf`; a.click();
+            a.href = url; a.download = nomeArquivo; a.click();
+            alert("PDF gerado e baixado como " + nomeArquivo);
         }
     };
   </script>
@@ -113,7 +116,7 @@
     </div>
     <label>Pagamento</label><textarea id="pagamento">50% + BOLETO 28DD.</textarea>
     <h3 style="text-align:right">Total: <span id="totalOrc">R$ 0,00</span></h3>
-    <button class="btn" style="background:var(--primary)" onclick="salvarOrcamento()">SALVAR ORÇAMENTO (OS <span id="osDisplay"></span>)</button>
+    <button class="btn" style="background:var(--primary)" onclick="salvarOrcamento()">SALVAR NO HISTÓRICO (OS <span id="osDisplay"></span>)</button>
   </div>
 
   <div id="historico" class="section"><div id="listaOrcamentos"></div></div>
@@ -137,8 +140,10 @@
 
   function calcular() {
     const d=parseFloat(document.getElementById('d').value), l=parseFloat(document.getElementById('l').value), e=parseFloat(document.getElementById('e').value), pk=parseFloat(document.getElementById('matSelect').value), h=parseFloat(document.getElementById('h').value), imp=parseFloat(document.getElementById('tipoServ').value);
-    const pesoLiquido = Math.ceil((Math.PI*(d+e)*l*e)*1200/1000000000);
-    const unit = (((pesoLiquido*pk*1.1)+(h*window.marbeDB.custos.vh))*2.5)*(1+imp);
+    
+    // Peso calculado por PEÇA
+    const pesoUnitario = Math.ceil((Math.PI*(d+e)*l*e)*1200/1000000000);
+    const unit = (((pesoUnitario*pk*1.1)+(h*window.marbeDB.custos.vh))*2.5)*(1+imp);
     
     itensTemp.push({ 
         n: "Revestimento " + document.getElementById('matSelect').options[document.getElementById('matSelect').selectedIndex].text, 
@@ -146,7 +151,7 @@
         e: e + "mm", 
         q: 1, 
         v: unit, 
-        kg: pesoLiquido 
+        kg_unit: pesoUnitario 
     });
     renderTabelaAtual();
     tab('orc');
@@ -160,7 +165,7 @@
             <td><input type="text" class="editable-input" value="${it.n}" onchange="itensTemp[${i}].n=this.value"></td>
             <td><input type="text" class="editable-input" value="${it.med}" onchange="itensTemp[${i}].med=this.value"></td>
             <td><input type="text" class="editable-input" value="${it.e}" onchange="itensTemp[${i}].e=this.value"></td>
-            <td><input type="number" class="editable-input" value="${it.q}" onchange="itensTemp[${i}].q=this.value; renderTabelaAtual()"></td>
+            <td><input type="number" class="editable-input" value="${it.q}" onchange="itensTemp[${i}].q=parseInt(this.value); renderTabelaAtual()"></td>
             <td><input type="number" class="editable-input" value="${it.v.toFixed(2)}" onchange="itensTemp[${i}].v=parseFloat(this.value); renderTabelaAtual()"></td>
             <td onclick="itensTemp.splice(${i},1);renderTabelaAtual()">X</td>
         </tr>`;
@@ -203,21 +208,29 @@
     const doc = new jsPDF();
     const d = window.marbeDB[base][index];
     
+    // Configura fonte para aceitar caracteres latinos
+    doc.setFont("helvetica", "bold");
     doc.setFontSize(14); doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 20, 20);
     
+    doc.setFont("helvetica", "normal");
     if(tipo === 'FUNCIONARIO') {
         doc.text(`VIA PRODUÇÃO - OS: ${d.os}`, 20, 30);
         const head = [['Item', 'Medidas', 'Camada', 'Qtd', 'Peso Bruto (20%)']];
-        const body = d.itens.map(i => [i.n, i.med, i.e, i.q, (i.kg * 1.2 * i.q).toFixed(2) + " kg"]);
-        doc.autoTable({ startY: 40, head: head, body: body });
+        const body = d.itens.map(i => {
+            // Peso bruto = (Peso Unitario * 1.2) * Quantidade de peças
+            const pesoTotal = i.kg_unit ? (i.kg_unit * 1.2 * i.q).toFixed(2) + " kg" : "---";
+            return [i.n, i.med, i.e, i.q, pesoTotal];
+        });
+        doc.autoTable({ startY: 40, head: head, body: body, headStyles: {fillColor: [50, 50, 50]} });
     } else {
         doc.text(`ORÇAMENTO - OS: ${d.os} | CLIENTE: ${d.cliente}`, 20, 30);
         const head = [['Descrição', 'Medidas', 'Qtd', 'Unit', 'Total']];
         const body = d.itens.map(i => [i.n, i.med, i.q, i.v.toFixed(2), (i.v*i.q).toFixed(2)]);
-        doc.autoTable({ startY: 40, head: head, body: body });
+        doc.autoTable({ startY: 40, head: head, body: body, headStyles: {fillColor: [44, 123, 229]} });
         const fY = doc.lastAutoTable.finalY + 10;
+        doc.setFont("helvetica", "bold");
         doc.text(`TOTAL: R$ ${d.total.toFixed(2)}`, 190, fY, {align:'right'});
-        doc.setFontSize(9);
+        doc.setFontSize(9); doc.setFont("helvetica", "normal");
         doc.text(`PRAZO: ${d.prazo} | GARANTIA: ${d.garantia}`, 20, fY + 10);
         doc.text(`PAGTO: ${d.pagamento}`, 20, fY + 16);
     }
