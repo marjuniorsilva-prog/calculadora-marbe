@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema Marbe v8.0</title>
+  <title>Sistema Marbe v9.0</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 
@@ -83,7 +83,7 @@
     <h3 style="text-align:right">Total Final: <span id="totalTxt">R$ 0,00</span></h3>
     
     <button class="btn" style="background:var(--danger)" onclick="gerarPDF('CLIENTE')">GERAR PDF PARA CLIENTE</button>
-    <button class="btn" style="background:var(--dark); background-color: #333;" onclick="gerarPDF('PRODUCAO')">GERAR PDF PRODUCAO (INTERNO)</button>
+    <button class="btn" style="background:#333;" onclick="gerarPDF('PRODUCAO')">GERAR PDF PRODUCAO (MESMA OS)</button>
   </div>
 
   <div id="sec-config" class="content-section">
@@ -104,7 +104,7 @@
   let temp = null;
 
   function inicializarSistema() {
-    const s = localStorage.getItem('marbe_v8');
+    const s = localStorage.getItem('marbe_v9');
     if(s) DB = JSON.parse(s);
     if(!DB.os) DB.os = 330;
     document.getElementById('numOS').value = DB.os;
@@ -135,7 +135,7 @@
 
   function salvar() { 
     DB.vHora = parseFloat(document.getElementById('cfgHora').value);
-    localStorage.setItem('marbe_v8', JSON.stringify(DB)); 
+    localStorage.setItem('marbe_v9', JSON.stringify(DB)); 
   }
 
   function calcular() {
@@ -145,10 +145,13 @@
     const pKg = parseFloat(document.getElementById('borrachaSel').value);
     const nB = document.getElementById('borrachaSel').options[document.getElementById('borrachaSel').selectedIndex].text;
     
-    // Calculo de Peso e Margem
-    const pesoLiq = (Math.PI * (d + e) * l * e) * 1200 / 1000000000;
-    const pesoFinal = Math.ceil(pesoLiq); 
-    const vlr = (((pesoFinal * pKg) * 1.1 + (parseFloat(document.getElementById('horas').value) * DB.vHora) + parseFloat(document.getElementById('ranhura').value)) * 2.5) * (1 + parseFloat(document.getElementById('impostoSel').value));
+    // Volume e Peso
+    const dMedio = d + e;
+    const volumeM3 = (Math.PI * dMedio * l * e) / 1000000000;
+    const pesoFinal = Math.ceil(volumeM3 * 1200); 
+
+    const custoBorracha = pesoFinal * pKg;
+    const vlr = (((custoBorracha * 1.1) + (parseFloat(document.getElementById('horas').value) * DB.vHora) + parseFloat(document.getElementById('ranhura').value)) * 2.5) * (1 + parseFloat(document.getElementById('impostoSel').value));
 
     temp = { 
         d: "Revestimento em " + nB, 
@@ -199,7 +202,7 @@
     const doc = new jsPDF();
     const dataAtual = new Date().toLocaleDateString('pt-BR');
     
-    // CABECALHO MARBE
+    // CABECALHO MARBE (Sem acentos para evitar erros no APK)
     doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.setTextColor(40);
     doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 20, 20);
     doc.setFontSize(9); doc.setFont("helvetica", "normal");
@@ -207,13 +210,13 @@
     doc.text("Endereco: Rua Sao Carlos, 84 - Vila Mariana - Ribeirao Preto / SP", 20, 31);
     doc.line(20, 34, 190, 34);
 
-    // OS E DATA (ENTRE FORNECEDOR E CLIENTE)
+    // OS E DATA (Sincronizados)
     doc.setFontSize(10); doc.setFont("helvetica", "bold");
     doc.text("ORDEM DE SERVICO (OS): " + DB.os, 20, 42);
     doc.text("DATA: " + dataAtual, 140, 42);
     doc.line(20, 45, 190, 45);
 
-    // DADOS DO CLIENTE
+    // CLIENTE
     doc.setFontSize(11); doc.text("DADOS DO CLIENTE", 20, 52);
     doc.setFont("helvetica", "normal"); doc.setFontSize(10);
     doc.text("Razao Social: " + document.getElementById('razaoCli').value, 20, 58);
@@ -231,29 +234,30 @@
             doc.setFont("helvetica", "normal"); doc.setFontSize(9);
             doc.text("Obs: " + document.getElementById('obs').value, 20, fY + 10);
         }
+        // Incrementa OS apenas no PDF do Cliente (Finaliza o ciclo)
+        DB.os++; salvar(); 
+        document.getElementById('numOS').value = DB.os;
     } else {
-        // PDF DE PRODUCAO (INTERNO)
-        doc.setFont("helvetica", "bold"); doc.text("RELATORIO INTERNO DE PRODUCAO / COMPRAS", 105, 75, {align:'center'});
+        // PDF DE PRODUCAO (Interno) - Usa a MESMA OS que esta na tela
+        doc.setFont("helvetica", "bold"); doc.text("RELATORIO INTERNO DE PRODUCAO E COMPRAS", 105, 75, {align:'center'});
         
         const bodyProd = itens.map(i => {
-            const kgCompra = (i.pesoKg * 1.2).toFixed(2); // +20%
-            const custoTotal = (kgCompra * i.custoBorracha).toFixed(2);
-            return [i.material, i.m, i.pesoKg + "kg", kgCompra + "kg", "R$ " + i.custoBorracha, "R$ " + custoTotal];
+            const kgCompra = (i.pesoKg * 1.2).toFixed(2);
+            const custoCompraTotal = (kgCompra * i.custoBorracha).toFixed(2);
+            return [i.material, i.m, i.pesoKg + "kg", kgCompra + "kg", "R$ " + i.custoBorracha, "R$ " + custoCompraTotal];
         });
 
         doc.autoTable({
             startY: 85, 
-            head: [['Materia-Prima', 'Medidas', 'Peso Liq.', 'Comprar (+20%)', 'Custo KG', 'Custo Total']], 
+            head: [['Material', 'Medidas', 'Peso Liq.', 'Compra (+20%)', 'Custo KG', 'Custo Total']], 
             body: bodyProd,
             headStyles: { fillColor: [51, 51, 51] }, theme: 'grid'
         });
-        
         const fYp = doc.lastAutoTable.finalY + 10;
-        doc.setFontSize(9); doc.text("* Este documento e para uso interno. Nao enviar ao cliente.", 20, fYp);
+        doc.setFontSize(9); doc.text("* Documento interno. Nao entregar ao cliente.", 20, fYp);
     }
 
-    if(tipo === 'CLIENTE') { DB.os++; salvar(); document.getElementById('numOS').value = DB.os; }
-    doc.save(tipo + "_OS_" + (DB.os - (tipo === 'CLIENTE' ? 1 : 0)) + ".pdf");
+    doc.save(tipo + "_OS_" + (tipo === 'CLIENTE' ? (DB.os-1) : DB.os) + ".pdf");
   }
 </script>
 </body>
