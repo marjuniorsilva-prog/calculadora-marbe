@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema Marbe v23.0</title>
+  <title>Sistema Marbe v24.0 - Oficial</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
   <style>
@@ -11,16 +11,16 @@
     body { font-family: sans-serif; background: #f4f7f6; margin: 0; padding: 5px; }
     .container { max-width: 1000px; background: #fff; padding: 15px; border-radius: 8px; margin: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
     .tabs { display: flex; gap: 3px; margin-bottom: 15px; flex-wrap: wrap; }
-    .tab-btn { flex: 1; padding: 10px 5px; border: none; background: #ddd; cursor: pointer; font-weight: bold; border-radius: 8px; font-size: 10px; text-transform: uppercase; min-width: 85px; }
+    .tab-btn { flex: 1; padding: 12px; border: none; background: #ddd; cursor: pointer; font-weight: bold; border-radius: 8px; font-size: 10px; text-transform: uppercase; min-width: 85px; }
     .tab-btn.active { background: var(--primary); color: white; }
     .section { display: none; }
     .section.active { display: block; }
     label { display: block; margin-top: 10px; font-weight: bold; font-size: 12px; color: #444; }
     input, select, textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box; }
-    .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; color: white; }
+    .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; color: white; font-size: 14px; }
     table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
-    table th, table td { border: 1px solid #ddd; padding: 5px; text-align: left; }
-    .input-table { width: 100%; padding: 5px; border: 1px solid #2c7be5; border-radius: 3px; font-size: 12px; background: #fff; }
+    table th, table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    .input-table { width: 100%; padding: 5px; border: 1px solid var(--primary); border-radius: 3px; font-size: 12px; background: #fff; }
     .card { border: 1px solid #ddd; padding: 10px; border-radius: 8px; margin-bottom: 8px; background: #fafafa; }
   </style>
 </head>
@@ -29,9 +29,9 @@
 <div class="container">
   <div class="tabs">
     <button class="tab-btn active" onclick="tab('calc')">Calculo</button>
-    <button class="tab-btn" onclick="tab('orc')">Orcam.</button>
+    <button class="tab-btn" onclick="tab('orc')">Orcamento</button>
     <button class="tab-btn" onclick="tab('hist')">Historico</button>
-    <button class="tab-btn" onclick="tab('entrega')">Entregues/NF</button>
+    <button class="tab-btn" onclick="tab('entrega')">Entregas/NF</button>
     <button class="tab-btn" onclick="tab('receber')" style="background:var(--success); color:white;">Receber</button>
     <button class="tab-btn" onclick="tab('cfg')">Precos Custo</button>
   </div>
@@ -55,8 +55,11 @@
   <div id="orc" class="section">
     <div style="display:grid; grid-template-columns: 80px 1fr; gap:10px;">
       <div><label>OS</label><input type="number" id="osAtual" readonly style="background:#eee"></div>
-      <div><label>Cliente</label><input type="text" id="razao" placeholder="Nome do Cliente"></div>
+      <div><label>CNPJ Cliente (Sintegra)</label><input type="text" id="cnpj" placeholder="00.000.000/0000-00" onblur="buscaCNPJ(this.value)"></div>
     </div>
+    <label>Razao Social</label><input type="text" id="razao" placeholder="Puxa automático">
+    <label>Endereco</label><input type="text" id="endereco" placeholder="Puxa automático">
+    
     <div class="table-container" style="overflow-x:auto;">
       <table>
         <thead>
@@ -75,10 +78,10 @@
     <h3 style="text-align:right">Total Geral: <span id="totalOrc">R$ 0,00</span></h3>
     
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-        <button class="btn" style="background:var(--danger)" onclick="gerarPDF('CLIENTE')">PDF CLIENTE</button>
-        <button class="btn" style="background:var(--info)" onclick="gerarPDF('PRODUCAO')">PDF PRODUCAO</button>
+        <button class="btn" style="background:var(--danger)" onclick="gerarPDF('CLIENTE')">GERAR PDF CLIENTE</button>
+        <button class="btn" style="background:var(--info)" onclick="gerarPDF('PRODUCAO')">GERAR PDF PRODUCAO</button>
     </div>
-    <button class="btn" style="background:#333; margin-top:20px;" onclick="finalizarPedido()">FINALIZAR E LIMPAR TELA (PROXIMA OS)</button>
+    <button class="btn" style="background:#333; margin-top:20px;" onclick="finalizarPedido()">FINALIZAR E PULAR OS</button>
   </div>
 
   <div id="hist" class="section"><div id="listaHist"></div></div>
@@ -97,9 +100,9 @@
   let itens = []; let tItem = null;
 
   function init() {
-    let p = localStorage.getItem('m_precos_v23');
+    let p = localStorage.getItem('marbe_precos_v24');
     if(p) PRECOS = JSON.parse(p);
-    let s = localStorage.getItem('m_dados_v23');
+    let s = localStorage.getItem('marbe_dados_v24');
     if(s) SISTEMA = JSON.parse(s);
     document.getElementById('osAtual').value = SISTEMA.os;
     renderCfg();
@@ -112,6 +115,18 @@
     if(id === 'hist') renderHist();
     if(id === 'entrega') renderEntrega();
     if(id === 'receber') renderReceber();
+  }
+
+  // BUSCA CNPJ AUTOMÁTICA
+  async function buscaCNPJ(v) {
+    const limpo = v.replace(/\D/g,'');
+    if(limpo.length !== 14) return;
+    try {
+        const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${limpo}`);
+        const data = await res.json();
+        document.getElementById('razao').value = data.razao_social || "";
+        document.getElementById('endereco').value = `${data.logradouro}, ${data.numero} - ${data.bairro} - ${data.municipio}/${data.uf}`;
+    } catch (e) { alert("Erro ao buscar CNPJ!"); }
   }
 
   function calcular() {
@@ -131,7 +146,7 @@
         med: d+"x"+l+"mm", e: e+"mm", q: 1, v: unit, kg: peso, custoK: pk, horas: h
     };
     document.getElementById('resCalc').style.display="block";
-    document.getElementById('resCalc').innerHTML = `Peso: ${peso}kg | Unitario: R$ ${unit.toFixed(2)}`;
+    document.getElementById('resCalc').innerHTML = `Peso: ${peso}kg | Preco: R$ ${unit.toFixed(2)}`;
     document.getElementById('addBtn').style.display="block";
   }
 
@@ -149,12 +164,13 @@
           <td><input type="number" class="input-table" value="${it.q}" onchange="itens[${idx}].q=this.value; renderCarrinho()"></td>
           <td>${it.v.toFixed(2)}</td>
           <td>${(it.v * it.q).toFixed(2)}</td>
-          <td onclick="itens.splice(${idx},1); renderCarrinho()" style="color:red; font-weight:bold; cursor:pointer;">X</td>
+          <td onclick="itens.splice(${idx},1); renderCarrinho()" style="color:red; cursor:pointer;">X</td>
         </tr>`;
     });
     document.getElementById('totalOrc').innerText = "R$ " + tot.toFixed(2);
   }
 
+  // GERAÇÃO DE PDF CLIENTE E PRODUÇÃO
   function gerarPDF(tipo) {
     if(itens.length === 0) return alert("Adicione itens!");
     const { jsPDF } = window.jspdf; const doc = new jsPDF();
@@ -166,34 +182,29 @@
     doc.text("Endereco: Rua Sao Carlos, 84 - Vila Mariana - Ribeirao Preto / SP", 20, 31);
     doc.line(20, 34, 190, 34);
 
-    doc.setFontSize(10); doc.text("ORDEM DE SERVICO (OS): " + osNum, 20, 42);
-    doc.text("DATA: " + new Date().toLocaleDateString('pt-BR'), 140, 42);
-    doc.text("Cliente: " + document.getElementById('razao').value, 20, 50);
+    doc.setFontSize(10); doc.text("OS: " + osNum + " | DATA: " + new Date().toLocaleDateString('pt-BR'), 20, 42);
+    doc.text("CLIENTE: " + document.getElementById('razao').value, 20, 50);
+    doc.text("ENDERECO: " + document.getElementById('endereco').value, 20, 56);
 
     if(tipo === 'CLIENTE') {
         const rows = itens.map(i => [i.n, i.med, i.e, i.q, i.v.toFixed(2), (i.v*i.q).toFixed(2)]);
-        doc.autoTable({ startY: 55, head: [['Descricao', 'Medidas', 'Camada', 'Qtd', 'Unit.', 'Total']], body: rows, theme: 'grid' });
+        doc.autoTable({ startY: 65, head: [['Descricao', 'Medidas', 'Camada', 'Qtd', 'Unit.', 'Total']], body: rows, theme: 'grid' });
         doc.setFont("helvetica", "bold"); doc.text("TOTAL: " + document.getElementById('totalOrc').innerText, 190, doc.lastAutoTable.finalY + 10, {align:'right'});
     } else {
         const rowsP = itens.map(i => [i.n, i.med, i.kg+"kg", (i.kg*1.2).toFixed(2)+"kg", i.horas+"h"]);
-        doc.autoTable({ startY: 55, head: [['Material', 'Medidas', 'Peso Liq.', 'Compra+20%', 'Horas']], body: rowsP, theme: 'grid' });
+        doc.autoTable({ startY: 65, head: [['Material', 'Medidas', 'Peso Liq.', 'Compra+20%', 'Horas']], body: rowsP, theme: 'grid' });
     }
     doc.save(tipo + "_OS_" + osNum + ".pdf");
   }
 
   function finalizarPedido() {
-    if(!confirm("Deseja finalizar esta OS e pular para o proximo numero?")) return;
+    if(!confirm("Finalizar OS e pular numero?")) return;
     SISTEMA.vendas.push({ os: SISTEMA.os, cliente: document.getElementById('razao').value, total: parseFloat(document.getElementById('totalOrc').innerText.replace("R$ ","")), confirmado: false, entregue: false, itens: [...itens] });
-    SISTEMA.os++; 
-    salvarDados();
-    itens = []; 
-    document.getElementById('razao').value = "";
-    renderCarrinho();
-    document.getElementById('osAtual').value = SISTEMA.os;
+    SISTEMA.os++; salvarDados(); itens = []; renderCarrinho(); document.getElementById('osAtual').value = SISTEMA.os;
     tab('calc');
-    alert("Pedido finalizado com sucesso!");
   }
 
+  // OUTRAS FUNÇÕES
   function renderHist() { document.getElementById('listaHist').innerHTML = SISTEMA.vendas.slice().reverse().map((v, i) => `<div class="card">OS: ${v.os} | ${v.cliente} | R$ ${v.total.toFixed(2)}<br>${!v.confirmado ? `<button onclick="confirmar(${SISTEMA.vendas.length-1-i})">Confirmar Venda</button>` : `<b style="color:green">VENDIDO</b>`}</div>`).join(''); }
   function confirmar(i) { SISTEMA.vendas[i].confirmado = true; salvarDados(); renderHist(); }
   function renderEntrega() { const vends = SISTEMA.vendas.filter(v => v.confirmado && !v.entregue); document.getElementById('listaEntrega').innerHTML = vends.map(v => `<div class="card"><strong>OS: ${v.os}</strong><br><input type="text" id="nf_${v.os}" placeholder="NF"><input type="number" id="parc_${v.os}" placeholder="Parc."><button onclick="lancarNF(${v.os})">LANCAR</button></div>`).join(''); }
@@ -201,8 +212,8 @@
   function renderReceber() { document.getElementById('listaBoletos').innerHTML = SISTEMA.financeiro.map((f, i) => `<div class="finance-card"><strong>${f.cliente}</strong><br>R$ ${f.valor.toFixed(2)} | Venc: <input type="date" value="${f.venc}" onchange="SISTEMA.financeiro[${i}].venc=this.value; salvarDados()"> <button onclick="SISTEMA.financeiro[${i}].pago=true; salvarDados(); renderReceber()">Baixar</button></div>`).join(''); }
   function renderCfg() { document.getElementById('matSelect').innerHTML = PRECOS.mats.map(m => `<option value="${m.p}">${m.n}</option>`).join(''); document.getElementById('listaMatsCfg').innerHTML = PRECOS.mats.map((m, i) => `<div style="display:flex; gap:5px; margin-top:5px"><input type="text" value="${m.n}" readonly style="flex:2"><input type="number" value="${m.p}" onchange="PRECOS.mats[${i}].p=parseFloat(this.value); salvarPrecos()"><button onclick="PRECOS.mats.splice(${i},1); salvarPrecos(); renderCfg()">X</button></div>`).join(''); }
   function addMat() { const n=prompt("Nome:"); const p=prompt("Preco:"); if(n&&p){PRECOS.mats.push({n,p:parseFloat(p)}); salvarPrecos(); renderCfg();} }
-  function salvarPrecos() { PRECOS.vh = parseFloat(document.getElementById('cfgVh').value); localStorage.setItem('m_precos_v23', JSON.stringify(PRECOS)); }
-  function salvarDados() { localStorage.setItem('m_dados_v23', JSON.stringify(SISTEMA)); }
+  function salvarPrecos() { PRECOS.vh = parseFloat(document.getElementById('cfgVh').value); localStorage.setItem('marbe_precos_v24', JSON.stringify(PRECOS)); }
+  function salvarDados() { localStorage.setItem('marbe_dados_v24', JSON.stringify(SISTEMA)); }
 </script>
 </body>
 </html>
