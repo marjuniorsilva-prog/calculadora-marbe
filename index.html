@@ -3,254 +3,269 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema Marbe v14.0 - Financeiro</title>
-  
+  <title>Sistema Marbe v16.0</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
   <style>
-    :root { --primary: #2c7be5; --success: #28a745; --danger: #d9534f; --info: #17a2b8; --warning: #f6c23e; --dark: #333; }
-    body { font-family: sans-serif; background: #f4f7f6; margin: 0; padding: 10px; }
-    .container { max-width: 1000px; background: #fff; padding: 20px; border-radius: 12px; margin: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-    
-    .tabs { display: flex; gap: 5px; margin-bottom: 20px; flex-wrap: wrap; }
-    .tab-btn { flex: 1; padding: 12px; border: none; background: #ddd; cursor: pointer; font-weight: bold; border-radius: 8px; font-size: 10px; min-width: 80px; text-transform: uppercase; }
+    :root { --primary: #2c7be5; --success: #28a745; --danger: #d9534f; --dark: #333; }
+    body { font-family: sans-serif; background: #f4f7f6; margin: 0; padding: 5px; }
+    .container { max-width: 1000px; background: #fff; padding: 15px; border-radius: 8px; margin: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .tabs { display: flex; gap: 3px; margin-bottom: 15px; flex-wrap: wrap; }
+    .tab-btn { flex: 1; padding: 10px 5px; border: none; background: #ddd; cursor: pointer; font-weight: bold; border-radius: 5px; font-size: 10px; text-transform: uppercase; min-width: 75px; }
     .tab-btn.active { background: var(--primary); color: white; }
-    
-    .content-section { display: none; }
-    .content-section.active { display: block; }
-
-    label { display: block; margin-top: 10px; font-weight: bold; color: #444; font-size: 13px; }
-    input, select, textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
-    .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; color: white; font-size: 14px; }
-    
-    table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
-    table th, table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-    .hist-card { border: 1px solid #ddd; padding: 10px; border-radius: 8px; margin-bottom: 8px; background: #fafafa; }
-    
-    .status-badge { font-size: 9px; padding: 2px 5px; border-radius: 5px; font-weight: bold; }
-    .status-pending { background: #ffeeba; color: #856404; }
-    .status-sold { background: #d4edda; color: #155724; }
-    .status-delivered { background: #cce5ff; color: #004085; }
-    
-    .finance-card { border-left: 5px solid var(--primary); padding: 10px; margin-bottom: 10px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .section { display: none; }
+    .section.active { display: block; }
+    label { display: block; margin-top: 10px; font-weight: bold; font-size: 12px; color: #444; }
+    input, select, textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box; }
+    .btn { width: 100%; padding: 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; color: white; font-size: 14px; }
+    .card { border: 1px solid #ddd; padding: 12px; border-radius: 8px; margin-bottom: 8px; background: #fafafa; position: relative; }
+    .badge { font-size: 10px; padding: 3px 6px; border-radius: 4px; color: white; font-weight: bold; text-transform: uppercase; }
+    .finance-item { border-left: 5px solid #ccc; padding-left: 10px; margin-bottom: 10px; background: #fff; padding: 10px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
   </style>
 </head>
-<body onload="inicializarSistema()">
+<body onload="init()">
 
 <div class="container">
   <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('calc')">Calc</button>
-    <button class="tab-btn" onclick="switchTab('cliente')">Orcam</button>
-    <button class="tab-btn" onclick="switchTab('hist')">Vendas</button>
-    <button class="tab-btn" onclick="switchTab('entrega')">Entrega/NF</button>
-    <button class="tab-btn" onclick="switchTab('receber')" style="background:var(--success); color:white;">Receber</button>
-    <button class="tab-btn" onclick="switchTab('dash')">Dash</button>
-    <button class="tab-btn" onclick="switchTab('config')">⚙</button>
+    <button class="tab-btn active" onclick="tab('calc')">Calculo</button>
+    <button class="tab-btn" onclick="tab('orc')">Orcam.</button>
+    <button class="tab-btn" onclick="tab('hist')">Historico</button>
+    <button class="tab-btn" onclick="tab('fin')">Financeiro</button>
+    <button class="tab-btn" onclick="tab('dash')">Dash</button>
+    <button class="tab-btn" onclick="tab('cfg')">⚙</button>
   </div>
 
-  <div id="sec-calc" class="content-section active">
+  <div id="calc" class="section active">
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-      <div><label>Diam (mm)</label><input type="number" id="diametro"></div>
-      <div><label>Comp (mm)</label><input type="number" id="comprimento"></div>
+      <div><label>Diametro (mm)</label><input type="number" id="d" placeholder="Ex: 200"></div>
+      <div><label>Comprimento (mm)</label><input type="number" id="l" placeholder="Ex: 1000"></div>
     </div>
-    <label>Material</label><select id="borrachaSel"></select>
-    <label>Espessura (mm)</label><input type="number" id="espessura">
-    <button class="btn" style="background:var(--success)" onclick="calcular()">CALCULAR UNITARIO</button>
-    <div id="resumo" style="display:none; padding:10px; background:#eef9f0; margin-top:10px; border-radius:8px; text-align:center"></div>
-    <button id="addBtn" class="btn" style="background:#6f42c1; display:none;" onclick="adicionar()">ADICIONAR AO ORCAMENTO</button>
-  </div>
-
-  <div id="sec-cliente" class="content-section">
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-        <div><label>OS</label><input type="number" id="numOS" readonly></div>
-        <div><label>CNPJ</label><input type="text" id="cnpjCli" onblur="buscarCNPJ(this.value)"></div>
+      <div><label>Camada Revest. (mm)</label><input type="number" id="e" placeholder="Ex: 15"></div>
+      <div><label>Horas Trab.</label><input type="number" id="h" value="10"></div>
     </div>
-    <label>Cliente</label><input type="text" id="razaoCli">
-    <div id="listaItensOrc"></div>
-    <h3 style="text-align:right">Total: <span id="totalTxt">R$ 0,00</span></h3>
-    <button class="btn" style="background:var(--danger)" onclick="gerarPDF('CLIENTE')">GERAR ORCAMENTO PDF</button>
+    <label>Material (Borracha)</label><select id="matSelect"></select>
+    <label>Tipo de Servico</label>
+    <select id="tipoServ">
+        <option value="0.045">PECA NOVA (4,5% Imposto)</option>
+        <option value="0.065">REFORMA (6,5% Imposto)</option>
+    </select>
+    
+    <button class="btn" style="background:var(--success)" onclick="calcular()">CALCULAR PRECO UNITARIO</button>
+    
+    <div id="resCalc" style="display:none; padding:15px; background:#eef9f0; margin-top:10px; border-radius:8px; text-align:center; border: 1px solid #c3e6cb;"></div>
+    <button id="addBtn" class="btn" style="background:var(--primary); display:none;" onclick="addAoPedido()">ADICIONAR AO ORCAMENTO (+)</button>
   </div>
 
-  <div id="sec-hist" class="content-section">
-    <h2>Vendas Confirmadas</h2>
-    <div id="listaHistorico"></div>
+  <div id="orc" class="section">
+    <div style="display:grid; grid-template-columns: 80px 1fr; gap:10px;">
+      <div><label>OS</label><input type="number" id="numOS" readonly style="background:#eee"></div>
+      <div><label>CNPJ Cliente</label><input type="text" id="cnpj" onblur="buscaCNPJ(this.value)"></div>
+    </div>
+    <label>Razao Social Cliente</label><input type="text" id="razao" placeholder="Puxado automaticamente">
+    <div id="listaItensOrc" style="margin-top:15px"></div>
+    <h3 style="text-align:right">TOTAL: <span id="totalOrc">R$ 0,00</span></h3>
+    <button class="btn" style="background:var(--danger)" onclick="gerarPDF('CLIENTE')">GERAR PDF CLIENTE</button>
+    <button class="btn" style="background:var(--dark)" onclick="gerarPDF('PRODUCAO')">GERAR PDF PRODUCAO (INTERNO)</button>
   </div>
 
-  <div id="sec-entrega" class="content-section">
-    <h2>Entrega e Faturamento (NF)</h2>
-    <p style="font-size: 11px; color: #666;">Selecione uma venda confirmada para informar a Nota Fiscal e Boletos.</p>
-    <div id="listaParaEntrega"></div>
+  <div id="hist" class="section">
+    <h3>Historico de Orçamentos</h3>
+    <div id="listaHist"></div>
   </div>
 
-  <div id="sec-receber" class="content-section">
-    <h2>Contas a Receber</h2>
+  <div id="fin" class="section">
+    <h3>Contas a Receber</h3>
     <div id="listaBoletos"></div>
   </div>
 
-  <div id="sec-dash" class="content-section">
-    <div id="dashResumo"></div>
-    <canvas id="chartMateriais"></canvas>
+  <div id="dash" class="section">
+    <h3>Faturamento e Lucro</h3>
+    <div id="dashRes"></div>
+    <canvas id="myChart" style="max-height: 250px;"></canvas>
   </div>
 
-  <div id="sec-config" class="content-section">
-    <label>Valor Hora</label><input type="number" id="cfgHora" onchange="salvar()">
-    <div id="listaB"></div>
-    <button class="btn" style="background:var(--danger)" onclick="limparTudo()">APAGAR TODOS OS DADOS</button>
+  <div id="cfg" class="section">
+    <label>Valor Hora Producao (R$)</label><input type="number" id="cfgVh" onchange="salvarDB()">
+    <div id="listaMateriais"></div>
+    <button class="btn" style="background:var(--primary)" onclick="addNovoMaterial()">+ Adicionar Material</button>
+    <hr>
+    <button class="btn" style="background:var(--danger); font-size: 10px;" onclick="if(confirm('Apagar tudo?')) {localStorage.clear(); location.reload();}">RESTAURAR SISTEMA (LIMPAR TUDO)</button>
   </div>
 </div>
 
 <script>
-  let DB = { vHora: 50, os: 330, mats: [{n: "Natural Preta", p: 13}, {n: "Natural Branca", p: 30}, {n: "Nitrilica", p: 49}], historico: [], financeiro: [] };
-  let itens = [];
-  let temp = null;
+  let DB = { 
+    vh: 50, 
+    os: 330, 
+    mats: [{n:"Natural Preta", p:13}, {n:"Natural Branca", p:30}, {n:"Nitrilica", p:49}], 
+    vendas: [], 
+    financeiro: [] 
+  };
+  let carrinho = []; 
+  let tempItem = null;
 
-  function inicializarSistema() {
-    const s = localStorage.getItem('marbe_v14');
-    if(s) DB = JSON.parse(s);
+  function init() {
+    let salvo = localStorage.getItem('marbe_v16');
+    if(salvo) DB = JSON.parse(salvo);
     document.getElementById('numOS').value = DB.os;
     renderConfig();
   }
 
-  function switchTab(t) {
-    document.querySelectorAll('.content-section, .tab-btn').forEach(e => e.classList.remove('active'));
-    document.getElementById('sec-'+t).classList.add('active');
+  function tab(id) {
+    document.querySelectorAll('.section, .tab-btn').forEach(e => e.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
     event.currentTarget.classList.add('active');
-    if(t === 'hist') renderHistorico();
-    if(t === 'entrega') renderEntrega();
-    if(t === 'receber') renderReceber();
+    if(id === 'hist') renderHist();
+    if(id === 'fin') renderFin();
   }
 
-  // --- LOGICA DE HISTORICO E VENDAS ---
-  function renderHistorico() {
-    const container = document.getElementById('listaHistorico');
-    container.innerHTML = DB.historico.slice().reverse().map((h, i) => {
-      const idx = DB.historico.length - 1 - i;
-      return `
-      <div class="hist-card">
-        <strong>OS: ${h.os}</strong> | ${h.cliente} | R$ ${h.total.toFixed(2)}
-        <div style="margin-top:5px;">
-          ${!h.vendido ? `<button onclick="confirmarVenda(${idx})" style="background:var(--success); color:white; border:none; padding:5px; border-radius:3px;">Confirmar Venda</button>` : `<span class="status-badge status-sold">Vendido</span>`}
-          <button onclick="regerarPDF(${idx}, 'CLIENTE')" style="background:var(--primary); color:white; border:none; padding:5px; border-radius:3px;">PDF</button>
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  function confirmarVenda(idx) {
-    DB.historico[idx].vendido = true;
-    salvar(); renderHistorico();
-    alert("Venda confirmada! Agora ela aparece na aba Entrega/NF.");
-  }
-
-  // --- ABA ENTREGA (LANÇAR NF E PARCELAS) ---
-  function renderEntrega() {
-    const container = document.getElementById('listaParaEntrega');
-    const vendidos = DB.historico.filter(h => h.vendido && !h.entregue);
-    if(vendidos.length === 0) { container.innerHTML = "<p>Nenhuma venda pendente de entrega.</p>"; return; }
-    
-    container.innerHTML = vendidos.map((h) => `
-      <div class="hist-card" style="border-top: 3px solid var(--info);">
-        <strong>OS: ${h.os} - ${h.cliente}</strong><br>
-        Valor: R$ ${h.total.toFixed(2)}<br>
-        <div style="background:#eee; padding:10px; margin-top:5px; border-radius:5px;">
-          <label>Nº Nota Fiscal</label><input type="text" id="nf_${h.os}" placeholder="Ex: 1234">
-          <label>Nº de Parcelas</label><input type="number" id="parc_${h.os}" value="1">
-          <button class="btn" style="background:var(--info); font-size:12px;" onclick="finalizarEntrega(${h.os})">FINALIZAR ENTREGA E GERAR BOLETOS</button>
-        </div>
-      </div>
-    `).join('');
-  }
-
-  function finalizarEntrega(osNum) {
-    const nf = document.getElementById('nf_'+osNum).value;
-    const numParc = parseInt(document.getElementById('parc_'+osNum).value);
-    if(!nf) return alert("Informe o numero da NF!");
-
-    const venda = DB.historico.find(h => h.os === osNum);
-    venda.entregue = true;
-    venda.nf = nf;
-
-    // Gerar Parcelas no Financeiro
-    const valorParc = venda.total / numParc;
-    for(let i=1; i<=numParc; i++) {
-        DB.financeiro.push({
-            os: osNum,
-            cliente: venda.cliente,
-            nf: nf,
-            parcela: `${i}/${numParc}`,
-            valor: valorParc,
-            vencimento: "", // Sera preenchido na aba Receber ou via prompt aqui
-            pago: false
-        });
-    }
-    salvar(); switchTab('receber');
-  }
-
-  // --- ABA RECEBER ---
-  function renderReceber() {
-    const container = document.getElementById('listaBoletos');
-    if(DB.financeiro.length === 0) { container.innerHTML = "<p>Nenhum boleto a receber.</p>"; return; }
-
-    container.innerHTML = DB.financeiro.map((f, idx) => `
-      <div class="finance-card" style="border-left-color: ${f.pago ? 'var(--success)' : 'var(--danger)'}">
-        <strong>${f.cliente}</strong> (NF: ${f.nf})<br>
-        Parcela: ${f.parcela} | <strong>R$ ${f.valor.toFixed(2)}</strong><br>
-        Vencimento: <input type="date" value="${f.vencimento}" onchange="DB.financeiro[${idx}].vencimento=this.value; salvar()" style="width:auto; display:inline-block; padding:2px;">
-        ${!f.pago ? `<button onclick="baixarBoleto(${idx})" style="background:var(--success); color:white; border:none; padding:5px; border-radius:3px; float:right;">Confirmar Recebimento</button>` : `<span style="color:green; float:right;">PAGO ✓</span>`}
-      </div>
-    `).join('');
-  }
-
-  function baixarBoleto(idx) {
-    if(confirm("Confirmar entrada desse valor no caixa?")) {
-        DB.financeiro[idx].pago = true;
-        salvar(); renderReceber();
-    }
-  }
-
-  // --- FUNÇÕES AUXILIARES (SALVAR, CALCULAR, ETC) ---
-  function salvar() { localStorage.setItem('marbe_v14', JSON.stringify(DB)); }
-
+  // --- CALCULADORA REVISADA ---
   function calcular() {
-    const d = parseFloat(document.getElementById('diametro').value);
-    const l = parseFloat(document.getElementById('comprimento').value);
-    const e = parseFloat(document.getElementById('espessura').value);
-    const pKg = parseFloat(document.getElementById('borrachaSel').value);
-    const peso = Math.ceil((Math.PI * (d + e) * l * e) * 1200 / 1000000000); 
-    const vlr = (((peso * pKg) * 1.1 + (10 * DB.vHora)) * 2.5) * 1.045; // Simplificado para exemplo
-    temp = { d: "Revestimento", med: d+"x"+l, esp: e+"mm", q: 1, v: vlr, pesoKg: peso, material: "Borracha", vendido: false, entregue: false };
-    document.getElementById('resumo').style.display = "block";
-    document.getElementById('resumo').innerHTML = "R$ " + vlr.toFixed(2);
+    const d = parseFloat(document.getElementById('d').value);
+    const l = parseFloat(document.getElementById('l').value);
+    const e = parseFloat(document.getElementById('e').value);
+    const pk = parseFloat(document.getElementById('matSelect').value);
+    const h = parseFloat(document.getElementById('h').value);
+    const imp = parseFloat(document.getElementById('tipoServ').value);
+    
+    if(!d || !l || !e) return alert("Preencha as medidas tecnicas!");
+
+    // Peso Liq: Perimetro Médio * Comprimento * Espessura * Densidade(1200)
+    const peso = Math.ceil((Math.PI * (d + e) * l * e) * 1200 / 1000000000);
+    const custoProd = (peso * pk * 1.1) + (h * DB.vh); // 10% margem material + MO
+    const unitario = (custoProd * 2.5) * (1 + imp); // Markup 2.5 + Imposto
+
+    tempItem = { 
+        d: "Revestimento em " + document.getElementById('matSelect').options[document.getElementById('matSelect').selectedIndex].text,
+        med: d + "x" + l + "mm",
+        camada: e + "mm",
+        qtd: 1,
+        vlr: unitario,
+        pesoKg: peso,
+        custoBorracha: pk,
+        horas: h,
+        servico: document.getElementById('tipoServ').options[document.getElementById('tipoServ').selectedIndex].text
+    };
+
+    const res = document.getElementById('resCalc');
+    res.style.display = "block";
+    res.innerHTML = `<strong>Resultado:</strong><br>Peso: ${peso}kg | Preço: R$ ${unitario.toFixed(2)}`;
     document.getElementById('addBtn').style.display = "block";
   }
 
-  function adicionar() { itens.push({...temp}); switchTab('cliente'); renderItensOrc(); }
+  function addAoPedido() {
+    carrinho.push({...tempItem});
+    renderItensCarrinho();
+    tab('orc');
+    document.getElementById('resCalc').style.display = "none";
+    document.getElementById('addBtn').style.display = "none";
+  }
 
-  function renderItensOrc() {
+  function renderItensCarrinho() {
     let t = 0;
-    itens.forEach(i => t += i.v * i.q);
-    document.getElementById('totalTxt').innerText = "R$ " + t.toFixed(2);
+    document.getElementById('listaItensOrc').innerHTML = carrinho.map((it, i) => {
+        t += it.vlr * it.qtd;
+        return `<div class="card">
+            <strong>${it.d}</strong> (${it.med})<br>
+            Qtd: <input type="number" value="${it.qtd}" style="width:50px; display:inline;" onchange="carrinho[${i}].qtd=this.value; renderItensCarrinho()"> 
+            | Unit: R$ ${it.vlr.toFixed(2)}
+            <button onclick="carrinho.splice(${i},1); renderItensCarrinho()" style="color:red; float:right; background:none; border:none; font-weight:bold;">X</button>
+        </div>`;
+    }).join('');
+    document.getElementById('totalOrc').innerText = "R$ " + t.toFixed(2);
   }
 
-  function gerarPDF(t) {
-    const dados = { os: DB.os, cliente: document.getElementById('razaoCli').value, total: parseFloat(document.getElementById('totalTxt').innerText.replace("R$ ","")), itens: JSON.parse(JSON.stringify(itens)), vendido: false, entregue: false };
-    DB.historico.push(dados);
-    DB.os++; salvar();
-    alert("Orcamento salvo! Consulte na aba Vendas para confirmar a conclusao.");
+  // --- GERAÇÃO DE PDF (SEM ACENTOS PARA EVITAR ERROS NO APK) ---
+  function gerarPDF(tipo) {
+    if(carrinho.length === 0) return alert("Adicione itens!");
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const osAtu = DB.os;
+
+    doc.setFont("helvetica", "bold"); doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 20, 20);
+    doc.setFontSize(9); doc.setFont("helvetica", "normal");
+    doc.text("CNPJ: 61.149.312/0001-56", 20, 26);
+    doc.text("Endereco: Rua Sao Carlos, 84 - Vila Mariana - Ribeirao Preto / SP", 20, 31);
+    doc.line(20, 34, 190, 34);
+
+    doc.setFontSize(10); doc.setFont("helvetica", "bold");
+    doc.text("ORDEM DE SERVICO (OS): " + osAtu, 20, 42);
+    doc.text("DATA: " + new Date().toLocaleDateString('pt-BR'), 140, 42);
+    doc.text("Cliente: " + document.getElementById('razao').value, 20, 50);
+
+    const body = carrinho.map(i => [i.d, i.med, i.camada, i.qtd, i.vlr.toFixed(2), (i.vlr*i.qtd).toFixed(2)]);
+    
+    if(tipo === 'CLIENTE') {
+        doc.autoTable({ startY: 55, head: [['Descricao', 'Medidas', 'Camada', 'Qtd', 'Unit.', 'Total']], body, theme: 'grid' });
+        // Salva venda no histórico como PENDENTE
+        DB.vendas.push({ os: osAtu, cliente: document.getElementById('razao').value, total: parseFloat(document.getElementById('totalOrc').innerText.replace("R$ ","")), confirmado: false, itens: [...carrinho], data: new Date().toLocaleDateString('pt-BR') });
+        DB.os++; salvarDB(); document.getElementById('numOS').value = DB.os;
+    } else {
+        const bodyProd = carrinho.map(i => [i.d, i.med, i.pesoKg+"kg", (i.pesoKg*1.2).toFixed(2)+"kg", i.horas+"h", i.servico]);
+        doc.autoTable({ startY: 55, head: [['Material', 'Medidas', 'Peso Liq', 'Compra+20%', 'Horas', 'Servico']], body: bodyProd, theme: 'grid' });
+    }
+    doc.save(tipo + "_OS_" + osAtu + ".pdf");
   }
 
+  // --- HISTÓRICO E FINANCEIRO ---
+  function renderHist() {
+    document.getElementById('listaHist').innerHTML = DB.vendas.slice().reverse().map((v, i) => {
+        const idx = DB.vendas.length - 1 - i;
+        return `<div class="card">
+            <strong>OS: ${v.os}</strong> | ${v.cliente} | R$ ${v.total.toFixed(2)}<br>
+            ${!v.confirmado ? `<button onclick="confirmarVenda(${idx})" style="background:var(--success); color:white; border:none; padding:5px; border-radius:4px; margin-top:5px;">Confirmar Venda (Gerar Boleto)</button>` : `<span class="badge" style="background:green">VENDIDO</span>`}
+        </div>`;
+    }).join('');
+  }
+
+  function confirmarVenda(i) {
+    const v = DB.vendas[i];
+    v.confirmado = true;
+    const parc = prompt("Em quantas parcelas/boletos?", "1");
+    const vParc = v.total / parseInt(parc);
+    for(let j=1; j<=parseInt(parc); j++) {
+        DB.financeiro.push({ os: v.os, cli: v.cliente, vlr: vParc, parc: j+"/"+parc, venc: "", pago: false });
+    }
+    salvarDB(); renderHist();
+  }
+
+  function renderFin() {
+    document.getElementById('listaBoletos').innerHTML = DB.financeiro.map((f, i) => `
+        <div class="finance-item" style="border-left-color: ${f.pago?'green':'red'}">
+            <strong>${f.cli}</strong> | OS: ${f.os} | Parcela: ${f.parc}<br>
+            Valor: R$ ${f.vlr.toFixed(2)} | Venc: <input type="date" value="${f.venc}" onchange="DB.financeiro[${i}].venc=this.value; salvarDB()" style="width:auto; height:30px;">
+            <button onclick="DB.financeiro[${i}].pago=true; salvarDB(); renderFin()" style="float:right;">Pagar</button>
+        </div>`).join('');
+  }
+
+  // --- CONFIG E AUXILIARES ---
   function renderConfig() {
-    document.getElementById('borrachaSel').innerHTML = DB.mats.map(m => `<option value="${m.p}">${m.n}</option>`).join('');
+    document.getElementById('cfgVh').value = DB.vh;
+    document.getElementById('matSelect').innerHTML = DB.mats.map(m => `<option value="${m.p}">${m.n}</option>`).join('');
+    document.getElementById('listaMateriais').innerHTML = DB.mats.map((m, i) => `
+        <div style="display:flex; gap:5px; margin-top:5px">
+            <input type="text" value="${m.n}" readonly>
+            <input type="number" value="${m.p}" onchange="DB.mats[${i}].p=parseFloat(this.value); salvarDB()">
+            <button onclick="DB.mats.splice(${i},1); salvarDB(); renderConfig()">X</button>
+        </div>`).join('');
   }
 
-  async function buscarCNPJ(v) {
+  function addNovoMaterial() {
+    const n = prompt("Nome:"); const p = prompt("Preco KG:");
+    if(n && p) { DB.mats.push({n, p: parseFloat(p)}); salvarDB(); renderConfig(); }
+  }
+
+  function salvarDB() { 
+    DB.vh = parseFloat(document.getElementById('cfgVh').value);
+    localStorage.setItem('marbe_v16', JSON.stringify(DB)); 
+  }
+
+  async function buscaCNPJ(v) {
     const r = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${v.replace(/\D/g,'')}`);
-    const d = await r.json(); document.getElementById('razaoCli').value = d.razao_social || "";
+    const d = await r.json(); document.getElementById('razao').value = d.razao_social || "";
   }
-
-  function limparTudo() { if(confirm("CUIDADO: Isso apagara todo o historico e financeiro. Confirma?")) { localStorage.clear(); location.reload(); } }
 </script>
 </body>
 </html>
