@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema Marbe v31.38 - Versão Ouro</title>
+  <title>Sistema Marbe v31.39 - Edição de Preço Liberada</title>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -21,14 +21,12 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    // Estrutura inicial robusta para não haver erro de "undefined"
     window.marbeDB = { os: 330, orçamentos: [], pedidos: [], financeiro: [], custos: {vh: 50, mats: []}, estoque: {} };
 
     onValue(ref(db, 'sistema/'), (snapshot) => {
       const data = snapshot.val();
       if (data) { 
           window.marbeDB = data; 
-          // Verificações de segurança para garantir que as listas existam
           if(!window.marbeDB.orçamentos) window.marbeDB.orçamentos = [];
           if(!window.marbeDB.pedidos) window.marbeDB.pedidos = [];
           if(!window.marbeDB.financeiro) window.marbeDB.financeiro = [];
@@ -41,18 +39,14 @@
 
     window.salvarNuvem = function() { set(ref(db, 'sistema/'), window.marbeDB); };
 
-    // Função Híbrida de PDF (Funciona no PC e no Celular)
     window.abrirPDFMobile = (blob, osNum) => {
         const url = URL.createObjectURL(blob);
-        // Abre nova aba (Mobile/PC)
         window.open(url, '_blank');
-        // Força download (PC)
         const a = document.createElement('a');
         a.href = url; a.download = `${osNum}.pdf`;
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
     };
 
-    // Formatação de Dinheiro Profissional (R$)
     window.fmtMoney = (v) => {
         return parseFloat(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     }
@@ -126,7 +120,7 @@
     <label>Razão Social</label><input type="text" id="razao">
     <label>Endereço Completo</label><input type="text" id="endereco">
     
-    <table><thead><tr><th>Descrição</th><th>Material</th><th>Qtd</th><th>Unit.</th><th>X</th></tr></thead><tbody id="corpoAtual"></tbody></table>
+    <table><thead><tr><th>Descrição</th><th>Material</th><th>Qtd</th><th>Unit. (R$)</th><th>X</th></tr></thead><tbody id="corpoAtual"></tbody></table>
     
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
         <div><label>Frete</label><select id="frete"><option>POR CONTA DO CLIENTE</option><option>POR CONTA DA EMPRESA</option></select></div>
@@ -195,6 +189,7 @@
     renderTabelaAtual(); tab('orc');
   }
 
+  // ALTERADO AQUI: Campo de Valor Unitário agora é <input> para permitir editar/desconto
   function renderTabelaAtual() {
     let total = 0;
     document.getElementById('corpoAtual').innerHTML = itensTemp.map((it, i) => {
@@ -203,7 +198,7 @@
             <td><input class="editable-input" value="${it.n}" onchange="itensTemp[${i}].n=this.value"></td>
             <td style="font-size:9px">${it.mat}</td>
             <td><input type="number" class="editable-input" style="width:40px" value="${it.q}" onchange="itensTemp[${i}].q=parseInt(this.value); renderTabelaAtual()"></td>
-            <td>${window.fmtMoney(it.v)}</td>
+            <td><input type="number" class="editable-input" style="width:80px" value="${it.v.toFixed(2)}" onchange="itensTemp[${i}].v=parseFloat(this.value); renderTabelaAtual()"></td>
             <td onclick="itensTemp.splice(${i},1);renderTabelaAtual()" style="cursor:pointer; color:red; font-weight:bold">X</td>
         </tr>`;
     }).join('');
