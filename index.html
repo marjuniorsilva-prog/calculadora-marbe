@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema Marbe v31.20 - Zap Direto</title>
+  <title>Sistema Marbe v31.21 - Final Oficial</title>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -36,36 +36,28 @@
 
     window.salvarNuvem = function() { set(ref(db, 'sistema/'), window.marbeDB); };
 
-    // FUNÇÃO DE COMPARTILHAMENTO REFORMULADA
+    // Função para compartilhar com nome automático
     window.compartilharArquivo = async (blob, osNum) => {
         const nomeArquivo = `${osNum}.pdf`;
-        const dataParaEnviar = new File([blob], nomeArquivo, { type: 'application/pdf' });
+        const file = new File([blob], nomeArquivo, { type: 'application/pdf' });
 
-        if (navigator.canShare && navigator.canShare({ files: [dataParaEnviar] })) {
+        if (navigator.share && navigator.canShare({ files: [file] })) {
             try {
                 await navigator.share({
-                    files: [dataParaEnviar],
+                    files: [file],
                     title: `OS ${osNum}`,
-                    text: `Documento Marbe OS ${osNum}`
+                    text: `Documento Marbe`
                 });
-            } catch (err) {
-                console.log("Compartilhamento bloqueado ou cancelado.");
-                baixarManual(blob, nomeArquivo);
-            }
+            } catch (err) { baixarArquivo(blob, nomeArquivo); }
         } else {
-            baixarManual(blob, nomeArquivo);
+            baixarArquivo(blob, nomeArquivo);
         }
     };
 
-    function baixarManual(blob, nome) {
+    function baixarArquivo(blob, nome) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
-        a.download = nome;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        alert("O arquivo " + nome + " foi baixado. Agora você pode anexar no WhatsApp.");
+        a.href = url; a.download = nome; a.click();
     }
   </script>
 
@@ -86,8 +78,8 @@
     .btn { width: 100%; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 8px; color: white; }
     table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
     table th, table td { border: 1px solid #ddd; padding: 6px; text-align: left; }
-    .editable-input { width: 100%; border: 1px solid #ffd666 !important; background: #fffbe6; padding: 4px; font-size: 11px; }
     .card-list { background: #fff; border: 1px solid #ddd; padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 5px solid #ccc; }
+    .editable-input { width: 100%; border: 1px solid #ffd666 !important; background: #fffbe6; padding: 4px; }
   </style>
 </head>
 <body>
@@ -97,7 +89,7 @@
     <button class="tab-btn active" onclick="tab('calc')">Cálculo</button>
     <button class="tab-btn" onclick="tab('orc')">Orçamento</button>
     <button class="tab-btn" onclick="tab('historico')">Histórico</button>
-    <button class="tab-btn" onclick="tab('pedidos')" style="background:var(--dark); color:white;">Pedidos</button>
+    <button class="tab-btn" onclick="tab('pedidos')" style="background:var(--dark); color:white;">Pedidos/NF</button>
     <button class="tab-btn" onclick="tab('financeiro')" style="background:var(--success); color:white;">Boletos</button>
   </div>
 
@@ -112,7 +104,7 @@
     </div>
     <label>Material</label><select id="matSelect"></select>
     <label>Tipo</label><select id="tipoServ"><option value="0.045">PEÇA NOVA</option><option value="0.065">REFORMA</option></select>
-    <button class="btn" style="background:var(--success)" onclick="calcular()">ADICIONAR ITEM</button>
+    <button class="btn" style="background:var(--success)" onclick="calcular()">CALCULAR E ADICIONAR</button>
   </div>
 
   <div id="orc" class="section">
@@ -132,7 +124,6 @@
 
 <script>
   let itensTemp = [];
-  let osEmEdicao = null;
 
   function tab(id) {
     document.querySelectorAll('.section, .tab-btn').forEach(e => e.classList.remove('active'));
@@ -169,11 +160,8 @@
   }
 
   function salvarOrcamento() {
-    const finalOS = osEmEdicao || window.marbeDB.os;
-    window.marbeDB.orçamentos.push({ os: finalOS, cliente: document.getElementById('razao').value, itens: [...itensTemp], total: itensTemp.reduce((a,b)=>a+(b.v*b.q),0) });
-    if(!osEmEdicao) window.marbeDB.os++;
-    window.salvarNuvem();
-    itensTemp = []; osEmEdicao = null; renderTabelaAtual(); tab('historico');
+    window.marbeDB.orçamentos.push({ os: window.marbeDB.os, cliente: document.getElementById('razao').value, itens: [...itensTemp], total: itensTemp.reduce((a,b)=>a+(b.v*b.q),0) });
+    window.marbeDB.os++; window.salvarNuvem(); itensTemp = []; renderTabelaAtual(); tab('historico');
   }
 
   function renderOrcamentos() {
@@ -182,6 +170,7 @@
         <strong>OS: ${o.os} - ${o.cliente}</strong><br>
         <button class="btn" style="background:var(--info)" onclick="gerarPDF('CLIENTE', ${i})">PDF CLIENTE</button>
         <button class="btn" style="background:var(--dark)" onclick="gerarPDF('PRODUCAO', ${i})">PDF PRODUCAO</button>
+        <button class="btn" style="background:var(--success)" onclick="fecharPedido(${i})">FECHAR VENDA / PEDIDO</button>
       </div>`).join('');
   }
 
@@ -194,7 +183,7 @@
     doc.setFontSize(14); doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 20, 20);
     if(tipo === 'PRODUCAO') {
         doc.text(`VIA PRODUCAO - OS: ${d.os}`, 20, 30);
-        doc.autoTable({ startY: 40, head: [['ITEM', 'MEDIDAS', 'QTD', 'PESO BRUTO']], body: d.itens.map(i => [clean(i.n), i.med, i.q, (i.kg_unit * 1.2 * i.q).toFixed(2) + " KG"]) });
+        doc.autoTable({ startY: 40, head: [['ITEM', 'MEDIDAS', 'QTD', 'PESO']], body: d.itens.map(i => [clean(i.n), i.med, i.q, (i.kg_unit * 1.2 * i.q).toFixed(2) + " KG"]) });
     } else {
         doc.text(`ORCAMENTO - OS: ${d.os} | CLIENTE: ${clean(d.cliente)}`, 20, 30);
         doc.autoTable({ startY: 40, head: [['DESCRICAO', 'MEDIDAS', 'QTD', 'TOTAL']], body: d.itens.map(i => [clean(i.n), i.med, i.q, (i.v*i.q).toFixed(2)]) });
@@ -202,9 +191,42 @@
     window.compartilharArquivo(doc.output('blob'), d.os);
   }
 
-  function tab(id) { document.querySelectorAll('.section, .tab-btn').forEach(e => e.classList.remove('active')); document.getElementById(id).classList.add('active'); }
-  function renderPedidos() { } 
-  function renderBoletos() { }
+  function fecharPedido(i) {
+    const orc = window.marbeDB.orçamentos.splice(i, 1)[0];
+    window.marbeDB.pedidos.push(orc); window.salvarNuvem(); tab('pedidos');
+  }
+
+  function renderPedidos() {
+    document.getElementById('listaPedidos').innerHTML = window.marbeDB.pedidos.map((p, i) => `
+      <div class="card-list">
+        <strong>OS: ${p.os} - ${p.cliente}</strong><br>
+        <input type="text" id="nf_${i}" placeholder="NF">
+        <input type="number" id="parc_${i}" placeholder="Parc." style="width:40%">
+        <input type="date" id="data_${i}" style="width:40%">
+        <button class="btn" style="background:var(--primary)" onclick="faturar(${i})">FATURAR</button>
+      </div>`).join('');
+  }
+
+  function faturar(i) {
+    const nf = document.getElementById(`nf_${i}`).value;
+    const qtd = parseInt(document.getElementById(`parc_${i}`).value);
+    const data = new Date(document.getElementById(`data_${i}`).value);
+    if(!nf || !qtd) return alert("Erro");
+    const p = window.marbeDB.pedidos[i];
+    for(let j=0; j<qtd; j++) {
+        let v = new Date(data); v.setMonth(v.getMonth() + j);
+        window.marbeDB.financeiro.push({ os: p.os, nf: nf, cliente: p.cliente, valor: p.total/qtd, venc: v.toLocaleDateString(), pago: false });
+    }
+    window.marbeDB.pedidos.splice(i, 1); window.salvarNuvem(); tab('financeiro');
+  }
+
+  function renderBoletos() {
+    document.getElementById('listaBoletos').innerHTML = window.marbeDB.financeiro.map((f, i) => `
+      <div class="card-list" style="border-left-color:${f.pago?'green':'red'}">
+        ${f.cliente} | R$ ${f.valor.toFixed(2)} | Venc: ${f.venc}
+        <button onclick="window.marbeDB.financeiro[i].pago=true; window.salvarNuvem();" style="float:right">Baixar</button>
+      </div>`).join('');
+  }
 </script>
 </body>
 </html>
