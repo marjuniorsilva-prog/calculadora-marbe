@@ -3,9 +3,59 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema Marbe v29.0 - Final Oficial</title>
+  <title>Sistema Marbe v31.2 - COMPLETO</title>
+  
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyATu_V6e1shKRpgBOkX1lw2beyzUEZUCo0",
+      authDomain: "marbeapp-e2db8.firebaseapp.com",
+      projectId: "marbeapp-e2db8",
+      storageBucket: "marbeapp-e2db8.firebasestorage.app",
+      messagingSenderId: "435226749841",
+      appId: "1:435226749841:web:c2b5f5dee676412b228830",
+      measurementId: "G-7E0M9SL1DK"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    window.marbeDB = { os: 330, vendas: [], financeiro: [], custos: {vh: 50, mats: []} };
+
+    const dbRef = ref(db, 'sistema/');
+    onValue(dbRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        window.marbeDB = data;
+        updateUI();
+      }
+    });
+
+    window.salvarNuvem = function() {
+      set(ref(db, 'sistema/'), window.marbeDB);
+    };
+
+    window.compartilharWhatsApp = async (blob, osNum, cliente) => {
+        const file = new File([blob], `${osNum}.pdf`, { type: 'application/pdf' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({
+                    files: [file],
+                    title: `OS ${osNum} - Marbe`,
+                    text: `Olá, segue Orçamento da OS ${osNum} - ${cliente}`
+                });
+            } catch (err) { alert("Compartilhamento cancelado."); }
+        } else {
+            alert("Seu navegador não suporta envio de arquivos. O arquivo foi baixado no seu celular.");
+        }
+    };
+  </script>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+  
   <style>
     :root { --primary: #2c7be5; --success: #28a745; --danger: #d9534f; --info: #17a2b8; }
     body { font-family: sans-serif; background: #f4f7f6; margin: 0; padding: 5px; }
@@ -15,26 +65,24 @@
     .tab-btn.active { background: var(--primary); color: white; }
     .section { display: none; }
     .section.active { display: block; }
-    label { display: block; margin-top: 10px; font-weight: bold; font-size: 12px; color: #444; }
+    label { display: block; margin-top: 10px; font-weight: bold; font-size: 12px; }
     input, select, textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box; }
-    .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; color: white; font-size: 14px; }
+    .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; color: white; }
     table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
     table th, table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-    .input-table { width: 100%; padding: 5px; border: 1px solid var(--primary); border-radius: 3px; font-size: 12px; background: #fff; }
     .card-list { background: #fff; border: 1px solid #ddd; padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 5px solid #ccc; }
-    .card-material { background: #f8f9fa; padding: 10px; border-radius: 6px; margin-bottom: 5px; border: 1px solid #ddd; display: flex; gap: 5px; align-items: center; }
+    .input-table { width: 100%; padding: 5px; border: 1px solid var(--primary); border-radius: 3px; font-size: 12px; }
   </style>
 </head>
-<body onload="init()">
+<body>
 
 <div class="container">
   <div class="tabs">
     <button class="tab-btn active" onclick="tab('calc')">Calculo</button>
     <button class="tab-btn" onclick="tab('orc')">Orcamento</button>
     <button class="tab-btn" onclick="tab('hist')">Historico</button>
-    <button class="tab-btn" onclick="tab('entrega')">Entregas/NF</button>
     <button class="tab-btn" onclick="tab('receber')" style="background:var(--success); color:white;">Receber</button>
-    <button class="tab-btn" onclick="tab('cfg')">Precos Custo</button>
+    <button class="tab-btn" onclick="tab('cfg')">Custos</button>
   </div>
 
   <div id="calc" class="section active">
@@ -43,11 +91,11 @@
       <div><label>Comprimento (mm)</label><input type="number" id="l"></div>
     </div>
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-      <div><label>Camada Revest. (mm)</label><input type="number" id="e"></div>
+      <div><label>Camada (mm)</label><input type="number" id="e"></div>
       <div><label>Horas Trab.</label><input type="number" id="h" value="10"></div>
     </div>
     <label>Material</label><select id="matSelect"></select>
-    <label>Tipo</label><select id="tipoServ"><option value="0.045">PECA NOVA (4.5%)</option><option value="0.065">REFORMA (6.5%)</option></select>
+    <label>Tipo</label><select id="tipoServ"><option value="0.045">PECA NOVA</option><option value="0.065">REFORMA</option></select>
     <button class="btn" style="background:var(--success)" onclick="calcular()">CALCULAR PRECO</button>
     <div id="resCalc" style="display:none; padding:10px; background:#eef9f0; margin-top:10px; border-radius:8px; text-align:center; border: 1px solid #c3e6cb;"></div>
     <button id="addBtn" class="btn" style="background:var(--primary); display:none;" onclick="addCarrinho()">ADICIONAR AO PEDIDO</button>
@@ -55,195 +103,133 @@
 
   <div id="orc" class="section">
     <div style="display:grid; grid-template-columns: 80px 1fr; gap:10px;">
-      <div><label>OS</label><input type="number" id="osAtual" readonly style="background:#eee"></div>
+      <div><label>OS</label><input type="number" id="osNum" readonly style="background:#eee"></div>
       <div><label>CNPJ Cliente</label><input type="text" id="cnpj" onblur="buscaCNPJ(this.value)"></div>
     </div>
     <label>Razao Social</label><input type="text" id="razao">
-    
-    <div class="table-container" style="overflow-x:auto;">
-      <table>
-        <thead>
-          <tr>
-            <th>Descricao (Editavel)</th>
-            <th style="width:80px">Camada (mm)</th>
-            <th style="width:60px">Qtd</th>
-            <th>Unit.</th>
-            <th>Total</th>
-            <th>X</th>
-          </tr>
-        </thead>
-        <tbody id="corpoOrc"></tbody>
-      </table>
-    </div>
-
+    <table><thead><tr><th>Descricao</th><th>Qtd</th><th>Unit.</th><th>Total</th><th>X</th></tr></thead><tbody id="corpoOrc"></tbody></table>
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-        <div>
-            <label>Frete</label>
-            <select id="frete">
-                <option value="POR CONTA DO CLIENTE">POR CONTA DO CLIENTE</option>
-                <option value="POR CONTA DA EMPRESA">POR CONTA DA EMPRESA</option>
-            </select>
-        </div>
+        <div><label>Frete</label><select id="frete"><option>POR CONTA DO CLIENTE</option><option>POR CONTA DA EMPRESA</option></select></div>
         <div><label>Garantia</label><input type="text" id="garantia" value="90 DIAS"></div>
     </div>
-    <label>Forma de Pagamento (Editavel)</label>
-    <textarea id="pagamento" rows="3">50% + BOLETO 28DD APOS FATURAMENTO. SUJEITO ANALISE DE CREDITO PODENDO MUDAR TERMOS CASO CLIENTE NAO SEJA APROVADO NO ATO DA EMISSAO DOS BOLETO.</textarea>
-
-    <h3 style="text-align:right">Total Geral: <span id="totalOrc">R$ 0,00</span></h3>
-    
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-        <button class="btn" style="background:var(--danger)" onclick="gerarPDF('CLIENTE')">PDF CLIENTE</button>
-        <button class="btn" style="background:var(--info)" onclick="gerarPDF('PRODUCAO')">PDF PRODUCAO</button>
-    </div>
-    <button class="btn" style="background:#333; margin-top:20px;" onclick="finalizarPedido()">FINALIZAR E PULAR OS</button>
+    <label>Prazo de Entrega</label><input type="text" id="prazo" value="10 DIAS UTEIS">
+    <label>Pagamento</label><textarea id="pagamento" rows="2">50% + BOLETO 28DD APOS FATURAMENTO.</textarea>
+    <h3 style="text-align:right">Total: <span id="totalOrc">R$ 0,00</span></h3>
+    <button class="btn" style="background:var(--danger)" onclick="gerarPDF('CLIENTE')">GERAR E COMPARTILHAR PDF</button>
+    <button class="btn" style="background:#333" onclick="finalizar()">FINALIZAR PEDIDO</button>
   </div>
 
   <div id="hist" class="section"><h3>Historico</h3><div id="listaHist"></div></div>
-  <div id="entrega" class="section"><h3>Entregas</h3><div id="listaEntrega"></div></div>
-  <div id="receber" class="section"><h3>Financeiro</h3><div id="listaBoletos"></div></div>
-
+  <div id="receber" class="section"><h3>Contas a Receber</h3><div id="listaBoletos"></div></div>
+  
   <div id="cfg" class="section">
-    <h3>Tabela de Materiais (Preco de Custo)</h3>
-    <label>Valor Hora Producao (R$)</label>
-    <input type="number" id="cfgVh" onchange="salvarPrecos()">
-    
-    <label>Materiais Cadastrados:</label>
-    <div id="listaMatsCfg" style="margin-top:10px; max-height: 300px; overflow-y: auto; border: 1px solid #eee; padding: 5px;"></div>
-
-    <div style="background: #e9ecef; padding: 15px; border-radius: 8px; margin-top: 20px; border: 1px solid #ccc;">
-        <strong style="color: var(--primary);">ADICIONAR NOVA MATERIA-PRIMA</strong>
-        <label>Nome do Produto</label>
-        <input type="text" id="novoNome" placeholder="Ex: Borracha Nitrilica 60 ShA">
-        <label>Valor por KG (Custo)</label>
-        <input type="number" id="novoPreco" placeholder="Ex: 45.00">
-        <button class="btn" style="background:var(--success)" onclick="addMat()">SALVAR NOVO PRODUTO</button>
+    <h3>Tabela de Custos</h3>
+    <div id="listaCustos"></div>
+    <div style="background:#eee; padding:15px; border-radius:8px; margin-top:15px;">
+        <label>Nova Borracha</label><input type="text" id="matNome">
+        <label>Preco KG</label><input type="number" id="matPreco">
+        <button class="btn" style="background:var(--success)" onclick="addMaterial()">SALVAR NOVO PRODUTo</button>
     </div>
-    <hr>
-    <button class="btn" style="background:#666; font-size: 10px;" onclick="if(confirm('Limpar sistema?')) {localStorage.clear(); location.reload();}">RESTAURAR SISTEMA (LIMPAR TUDO)</button>
   </div>
 </div>
 
 <script>
-  let PRECOS = { vh: 50, mats: [{n:"Natural Preta", p:13}, {n:"Nitrilica", p:49}] };
-  let SISTEMA = { os: 330, vendas: [], financeiro: [] };
   let itens = []; let tItem = null;
-
-  function init() {
-    let p = localStorage.getItem('marbe_p_v29');
-    if(p) PRECOS = JSON.parse(p);
-    let s = localStorage.getItem('marbe_d_v29');
-    if(s) SISTEMA = JSON.parse(s);
-    document.getElementById('osAtual').value = SISTEMA.os;
-    renderCfg();
-  }
 
   function tab(id) {
     document.querySelectorAll('.section, .tab-btn').forEach(e => e.classList.remove('active'));
     document.getElementById(id).classList.add('active');
-    event.currentTarget.classList.add('active');
-    if(id === 'hist') renderHist();
-    if(id === 'entrega') renderEntrega();
-    if(id === 'receber') renderReceber();
-    if(id === 'cfg') renderCfg();
   }
 
-  // --- LOGICA DE MATERIAIS ---
-  function renderCfg() {
-    document.getElementById('cfgVh').value = PRECOS.vh;
-    document.getElementById('matSelect').innerHTML = PRECOS.mats.map(m => `<option value="${m.p}">${m.n}</option>`).join('');
-    const l = document.getElementById('listaMatsCfg');
-    l.innerHTML = PRECOS.mats.map((m, i) => `
-        <div class="card-material">
-            <input type="text" value="${m.n}" style="flex:2" onchange="PRECOS.mats[${i}].n=this.value; salvarPrecos()">
-            <input type="number" value="${m.p}" style="flex:1" onchange="PRECOS.mats[${i}].p=parseFloat(this.value); salvarPrecos()">
-            <button onclick="PRECOS.mats.splice(${i},1); salvarPrecos(); renderCfg()" style="background:var(--danger); border:none; color:white; padding:10px; border-radius:4px;">X</button>
-        </div>`).join('');
+  function updateUI() {
+    document.getElementById('osNum').value = window.marbeDB.os;
+    document.getElementById('matSelect').innerHTML = window.marbeDB.custos.mats.map(m => `<option value="${m.p}">${m.n}</option>`).join('');
+    renderCustos(); renderReceber(); renderHist();
   }
 
-  function addMat() {
-    const n = document.getElementById('novoNome').value;
-    const p = parseFloat(document.getElementById('novoPreco').value);
-    if(n && p) {
-        PRECOS.mats.push({n, p});
-        document.getElementById('novoNome').value = "";
-        document.getElementById('novoPreco').value = "";
-        salvarPrecos(); renderCfg();
-    } else { alert("Preencha nome e valor!"); }
-  }
-
-  // --- CALCULADORA ---
   function calcular() {
-    const d = parseFloat(document.getElementById('d').value);
-    const l = parseFloat(document.getElementById('l').value);
-    const e = parseFloat(document.getElementById('e').value);
-    const pk = parseFloat(document.getElementById('matSelect').value);
-    const h = parseFloat(document.getElementById('h').value);
-    const imp = parseFloat(document.getElementById('tipoServ').value);
-    if(!d || !l || !e) return alert("Preencha medidas!");
-    const peso = Math.ceil((Math.PI * (d + e) * l * e) * 1200 / 1000000000);
-    const unit = (((peso * pk * 1.1) + (h * PRECOS.vh)) * 2.5) * (1 + imp);
-    tItem = { n: "Revestimento em " + document.getElementById('matSelect').options[document.getElementById('matSelect').selectedIndex].text, med: d+"x"+l+"mm", e: e+"mm", q: 1, v: unit, kg: peso, custoK: pk, horas: h };
+    const d=parseFloat(document.getElementById('d').value), l=parseFloat(document.getElementById('l').value), e=parseFloat(document.getElementById('e').value), pk=parseFloat(document.getElementById('matSelect').value), h=parseFloat(document.getElementById('h').value), imp=parseFloat(document.getElementById('tipoServ').value);
+    const peso = Math.ceil((Math.PI*(d+e)*l*e)*1200/1000000000);
+    const unit = (((peso*pk*1.1)+(h*window.marbeDB.custos.vh))*2.5)*(1+imp);
+    tItem = { n: "Revestimento "+document.getElementById('matSelect').options[document.getElementById('matSelect').selectedIndex].text, med: d+"x"+l+"mm", e: e+"mm", q: 1, v: unit, kg: peso, h: h };
     document.getElementById('resCalc').style.display="block";
-    document.getElementById('resCalc').innerHTML = `Unitario: R$ ${unit.toFixed(2)} | Peso: ${peso}kg`;
+    document.getElementById('resCalc').innerHTML = `Unit: R$ ${unit.toFixed(2)} | Peso: ${peso}kg`;
     document.getElementById('addBtn').style.display="block";
   }
 
   function addCarrinho() { itens.push({...tItem}); renderCarrinho(); tab('orc'); }
   function renderCarrinho() {
-    const tbody = document.getElementById('corpoOrc');
-    tbody.innerHTML = ""; let tot = 0;
-    itens.forEach((it, idx) => {
-      tot += it.v * it.q;
-      tbody.innerHTML += `<tr><td><input type="text" class="input-table" value="${it.n}" onchange="itens[${idx}].n=this.value"></td><td><input type="text" class="input-table" value="${it.e}" onchange="itens[${idx}].e=this.value"></td><td><input type="number" class="input-table" value="${it.q}" onchange="itens[${idx}].q=this.value; renderCarrinho()"></td><td>${it.v.toFixed(2)}</td><td>${(it.v * it.q).toFixed(2)}</td><td onclick="itens.splice(${idx},1); renderCarrinho()" style="color:red; cursor:pointer;">X</td></tr>`;
-    });
+    let tot = 0;
+    document.getElementById('corpoOrc').innerHTML = itens.map((it, idx) => {
+        tot += it.v * it.q;
+        return `<tr><td>${it.n}</td><td><input type="number" class="input-table" value="${it.q}" onchange="itens[${idx}].q=this.value; renderCarrinho()"></td><td>${it.v.toFixed(2)}</td><td>${(it.v*it.q).toFixed(2)}</td><td onclick="itens.splice(${idx},1); renderCarrinho()">X</td></tr>`;
+    }).join('');
     document.getElementById('totalOrc').innerText = "R$ " + tot.toFixed(2);
   }
 
-  // --- PDF ---
-  function efetuarPDF(p, tipo) {
-    const { jsPDF } = window.jspdf; const doc = new jsPDF();
-    doc.setFont("helvetica", "bold"); doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 20, 20);
-    doc.setFontSize(9); doc.setFont("helvetica", "normal");
-    doc.text("CNPJ: 61.149.312/0001-56", 20, 26);
-    doc.text("Endereco: Rua Sao Carlos, 84 - Vila Mariana - Ribeirao Preto / SP", 20, 31);
-    doc.line(20, 34, 190, 34);
-    doc.setFontSize(10); doc.text("OS: " + p.os + " | Cliente: " + p.cliente, 20, 42);
+  function finalizar() {
+    window.marbeDB.vendas.push({ os: window.marbeDB.os, cliente: document.getElementById('razao').value, total: parseFloat(document.getElementById('totalOrc').innerText.replace("R$ ","")), itens: [...itens], pago: false });
+    // Gera boleto automático para o financeiro
+    window.marbeDB.financeiro.push({ os: window.marbeDB.os, cliente: document.getElementById('razao').value, valor: parseFloat(document.getElementById('totalOrc').innerText.replace("R$ ","")), pago: false });
+    window.marbeDB.os++;
+    window.salvarNuvem();
+    itens = []; renderCarrinho(); tab('calc');
+  }
 
-    if(tipo === 'CLIENTE') {
-        const rows = p.itens.map(i => [i.n, i.med, i.e, i.q, i.v.toFixed(2), (i.v*i.q).toFixed(2)]);
-        doc.autoTable({ startY: 50, head: [['Descricao', 'Medidas', 'Camada', 'Qtd', 'Unit.', 'Total']], body: rows });
-        const fY = doc.lastAutoTable.finalY + 10;
-        doc.setFont("helvetica", "bold"); doc.text("TOTAL: R$ " + p.total.toFixed(2), 190, fY, {align:'right'});
-        doc.setFontSize(9); doc.text("FRETE: " + (p.frete || "A COMBINAR"), 20, fY + 10);
-        doc.text("GARANTIA: " + (p.garantia || "90 DIAS"), 20, fY + 16);
-        doc.text("PAGAMENTO: " + (p.pagamento || ""), 20, fY + 22, {maxWidth: 170});
-    } else {
-        const rowsP = p.itens.map(i => [i.n, i.med, i.kg+"kg", (i.kg*1.2).toFixed(2)+"kg", i.horas+"h"]);
-        doc.autoTable({ startY: 50, head: [['Material', 'Medidas', 'Peso Liq.', 'Compra+20%', 'Horas']], body: rowsP });
+  function gerarPDF(tipo, dadosManual = null) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const d = dadosManual || { os: document.getElementById('osNum').value, cliente: document.getElementById('razao').value, itens: [...itens], total: document.getElementById('totalOrc').innerText };
+    
+    doc.setFontSize(14); doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 20, 20);
+    doc.setFontSize(10); doc.text(`OS: ${d.os} | CLIENTE: ${d.cliente}`, 20, 30);
+    
+    let head = [['Item', 'Medidas', 'Qtd', 'Unit', 'Total']];
+    let body = d.itens.map(i => [i.n, i.med, i.q, i.v.toFixed(2), (i.v*i.q).toFixed(2)]);
+    
+    if(tipo === 'FUNCIONARIO') {
+        head = [['Item', 'Medidas', 'Camada', 'Qtd', 'Horas']];
+        body = d.itens.map(i => [i.n, i.med, i.e, i.q, i.h+"h"]);
     }
-    doc.save(tipo + "_OS_" + p.os + ".pdf");
+
+    doc.autoTable({ startY: 40, head: head, body: body });
+    const pdfBlob = doc.output('blob');
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    const link = document.createElement('a');
+    link.href = pdfUrl; link.download = `${d.os}.pdf`; link.click();
+    
+    if(confirm("Deseja compartilhar no WhatsApp?")) {
+        window.compartilharWhatsApp(pdfBlob, d.os, d.cliente);
+    }
   }
 
-  function gerarPDF(tipo) {
-    const d = { os: SISTEMA.os, cliente: document.getElementById('razao').value, total: parseFloat(document.getElementById('totalOrc').innerText.replace("R$ ","")), itens: JSON.parse(JSON.stringify(itens)), frete: document.getElementById('frete').value, garantia: document.getElementById('garantia').value, pagamento: document.getElementById('pagamento').value };
-    efetuarPDF(d, tipo);
+  function renderReceber() {
+    document.getElementById('listaBoletos').innerHTML = window.marbeDB.financeiro.map((f, i) => `
+      <div class="card-list" style="border-left-color: ${f.pago ? 'green' : 'red'}">
+        <strong>${f.cliente}</strong> | OS: ${f.os}<br>R$ ${f.valor.toFixed(2)}
+        ${f.pago ? '<b style="float:right;color:green">PAGO</b>' : `<button onclick="window.marbeDB.financeiro[${i}].pago=true; window.salvarNuvem();" style="float:right; background:green; color:white; border:none; padding:5px; border-radius:4px;">Baixar</button>`}
+      </div>`).join('');
   }
 
-  function finalizarPedido() {
-    SISTEMA.vendas.push({ os: SISTEMA.os, cliente: document.getElementById('razao').value, total: parseFloat(document.getElementById('totalOrc').innerText.replace("R$ ","")), confirmado: false, entregue: false, itens: [...itens] });
-    SISTEMA.os++; salvarDados(); itens = []; renderCarrinho(); document.getElementById('osAtual').value = SISTEMA.os; tab('calc');
+  function renderHist() {
+    document.getElementById('listaHist').innerHTML = window.marbeDB.vendas.slice().reverse().map((v, i) => {
+        const idx = window.marbeDB.vendas.length - 1 - i;
+        return `<div class="card-list">
+            <strong>${v.cliente}</strong> (OS: ${v.os}) - R$ ${v.total.toFixed(2)}<br>
+            <button onclick="reimprimir(${idx}, 'CLIENTE')">PDF Cliente</button>
+            <button onclick="reimprimir(${idx}, 'FUNCIONARIO')" style="background:var(--info); color:white;">Planilha Func.</button>
+        </div>`;
+    }).join('');
   }
 
-  // --- OUTRAS FUNÇÕES ---
-  function renderHist() { document.getElementById('listaHist').innerHTML = SISTEMA.vendas.slice().reverse().map((v, i) => `<div class="card-list"><strong>${v.cliente}</strong> (OS: ${v.os})<br>R$ ${v.total.toFixed(2)}<br><button onclick="regerarPDF(${SISTEMA.vendas.length-1-i}, 'CLIENTE')">PDF CLI</button> <button onclick="regerarPDF(${SISTEMA.vendas.length-1-i}, 'PRODUCAO')">PDF PROD</button> ${!v.confirmado ? `<button onclick="confirmar(${SISTEMA.vendas.length-1-i})">Vendido</button>` : 'VENDIDO'}</div>`).join(''); }
-  function regerarPDF(idx, t) { efetuarPDF(SISTEMA.vendas[idx], t); }
-  function confirmar(i) { SISTEMA.vendas[i].confirmado = true; salvarDados(); renderHist(); }
-  function renderEntrega() { const vends = SISTEMA.vendas.filter(v => v.confirmado && !v.entregue); document.getElementById('listaEntrega').innerHTML = vends.map(v => `<div class="card-list"><strong>${v.cliente}</strong> (OS: ${v.os})<br><input type="text" id="nf_${v.os}" placeholder="NF"><input type="number" id="parc_${v.os}" placeholder="Parc."><button onclick="lancarNF(${v.os})">OK</button></div>`).join(''); }
-  function lancarNF(os) { const nf=document.getElementById('nf_'+os).value; const q=parseInt(document.getElementById('parc_'+os).value); if(!nf||!q) return; let v=SISTEMA.vendas.find(x=>x.os===os); v.entregue=true; v.nf=nf; for(let i=1;i<=q;i++){SISTEMA.financeiro.push({os,cliente:v.cliente,nf,parc:i+"/"+q,valor:v.total/q,venc:"",pago:false});} salvarDados(); tab('receber'); }
-  function renderReceber() { document.getElementById('listaBoletos').innerHTML = SISTEMA.financeiro.map((f, i) => `<div class="card-list"><strong>${f.cliente}</strong> | OS: ${f.os}<br>R$ ${f.valor.toFixed(2)} | Venc: <input type="date" value="${f.venc}" onchange="SISTEMA.financeiro[${i}].venc=this.value; salvarDados()"> <button onclick="SISTEMA.financeiro[${i}].pago=true; salvarDados(); renderReceber()">Pago</button></div>`).join(''); }
-  function salvarPrecos() { PRECOS.vh = parseFloat(document.getElementById('cfgVh').value); localStorage.setItem('marbe_p_v29', JSON.stringify(PRECOS)); }
-  function salvarDados() { localStorage.setItem('marbe_d_v29', JSON.stringify(SISTEMA)); }
-  async function buscaCNPJ(v) { const r = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${v.replace(/\D/g,'')}`); const d = await r.json(); document.getElementById('razao').value = d.razao_social || ""; }
-</script>
-</body>
-</html>
+  function reimprimir(i, t) {
+    const v = window.marbeDB.vendas[i];
+    gerarPDF(t, { os: v.os, cliente: v.cliente, itens: v.itens, total: "R$ "+v.total.toFixed(2) });
+  }
+
+  function renderCustos() {
+    document.getElementById('listaCustos').innerHTML = window.marbeDB.custos.mats.map((m, i) => `
+      <div style="display:flex; gap:10px; margin-bottom:5px;">
+        <input type="text" value="${m.n}" readonly style="flex:2">
+        <input type="number" value="${m.p}" readonly style="flex:1">
+        <button onclick="window.marbeDB.custos.mats.splice(${i},1); window.salvarNuvem
