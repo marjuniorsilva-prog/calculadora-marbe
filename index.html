@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema Marbe v22.0</title>
+  <title>Sistema Marbe v23.0</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
   <style>
@@ -11,18 +11,17 @@
     body { font-family: sans-serif; background: #f4f7f6; margin: 0; padding: 5px; }
     .container { max-width: 1000px; background: #fff; padding: 15px; border-radius: 8px; margin: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
     .tabs { display: flex; gap: 3px; margin-bottom: 15px; flex-wrap: wrap; }
-    .tab-btn { flex: 1; padding: 10px 5px; border: none; background: #ddd; cursor: pointer; font-weight: bold; border-radius: 5px; font-size: 10px; text-transform: uppercase; min-width: 85px; }
+    .tab-btn { flex: 1; padding: 10px 5px; border: none; background: #ddd; cursor: pointer; font-weight: bold; border-radius: 8px; font-size: 10px; text-transform: uppercase; min-width: 85px; }
     .tab-btn.active { background: var(--primary); color: white; }
     .section { display: none; }
     .section.active { display: block; }
     label { display: block; margin-top: 10px; font-weight: bold; font-size: 12px; color: #444; }
     input, select, textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box; }
     .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; color: white; }
-    .card { border: 1px solid #ddd; padding: 10px; border-radius: 8px; margin-bottom: 8px; background: #fafafa; }
     table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
     table th, table td { border: 1px solid #ddd; padding: 5px; text-align: left; }
-    .input-table { width: 100%; padding: 5px; border: 1px solid #aaa; border-radius: 3px; font-size: 12px; }
-    .finance-card { border-left: 5px solid var(--primary); padding: 10px; margin-bottom: 10px; background: #fff; }
+    .input-table { width: 100%; padding: 5px; border: 1px solid #2c7be5; border-radius: 3px; font-size: 12px; background: #fff; }
+    .card { border: 1px solid #ddd; padding: 10px; border-radius: 8px; margin-bottom: 8px; background: #fafafa; }
   </style>
 </head>
 <body onload="init()">
@@ -46,25 +45,24 @@
       <div><label>Camada Revest. (mm)</label><input type="number" id="e"></div>
       <div><label>Horas Trab.</label><input type="number" id="h" value="10"></div>
     </div>
-    <label>Material (Borracha)</label><select id="matSelect"></select>
-    <label>Tipo de Servico</label>
-    <select id="tipoServ">
-        <option value="0.045">PECA NOVA (4,5%)</option>
-        <option value="0.065">REFORMA (6,5%)</option>
-    </select>
+    <label>Material</label><select id="matSelect"></select>
+    <label>Tipo</label><select id="tipoServ"><option value="0.045">PECA NOVA</option><option value="0.065">REFORMA</option></select>
     <button class="btn" style="background:var(--success)" onclick="calcular()">CALCULAR PRECO</button>
     <div id="resCalc" style="display:none; padding:10px; background:#eef9f0; margin-top:10px; border-radius:8px; text-align:center; border: 1px solid #c3e6cb;"></div>
     <button id="addBtn" class="btn" style="background:var(--primary); display:none;" onclick="addCarrinho()">ADICIONAR AO PEDIDO</button>
   </div>
 
   <div id="orc" class="section">
-    <label>Razao Social Cliente</label><input type="text" id="razao" placeholder="Nome do Cliente">
+    <div style="display:grid; grid-template-columns: 80px 1fr; gap:10px;">
+      <div><label>OS</label><input type="number" id="osAtual" readonly style="background:#eee"></div>
+      <div><label>Cliente</label><input type="text" id="razao" placeholder="Nome do Cliente"></div>
+    </div>
     <div class="table-container" style="overflow-x:auto;">
       <table>
         <thead>
           <tr>
-            <th>Descricao</th>
-            <th style="width:70px">Camada</th>
+            <th>Descricao (Editavel)</th>
+            <th style="width:80px">Camada (mm)</th>
             <th style="width:60px">Qtd</th>
             <th>Unit.</th>
             <th>Total</th>
@@ -74,18 +72,22 @@
         <tbody id="corpoOrc"></tbody>
       </table>
     </div>
-    <h3 style="text-align:right; margin-top:15px;">Total Geral: <span id="totalOrc">R$ 0,00</span></h3>
-    <button class="btn" style="background:var(--danger)" onclick="gerarPDF('CLIENTE')">GERAR PDF E SALVAR</button>
+    <h3 style="text-align:right">Total Geral: <span id="totalOrc">R$ 0,00</span></h3>
+    
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+        <button class="btn" style="background:var(--danger)" onclick="gerarPDF('CLIENTE')">PDF CLIENTE</button>
+        <button class="btn" style="background:var(--info)" onclick="gerarPDF('PRODUCAO')">PDF PRODUCAO</button>
+    </div>
+    <button class="btn" style="background:#333; margin-top:20px;" onclick="finalizarPedido()">FINALIZAR E LIMPAR TELA (PROXIMA OS)</button>
   </div>
 
   <div id="hist" class="section"><div id="listaHist"></div></div>
   <div id="entrega" class="section"><div id="listaEntrega"></div></div>
   <div id="receber" class="section"><div id="listaBoletos"></div></div>
   <div id="cfg" class="section">
-    <h3>Tabela de Materiais (Custo)</h3>
-    <label>Valor Hora Producao (R$)</label><input type="number" id="cfgVh" onchange="salvarTabelaPrecos()">
+    <label>Valor Hora</label><input type="number" id="cfgVh" onchange="salvarPrecos()">
     <div id="listaMatsCfg"></div>
-    <button class="btn" style="background:var(--primary)" onclick="addMat()">+ Adicionar Borracha</button>
+    <button class="btn" style="background:var(--primary)" onclick="addMat()">+ Novo Material</button>
   </div>
 </div>
 
@@ -95,10 +97,11 @@
   let itens = []; let tItem = null;
 
   function init() {
-    let p = localStorage.getItem('marbe_precos_v22');
+    let p = localStorage.getItem('m_precos_v23');
     if(p) PRECOS = JSON.parse(p);
-    let s = localStorage.getItem('marbe_dados_v22');
+    let s = localStorage.getItem('m_dados_v23');
     if(s) SISTEMA = JSON.parse(s);
+    document.getElementById('osAtual').value = SISTEMA.os;
     renderCfg();
   }
 
@@ -115,8 +118,8 @@
     const d = parseFloat(document.getElementById('d').value);
     const l = parseFloat(document.getElementById('l').value);
     const e = parseFloat(document.getElementById('e').value);
-    const h = parseFloat(document.getElementById('h').value);
     const pk = parseFloat(document.getElementById('matSelect').value);
+    const h = parseFloat(document.getElementById('h').value);
     const imp = parseFloat(document.getElementById('tipoServ').value);
     if(!d || !l || !e) return alert("Preencha as medidas!");
 
@@ -125,10 +128,10 @@
 
     tItem = { 
         n: "Revestimento em " + document.getElementById('matSelect').options[document.getElementById('matSelect').selectedIndex].text,
-        med: d+"x"+l+"mm", e: e+"mm", q: 1, v: unit, kg: peso, custoK: pk 
+        med: d+"x"+l+"mm", e: e+"mm", q: 1, v: unit, kg: peso, custoK: pk, horas: h
     };
     document.getElementById('resCalc').style.display="block";
-    document.getElementById('resCalc').innerHTML = `Peso: ${peso}kg | Preco: R$ ${unit.toFixed(2)}`;
+    document.getElementById('resCalc').innerHTML = `Peso: ${peso}kg | Unitario: R$ ${unit.toFixed(2)}`;
     document.getElementById('addBtn').style.display="block";
   }
 
@@ -136,46 +139,70 @@
 
   function renderCarrinho() {
     const tbody = document.getElementById('corpoOrc');
-    tbody.innerHTML = "";
-    let tot = 0;
+    tbody.innerHTML = ""; let tot = 0;
     itens.forEach((it, idx) => {
-      const subtotal = it.v * it.q;
-      tot += subtotal;
+      tot += it.v * it.q;
       tbody.innerHTML += `
         <tr>
           <td><input type="text" class="input-table" value="${it.n}" onchange="itens[${idx}].n=this.value"></td>
           <td><input type="text" class="input-table" value="${it.e}" onchange="itens[${idx}].e=this.value"></td>
           <td><input type="number" class="input-table" value="${it.q}" onchange="itens[${idx}].q=this.value; renderCarrinho()"></td>
           <td>${it.v.toFixed(2)}</td>
-          <td>${subtotal.toFixed(2)}</td>
-          <td onclick="itens.splice(${idx},1); renderCarrinho()" style="color:red; font-weight:bold; text-align:center;">X</td>
+          <td>${(it.v * it.q).toFixed(2)}</td>
+          <td onclick="itens.splice(${idx},1); renderCarrinho()" style="color:red; font-weight:bold; cursor:pointer;">X</td>
         </tr>`;
     });
     document.getElementById('totalOrc').innerText = "R$ " + tot.toFixed(2);
   }
 
-  // --- PDF E DADOS ---
-  function gerarPDF() {
+  function gerarPDF(tipo) {
+    if(itens.length === 0) return alert("Adicione itens!");
     const { jsPDF } = window.jspdf; const doc = new jsPDF();
     const osNum = SISTEMA.os;
-    doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 20, 20);
-    doc.text("OS: "+osNum+" | Cliente: "+document.getElementById('razao').value, 20, 30);
-    const rows = itens.map(i => [i.n, i.med, i.e, i.q, i.v.toFixed(2), (i.v*i.q).toFixed(2)]);
-    doc.autoTable({ startY: 40, head: [['Descricao', 'Medidas', 'Camada', 'Qtd', 'Unit.', 'Total']], body: rows });
-    SISTEMA.vendas.push({ os: osNum, cliente: document.getElementById('razao').value, total: parseFloat(document.getElementById('totalOrc').innerText.replace("R$ ","")), confirmado: false, entregue: false, itens: [...itens] });
-    SISTEMA.os++; salvarDados(); doc.save("OS_"+osNum+".pdf");
+
+    doc.setFont("helvetica", "bold"); doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 20, 20);
+    doc.setFontSize(9); doc.setFont("helvetica", "normal");
+    doc.text("CNPJ: 61.149.312/0001-56", 20, 26);
+    doc.text("Endereco: Rua Sao Carlos, 84 - Vila Mariana - Ribeirao Preto / SP", 20, 31);
+    doc.line(20, 34, 190, 34);
+
+    doc.setFontSize(10); doc.text("ORDEM DE SERVICO (OS): " + osNum, 20, 42);
+    doc.text("DATA: " + new Date().toLocaleDateString('pt-BR'), 140, 42);
+    doc.text("Cliente: " + document.getElementById('razao').value, 20, 50);
+
+    if(tipo === 'CLIENTE') {
+        const rows = itens.map(i => [i.n, i.med, i.e, i.q, i.v.toFixed(2), (i.v*i.q).toFixed(2)]);
+        doc.autoTable({ startY: 55, head: [['Descricao', 'Medidas', 'Camada', 'Qtd', 'Unit.', 'Total']], body: rows, theme: 'grid' });
+        doc.setFont("helvetica", "bold"); doc.text("TOTAL: " + document.getElementById('totalOrc').innerText, 190, doc.lastAutoTable.finalY + 10, {align:'right'});
+    } else {
+        const rowsP = itens.map(i => [i.n, i.med, i.kg+"kg", (i.kg*1.2).toFixed(2)+"kg", i.horas+"h"]);
+        doc.autoTable({ startY: 55, head: [['Material', 'Medidas', 'Peso Liq.', 'Compra+20%', 'Horas']], body: rowsP, theme: 'grid' });
+    }
+    doc.save(tipo + "_OS_" + osNum + ".pdf");
   }
 
-  // Funções de apoio (Histórico, Financeiro, Config) permanecem iguais para manter a estabilidade
+  function finalizarPedido() {
+    if(!confirm("Deseja finalizar esta OS e pular para o proximo numero?")) return;
+    SISTEMA.vendas.push({ os: SISTEMA.os, cliente: document.getElementById('razao').value, total: parseFloat(document.getElementById('totalOrc').innerText.replace("R$ ","")), confirmado: false, entregue: false, itens: [...itens] });
+    SISTEMA.os++; 
+    salvarDados();
+    itens = []; 
+    document.getElementById('razao').value = "";
+    renderCarrinho();
+    document.getElementById('osAtual').value = SISTEMA.os;
+    tab('calc');
+    alert("Pedido finalizado com sucesso!");
+  }
+
   function renderHist() { document.getElementById('listaHist').innerHTML = SISTEMA.vendas.slice().reverse().map((v, i) => `<div class="card">OS: ${v.os} | ${v.cliente} | R$ ${v.total.toFixed(2)}<br>${!v.confirmado ? `<button onclick="confirmar(${SISTEMA.vendas.length-1-i})">Confirmar Venda</button>` : `<b style="color:green">VENDIDO</b>`}</div>`).join(''); }
   function confirmar(i) { SISTEMA.vendas[i].confirmado = true; salvarDados(); renderHist(); }
   function renderEntrega() { const vends = SISTEMA.vendas.filter(v => v.confirmado && !v.entregue); document.getElementById('listaEntrega').innerHTML = vends.map(v => `<div class="card"><strong>OS: ${v.os}</strong><br><input type="text" id="nf_${v.os}" placeholder="NF"><input type="number" id="parc_${v.os}" placeholder="Parc."><button onclick="lancarNF(${v.os})">LANCAR</button></div>`).join(''); }
   function lancarNF(os) { const nf=document.getElementById('nf_'+os).value; const q=parseInt(document.getElementById('parc_'+os).value); if(!nf||!q) return; let v=SISTEMA.vendas.find(x=>x.os===os); v.entregue=true; v.nf=nf; for(let i=1;i<=q;i++){SISTEMA.financeiro.push({os,cliente:v.cliente,nf,parc:i+"/"+q,valor:v.total/q,venc:"",pago:false});} salvarDados(); tab('receber'); }
-  function renderReceber() { document.getElementById('listaBoletos').innerHTML = SISTEMA.financeiro.map((f, i) => `<div class="finance-card" style="border-left-color:${f.pago?'green':'red'}"><strong>${f.cliente}</strong><br>R$ ${f.valor.toFixed(2)} | Venc: <input type="date" value="${f.venc}" onchange="SISTEMA.financeiro[${i}].venc=this.value; salvarDados()"> <button onclick="SISTEMA.financeiro[${i}].pago=true; salvarDados(); renderReceber()">Pagar</button></div>`).join(''); }
-  function renderCfg() { document.getElementById('cfgVh').value = PRECOS.vh; document.getElementById('matSelect').innerHTML = PRECOS.mats.map(m => `<option value="${m.p}">${m.n}</option>`).join(''); document.getElementById('listaMatsCfg').innerHTML = PRECOS.mats.map((m, i) => `<div style="display:flex; gap:5px; margin-top:5px"><input type="text" value="${m.n}" readonly style="flex:2"><input type="number" value="${m.p}" onchange="PRECOS.mats[${i}].p=parseFloat(this.value); salvarTabelaPrecos()"><button onclick="PRECOS.mats.splice(${i},1); salvarTabelaPrecos(); renderCfg()">X</button></div>`).join(''); }
-  function addMat() { const n=prompt("Nome:"); const p=prompt("Preco:"); if(n&&p){PRECOS.mats.push({n,p:parseFloat(p)}); salvarTabelaPrecos(); renderCfg();} }
-  function salvarTabelaPrecos() { PRECOS.vh = parseFloat(document.getElementById('cfgVh').value); localStorage.setItem('marbe_precos_v22', JSON.stringify(PRECOS)); }
-  function salvarDados() { localStorage.setItem('marbe_dados_v22', JSON.stringify(SISTEMA)); }
+  function renderReceber() { document.getElementById('listaBoletos').innerHTML = SISTEMA.financeiro.map((f, i) => `<div class="finance-card"><strong>${f.cliente}</strong><br>R$ ${f.valor.toFixed(2)} | Venc: <input type="date" value="${f.venc}" onchange="SISTEMA.financeiro[${i}].venc=this.value; salvarDados()"> <button onclick="SISTEMA.financeiro[${i}].pago=true; salvarDados(); renderReceber()">Baixar</button></div>`).join(''); }
+  function renderCfg() { document.getElementById('matSelect').innerHTML = PRECOS.mats.map(m => `<option value="${m.p}">${m.n}</option>`).join(''); document.getElementById('listaMatsCfg').innerHTML = PRECOS.mats.map((m, i) => `<div style="display:flex; gap:5px; margin-top:5px"><input type="text" value="${m.n}" readonly style="flex:2"><input type="number" value="${m.p}" onchange="PRECOS.mats[${i}].p=parseFloat(this.value); salvarPrecos()"><button onclick="PRECOS.mats.splice(${i},1); salvarPrecos(); renderCfg()">X</button></div>`).join(''); }
+  function addMat() { const n=prompt("Nome:"); const p=prompt("Preco:"); if(n&&p){PRECOS.mats.push({n,p:parseFloat(p)}); salvarPrecos(); renderCfg();} }
+  function salvarPrecos() { PRECOS.vh = parseFloat(document.getElementById('cfgVh').value); localStorage.setItem('m_precos_v23', JSON.stringify(PRECOS)); }
+  function salvarDados() { localStorage.setItem('m_dados_v23', JSON.stringify(SISTEMA)); }
 </script>
 </body>
 </html>
