@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema Marbe v31.36 - Botão Editar Restaurado</title>
+  <title>Sistema Marbe v31.37 - Custos OK</title>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -27,10 +27,13 @@
       const data = snapshot.val();
       if (data) { 
           window.marbeDB = data; 
+          // Garantias de integridade para não sumir nada
           if(!window.marbeDB.orçamentos) window.marbeDB.orçamentos = [];
           if(!window.marbeDB.pedidos) window.marbeDB.pedidos = [];
           if(!window.marbeDB.financeiro) window.marbeDB.financeiro = [];
           if(!window.marbeDB.estoque) window.marbeDB.estoque = {};
+          if(!window.marbeDB.custos) window.marbeDB.custos = {vh: 50, mats: []};
+          if(!window.marbeDB.custos.mats) window.marbeDB.custos.mats = [];
           updateUI(); 
       }
     });
@@ -60,13 +63,11 @@
     .section.active { display: block; }
     label { display: block; margin-top: 8px; font-weight: bold; font-size: 10px; }
     input, select, textarea { width: 100%; padding: 6px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; box-sizing: border-box; }
-    .btn { width: 100%; padding: 10px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 8px; color: white; text-align: center; display: block; font-size: 11px; }
+    .btn { width: 100%; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 8px; color: white; text-align: center; display: block; font-size: 11px; }
     table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 8px; }
     table th, table td { border: 1px solid #ddd; padding: 5px; text-align: left; }
     .card-list { background: #fff; border: 1px solid #ddd; padding: 10px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid #ccc; }
     .editable-input { width: 100%; border: 1px solid #ffd666 !important; background: #fffbe6; padding: 3px; }
-    .negativo { color: var(--danger); font-weight: bold; }
-    .positivo { color: var(--success); font-weight: bold; }
   </style>
 </head>
 <body>
@@ -116,11 +117,14 @@
   <div id="pedidos" class="section"><div id="listaPedidos"></div></div>
   <div id="financeiro" class="section"><div id="listaBoletos"></div></div>
   <div id="suprimentos" class="section"><h3>Resumo de Borracha</h3><div id="dashboardSuprimentos"></div></div>
+  
   <div id="cfg" class="section">
+      <h3>Lista de Materiais Cadastrados</h3>
       <div id="listaCustos"></div>
+      <hr>
       <label>Novo Material</label>
       <input type="text" id="matNome" placeholder="Nome"><input type="number" id="matPreco" placeholder="Preço KG">
-      <button class="btn" style="background:var(--success)" onclick="addMaterial()">CADASTRAR</button>
+      <button class="btn" style="background:var(--success)" onclick="addMaterial()">CADASTRAR MATERIAL</button>
   </div>
 </div>
 
@@ -135,8 +139,10 @@
   }
 
   function updateUI() {
-    document.getElementById('osLabel').innerText = window.marbeDB.os;
-    document.getElementById('matSelect').innerHTML = (window.marbeDB.custos.mats || []).map(m => `<option value="${m.p}">${m.n}</option>`).join('');
+    const sel = document.getElementById('matSelect');
+    if(sel && window.marbeDB.custos && window.marbeDB.custos.mats) {
+        sel.innerHTML = window.marbeDB.custos.mats.map(m => `<option value="${m.p}">${m.n}</option>`).join('');
+    }
     renderOrcamentos(); renderPedidos(); renderBoletos(); renderCustos();
   }
 
@@ -195,7 +201,6 @@
     window.marbeDB.pedidos.push(orc); window.salvarNuvem(); tab('pedidos');
   }
 
-  // FUNÇÃO RENDER PEDIDOS RESTAURADA COM BOTÃO EDITAR
   function renderPedidos() {
     document.getElementById('listaPedidos').innerHTML = (window.marbeDB.pedidos || []).map((p, i) => `
       <div class="card-list"><strong>OS: ${p.os} - ${p.cliente}</strong><br>
@@ -224,20 +229,16 @@
   function gerarPDF(tipo, index, base) {
     const { jsPDF } = window.jspdf; const doc = new jsPDF(); const d = window.marbeDB[base][index];
     const clean = (t) => t ? t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase() : "";
-    doc.setFontSize(10); doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 20, 15);
+    doc.setFontSize(9); doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 20, 15);
     if(tipo === 'PRODUCAO') {
         doc.text(`VIA PRODUCAO - OS: ${d.os}`, 20, 22);
         doc.autoTable({ startY: 28, head: [['ITEM', 'MAT.', 'HORAS', 'PESO BRUTO']], body: d.itens.map(i => [clean(i.n), clean(i.mat), (i.h || 0) + "H", (i.kg_unit * 1.2 * i.q).toFixed(2) + " KG"]) });
     } else {
-        doc.text(`ORCAMENTO - OS: ${d.os}`, 20, 22);
-        doc.text(`CLIENTE: ${clean(d.cliente)}`, 20, 28);
-        doc.text(`CNPJ: ${d.cnpj || ""}`, 20, 33);
-        doc.text(`ENDERECO: ${clean(d.endereco)}`, 20, 38);
-        doc.autoTable({ startY: 43, head: [['DESCRICAO', 'MEDIDAS', 'QTD', 'TOTAL']], body: d.itens.map(i => [clean(i.n), i.med, i.q, (i.v*i.q).toFixed(2)]) });
-        const fY = doc.lastAutoTable.finalY + 10;
-        doc.text(`TOTAL: R$ ${d.total.toFixed(2)}`, 190, fY, {align:'right'});
-        doc.setFontSize(8); doc.text(`FRETE: ${clean(d.frete)} | PRAZO: ${clean(d.prazo)}`, 20, fY + 8);
-        doc.text(`PAGAMENTO: ${clean(d.pagamento)}`, 20, fY + 13);
+        doc.text(`ORCAMENTO - OS: ${d.os} | DATA: ${new Date().toLocaleDateString('pt-BR')}`, 20, 22);
+        doc.text(`CLIENTE: ${clean(d.cliente)}`, 20, 27);
+        doc.text(`CNPJ: ${d.cnpj || ""}`, 20, 31);
+        doc.text(`ENDERECO: ${clean(d.endereco)}`, 20, 35);
+        doc.autoTable({ startY: 40, head: [['DESCRICAO', 'MEDIDAS', 'QTD', 'TOTAL']], body: d.itens.map(i => [clean(i.n), i.med, i.q, (i.v*i.q).toFixed(2)]) });
     }
     window.abrirPDFMobile(doc.output('blob'), d.os);
   }
@@ -250,16 +251,37 @@
     let html = `<table><thead><tr><th>Material</th><th>Preciso</th><th>Estoque</th><th>Saldo</th></tr></thead><tbody>`;
     Object.keys(necessidade).forEach(mat => {
         const prec = necessidade[mat], comp = window.marbeDB.estoque[mat] || 0, saldo = comp - prec;
-        html += `<tr><td>${mat}</td><td>${prec.toFixed(2)}kg</td><td><input type="number" value="${comp}" onchange="window.marbeDB.estoque['${mat}']=parseFloat(this.value); window.salvarNuvem();" style="width:60px"></td><td class="${saldo < 0 ? 'negativo' : 'positivo'}">${saldo.toFixed(2)}</td></tr>`;
+        html += `<tr><td>${mat}</td><td>${prec.toFixed(2)}kg</td><td><input type="number" value="${comp}" onchange="window.marbeDB.estoque['${mat}']=parseFloat(this.value); window.salvarNuvem();" style="width:60px"></td><td>${saldo.toFixed(2)}</td></tr>`;
     });
     document.getElementById('dashboardSuprimentos').innerHTML = html + "</tbody></table>";
+  }
+
+  function renderCustos() {
+    if(window.marbeDB.custos && window.marbeDB.custos.mats) {
+        document.getElementById('listaCustos').innerHTML = window.marbeDB.custos.mats.map((m, i) => `
+          <div style="display:flex; gap:5px; margin-bottom:5px;">
+            <input value="${m.n}" readonly style="flex:2">
+            <input value="${m.p}" readonly style="flex:1">
+            <button onclick="window.marbeDB.custos.mats.splice(${i},1); window.salvarNuvem()" style="background:red; color:white; border:none; padding:5px; border-radius:4px;">X</button>
+          </div>`).join('');
+    }
+  }
+
+  function addMaterial() {
+    const n = document.getElementById('matNome').value, p = parseFloat(document.getElementById('matPreco').value);
+    if(n && p) { 
+        if(!window.marbeDB.custos.mats) window.marbeDB.custos.mats = [];
+        window.marbeDB.custos.mats.push({n, p}); 
+        window.salvarNuvem(); 
+        document.getElementById('matNome').value=""; 
+        document.getElementById('matPreco').value=""; 
+    }
   }
 
   function editarExistente(origem, index) {
       const base = window.marbeDB[origem][index]; idEdicao = { origem, index, os: base.os };
       document.getElementById('cnpj').value = base.cnpj || ""; document.getElementById('razao').value = base.cliente;
       document.getElementById('endereco').value = base.endereco || ""; document.getElementById('osEdicaoLabel').innerText = base.os;
-      document.getElementById('frete').value = base.frete; document.getElementById('prazo').value = base.prazo; document.getElementById('pagamento').value = base.pagamento;
       document.getElementById('btnCancelaEdit').style.display = 'block'; itensTemp = JSON.parse(JSON.stringify(base.itens));
       renderTabelaAtual(); tab('orc');
   }
@@ -270,16 +292,7 @@
   }
 
   function renderBoletos() {
-    document.getElementById('listaBoletos').innerHTML = (window.marbeDB.financeiro || []).map((f, i) => `<div class="card-list">${f.cliente} | R$ ${f.valor.toFixed(2)} | Venc: ${f.venc} <button class="btn" style="background:green; width:auto; display:inline-block; padding:5px; float:right" onclick="window.marbeDB.financeiro[${i}].pago=true; window.salvarNuvem();">PAGO</button></div>`).join('');
-  }
-
-  function renderCustos() {
-    document.getElementById('listaCustos').innerHTML = (window.marbeDB.custos.mats || []).map((m, i) => `<div style="display:flex; gap:5px; margin-bottom:5px;"><input value="${m.n}" readonly style="flex:2"><input value="${m.p}" readonly style="flex:1"><button onclick="window.marbeDB.custos.mats.splice(${i},1); window.salvarNuvem()">X</button></div>`).join('');
-  }
-
-  function addMaterial() {
-    const n = document.getElementById('matNome').value, p = parseFloat(document.getElementById('matPreco').value);
-    if(n && p) { window.marbeDB.custos.mats.push({n, p}); window.salvarNuvem(); document.getElementById('matNome').value=""; document.getElementById('matPreco').value=""; }
+    document.getElementById('listaBoletos').innerHTML = (window.marbeDB.financeiro || []).map((f, i) => `<div class="card-list">${f.cliente} | OS: ${f.os} | R$ ${f.valor.toFixed(2)} | Venc: ${f.venc} <button class="btn" style="background:green; width:auto; display:inline-block; padding:5px; float:right" onclick="window.marbeDB.financeiro[${i}].pago=true; window.salvarNuvem();">PAGO</button></div>`).join('');
   }
 </script>
 </body>
