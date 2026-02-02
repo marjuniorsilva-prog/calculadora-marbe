@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema v31.40</title>
+  <title>Sistema v31.50</title>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -167,7 +167,7 @@
 
   function calcular() {
     const d=parseFloat(document.getElementById('d').value), l=parseFloat(document.getElementById('l').value), e=parseFloat(document.getElementById('e').value), pk=parseFloat(document.getElementById('matSelect').value), h=parseFloat(document.getElementById('h').value);
-    if(document.getElementById('matSelect').selectedIndex < 0) return alert("Cadastre e selecione um material em Custos primeiro.");
+    if(document.getElementById('matSelect').selectedIndex < 0) return alert("Cadastre e selecione um material primeiro.");
     const matNome = document.getElementById('matSelect').options[document.getElementById('matSelect').selectedIndex].text;
     
     // CÁLCULO DA BORRACHA CORRIGIDO
@@ -220,25 +220,25 @@
       <div class="card-list">
         <strong>OS: ${o.os} - ${o.cliente}</strong><br>
         <span style="font-size:12px; color:#666">${window.fmtMoney(o.total)}</span><br>
-        <div style="display:flex; gap:5px; margin-top:5px; flex-wrap: wrap;">
-            <button class="btn" style="background:var(--info); padding:8px; margin:0; flex:1" onclick="gerarPDF('CLIENTE', ${i}, 'orçamentos')">PDF ORC</button>
-            <button class="btn" style="background:var(--dark); padding:8px; margin:0; flex:1" onclick="gerarPDF('PRODUCAO', ${i}, 'orçamentos')">VER PROD</button>
-            <button class="btn" style="background:var(--dark); padding:8px; margin:0; flex:1" onclick="editarExistente('orçamentos', ${i})">EDITAR</button>
-            <button class="btn" style="background:var(--success); padding:8px; margin:0; flex:1" onclick="fecharPedido(${i})">FECHAR</button>
+        <div style="display:flex; gap:5px; margin-top:5px; flex-wrap:wrap">
+            <button class="btn" style="background:var(--info); flex:1; padding:8px; margin:0" onclick="gerarPDF('CLIENTE', ${i}, 'orçamentos')">PDF ORC</button>
+            <button class="btn" style="background:var(--dark); flex:1; padding:8px; margin:0" onclick="gerarPDF('PRODUCAO', ${i}, 'orçamentos')">PRODUÇÃO</button>
+            <button class="btn" style="background:var(--dark); flex:1; padding:8px; margin:0" onclick="editarExistente('orçamentos', ${i})">EDITAR</button>
+            <button class="btn" style="background:var(--success); flex:1; padding:8px; margin:0" onclick="fecharPedido(${i})">FECHAR</button>
         </div>
       </div>`).join('');
   }
 
   function fecharPedido(i) {
-    if(!confirm("Deseja realmente fechar este pedido e enviar para a produção?")) return;
+    if(!confirm("Deseja fechar o pedido e enviar para Produção?")) return;
     const orc = window.marbeDB.orçamentos.splice(i, 1)[0];
     window.marbeDB.pedidos.push(orc); window.salvarNuvem(); tab('pedidos');
   }
 
-  function voltarParaOrcamento(i) {
+  function reverterParaOrcamento(i) {
     if(!confirm("Deseja mover este pedido de volta para Orçamentos (Histórico)?")) return;
-    const ped = window.marbeDB.pedidos.splice(i, 1)[0];
-    window.marbeDB.orçamentos.push(ped); window.salvarNuvem(); tab('historico');
+    const pedido = window.marbeDB.pedidos.splice(i, 1)[0];
+    window.marbeDB.orçamentos.push(pedido); window.salvarNuvem(); tab('historico');
   }
 
   function renderPedidos() {
@@ -246,9 +246,9 @@
       <div class="card-list">
         <strong>OS: ${p.os} - ${p.cliente}</strong> | ${window.fmtMoney(p.total)}<br>
         <div style="display:flex; gap:5px; margin:5px 0;">
-            <button class="btn" style="background:var(--info); width:auto; padding:8px; margin:0; flex:1" onclick="editarExistente('pedidos', ${i})">EDITAR</button>
-            <button class="btn" style="background:var(--danger); width:auto; padding:8px; margin:0; flex:1" onclick="voltarParaOrcamento(${i})">VOLTAR P/ ORÇ</button>
-            <button class="btn" style="background:var(--dark); width:auto; padding:8px; margin:0; flex:1" onclick="gerarPDF('PRODUCAO', ${i}, 'pedidos')">PRODUÇÃO</button>
+            <button class="btn" style="background:var(--info); flex:1; padding:8px; margin:0" onclick="editarExistente('pedidos', ${i})">EDITAR</button>
+            <button class="btn" style="background:var(--danger); flex:1; padding:8px; margin:0" onclick="reverterParaOrcamento(${i})">VOLTAR P/ ORÇ</button>
+            <button class="btn" style="background:var(--dark); flex:1; padding:8px; margin:0" onclick="gerarPDF('PRODUCAO', ${i}, 'pedidos')">PRODUÇÃO</button>
         </div>
         <input type="text" id="nf_${i}" placeholder="Nº NF" style="margin-top:5px">
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
