@@ -37,11 +37,7 @@
       }
     });
 
-    window.salvarNuvem = function() { 
-        set(ref(db, 'sistema/'), window.marbeDB)
-            .then(() => { alert("Salvo com sucesso na nuvem!"); })
-            .catch((error) => { alert("Erro ao salvar: " + error.message); });
-    };
+    window.salvarNuvem = function() { set(ref(db, 'sistema/'), window.marbeDB); };
 
     window.abrirPDFMobile = (blob, osNum) => {
         const url = URL.createObjectURL(blob);
@@ -170,15 +166,8 @@
   }
 
   function calcular() {
-    const d=parseFloat(document.getElementById('d').value), 
-          l=parseFloat(document.getElementById('l').value), 
-          e=parseFloat(document.getElementById('e').value), 
-          pk=parseFloat(document.getElementById('matSelect').value), 
-          h=parseFloat(document.getElementById('h').value);
-
-    if(isNaN(d) || isNaN(l) || isNaN(e)) return alert("Preencha as medidas corretamente.");
+    const d=parseFloat(document.getElementById('d').value), l=parseFloat(document.getElementById('l').value), e=parseFloat(document.getElementById('e').value), pk=parseFloat(document.getElementById('matSelect').value), h=parseFloat(document.getElementById('h').value);
     if(document.getElementById('matSelect').selectedIndex < 0) return alert("Cadastre e selecione um material em Custos primeiro.");
-    
     const matNome = document.getElementById('matSelect').options[document.getElementById('matSelect').selectedIndex].text;
     
     // CÁLCULO DA BORRACHA CORRIGIDO
@@ -205,36 +194,25 @@
   }
 
   function salvarOrcamento() {
-    if(itensTemp.length === 0) return alert("Adicione pelo menos um item ao orçamento.");
-    
     const orcData = { 
         os: idEdicao ? idEdicao.os : window.marbeDB.os, 
-        cliente: document.getElementById('razao').value || "CLIENTE NÃO INFORMADO", 
-        cnpj: document.getElementById('cnpj').value || "", 
-        endereco: document.getElementById('endereco').value || "", 
+        cliente: document.getElementById('razao').value, 
+        cnpj: document.getElementById('cnpj').value, 
+        endereco: document.getElementById('endereco').value, 
         itens: JSON.parse(JSON.stringify(itensTemp)), 
         frete: document.getElementById('frete').value, 
         prazo: document.getElementById('prazo').value, 
         pagamento: document.getElementById('pagamento').value, 
         total: itensTemp.reduce((a,b)=>a+(b.v*b.q),0) 
     };
-
     if(idEdicao) {
         if(idEdicao.origem === 'pedidos') window.marbeDB.pedidos[idEdicao.index] = orcData;
         else window.marbeDB.orçamentos[idEdicao.index] = orcData;
-        idEdicao = null; 
-        document.getElementById('btnCancelaEdit').style.display = 'none'; 
-        document.getElementById('osEdicaoLabel').innerText = "Nova";
+        idEdicao = null; document.getElementById('btnCancelaEdit').style.display = 'none'; document.getElementById('osEdicaoLabel').innerText = "Nova";
     } else {
-        if(!window.marbeDB.orçamentos) window.marbeDB.orçamentos = [];
-        window.marbeDB.orçamentos.push(orcData); 
-        window.marbeDB.os++;
+        window.marbeDB.orçamentos.push(orcData); window.marbeDB.os++;
     }
-
-    window.salvarNuvem(); 
-    itensTemp = []; 
-    renderTabelaAtual(); 
-    tab('historico');
+    window.salvarNuvem(); itensTemp = []; renderTabelaAtual(); tab('historico');
   }
 
   function renderOrcamentos() {
@@ -251,9 +229,15 @@
   }
 
   function fecharPedido(i) {
+    if(!confirm("Deseja realmente fechar este pedido e enviar para a produção?")) return;
     const orc = window.marbeDB.orçamentos.splice(i, 1)[0];
-    if(!window.marbeDB.pedidos) window.marbeDB.pedidos = [];
     window.marbeDB.pedidos.push(orc); window.salvarNuvem(); tab('pedidos');
+  }
+
+  function voltarParaOrcamento(i) {
+    if(!confirm("Deseja mover este pedido de volta para Orçamentos (Histórico)?")) return;
+    const ped = window.marbeDB.pedidos.splice(i, 1)[0];
+    window.marbeDB.orçamentos.push(ped); window.salvarNuvem(); tab('historico');
   }
 
   function renderPedidos() {
@@ -261,7 +245,8 @@
       <div class="card-list">
         <strong>OS: ${p.os} - ${p.cliente}</strong> | ${window.fmtMoney(p.total)}<br>
         <div style="display:flex; gap:5px; margin:5px 0;">
-            <button class="btn" style="background:var(--info); width:auto; padding:8px; margin:0; flex:1" onclick="editarExistente('pedidos', ${i})">EDITAR/DESC.</button>
+            <button class="btn" style="background:var(--info); width:auto; padding:8px; margin:0; flex:1" onclick="editarExistente('pedidos', ${i})">EDITAR</button>
+            <button class="btn" style="background:var(--danger); width:auto; padding:8px; margin:0; flex:1" onclick="voltarParaOrcamento(${i})">VOLTAR P/ ORÇ</button>
             <button class="btn" style="background:var(--dark); width:auto; padding:8px; margin:0; flex:1" onclick="gerarPDF('PRODUCAO', ${i}, 'pedidos')">PRODUÇÃO</button>
         </div>
         <input type="text" id="nf_${i}" placeholder="Nº NF" style="margin-top:5px">
@@ -277,7 +262,6 @@
     const nf = document.getElementById(`nf_${i}`).value, qtd = parseInt(document.getElementById(`parc_${i}`).value), dt = document.getElementById(`data_${i}`).value;
     if(!nf || !qtd || !dt) return alert("Preencha NF, Parcelas e Data!");
     const p = window.marbeDB.pedidos[i]; const dataBase = new Date(dt + "T12:00:00");
-    if(!window.marbeDB.financeiro) window.marbeDB.financeiro = [];
     for(let j=0; j<qtd; j++) {
         let v = new Date(dataBase); v.setMonth(v.getMonth() + j);
         window.marbeDB.financeiro.push({ os: p.os, nf: nf, cliente: p.cliente, valor: p.total/qtd, venc: v.toLocaleDateString('pt-BR'), pago: false });
