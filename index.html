@@ -166,11 +166,20 @@
   }
 
   function calcular() {
-    const d=parseFloat(document.getElementById('d').value), l=parseFloat(document.getElementById('l').value), e=parseFloat(document.getElementById('e').value), pk=parseFloat(document.getElementById('matSelect').value), h=parseFloat(document.getElementById('h').value);
+    const d=parseFloat(document.getElementById('d').value), 
+          l=parseFloat(document.getElementById('l').value), 
+          e=parseFloat(document.getElementById('e').value), 
+          pk=parseFloat(document.getElementById('matSelect').value), 
+          h=parseFloat(document.getElementById('h').value);
+
     if(document.getElementById('matSelect').selectedIndex < 0) return alert("Cadastre e selecione um material em Custos primeiro.");
+    
     const matNome = document.getElementById('matSelect').options[document.getElementById('matSelect').selectedIndex].text;
-    const pesoUnit = Math.ceil((Math.PI*(d+e)*l*e)*1200/1000000000);
+    
+    // CORREÇÃO DO CÁLCULO DA BORRACHA APLICADA AQUI:
+    const pesoUnit = Math.ceil((Math.PI * (d + e) * e * l) * 0.0000012);
     const unit = (((pesoUnit*pk*1.1)+(h*window.marbeDB.custos.vh))*2.5)*(1+(parseFloat(document.getElementById('tipoServ').value)));
+    
     itensTemp.push({ n: "Revestimento " + matNome, mat: matNome, med: d + "x" + l + "mm", e: e + "mm", h: h, q: 1, v: unit, kg_unit: pesoUnit });
     renderTabelaAtual(); tab('orc');
   }
@@ -265,10 +274,10 @@
     
     if(tipo === 'PRODUCAO') {
         doc.text(`VIA PRODUCAO - OS: ${d.os}`, 20, 22);
-        doc.text(`PRAZO ENTREGA: ${clean(d.prazo)}`, 20, 27); // ADICIONADO PRAZO
+        doc.text(`PRAZO ENTREGA: ${clean(d.prazo)}`, 20, 27);
         doc.autoTable({ 
             startY: 32, 
-            head: [['ITEM', 'MAT.', 'QTD', 'HORAS', 'PESO BRUTO']], // ADICIONADO QTD
+            head: [['ITEM', 'MAT.', 'QTD', 'HORAS', 'PESO BRUTO']], 
             body: d.itens.map(i => [clean(i.n), clean(i.mat), i.q, (i.h || 0) + "H", (i.kg_unit * 1.2 * i.q).toFixed(2) + " KG"]),
             theme: 'grid'
         });
