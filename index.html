@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema v31.43</title>
+  <title>Sistema v32.0 (Borracha Prensada)</title>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -23,7 +23,6 @@
     const db = getDatabase(app);
     window.marbeDB = { os: 330, orçamentos: [], pedidos: [], financeiro: [], custos: {vh: 50, mats: []}, estoque: {} };
 
-    // Só carrega dados se passar pelo login (opcional, mas visualmente melhor carregar em background)
     onValue(ref(db, 'sistema/'), (snapshot) => {
       const data = snapshot.val();
       if (data) { 
@@ -40,7 +39,7 @@
 
     window.salvarNuvem = function() { 
         set(ref(db, 'sistema/'), window.marbeDB)
-            .then(() => { alert("Salvo com sucesso na nuvem!"); })
+            .then(() => { console.log("Salvo com sucesso!"); })
             .catch((error) => { alert("Erro ao salvar: " + error.message); });
     };
 
@@ -61,29 +60,31 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
   
   <style>
-    :root { --primary: #2c7be5; --success: #28a745; --danger: #d9534f; --info: #17a2b8; --dark: #333; --prod: #6f42c1; }
+    :root { --primary: #2c7be5; --success: #28a745; --danger: #d9534f; --info: #17a2b8; --dark: #333; --prod: #6f42c1; --warning: #ffc107; }
     body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; margin: 0; padding: 5px; color: #333; }
     
-    /* ESTILOS DO LOGIN */
+    /* LOGIN */
     #loginScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
     .login-box { width: 100%; max-width: 350px; text-align: center; }
     .login-logo { max-width: 100%; height: auto; margin-bottom: 30px; }
     .login-input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; box-sizing: border-box; }
     .login-btn { width: 100%; padding: 12px; background: #002B49; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
-    .login-btn:hover { background: #00406b; }
 
-    .container { max-width: 1000px; background: #fff; padding: 15px; border-radius: 8px; margin: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: none; /* Escondido inicialmente */ }
+    /* LAYOUT GERAL */
+    .container { max-width: 1000px; background: #fff; padding: 15px; border-radius: 8px; margin: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: none; }
     .tabs { display: flex; gap: 4px; margin-bottom: 15px; flex-wrap: wrap; }
     .tab-btn { flex: 1; padding: 10px; border: none; background: #e9ecef; cursor: pointer; font-weight: bold; border-radius: 6px; font-size: 10px; text-transform: uppercase; min-width: 70px; transition: 0.2s; }
-    .tab-btn:hover { background: #dee2e6; }
     .tab-btn.active { background: var(--primary); color: white; }
     .section { display: none; animation: fadeIn 0.3s; }
     .section.active { display: block; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    
+    /* FORMULARIOS */
     label { display: block; margin-top: 10px; font-weight: 600; font-size: 11px; color: #555; }
     input, select, textarea { width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
-    input:focus { border-color: var(--primary); outline: none; }
     .btn { width: 100%; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; color: white; text-align: center; display: block; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    
+    /* TABELAS E CARDS */
     table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
     table th { background: #f8f9fa; border: 1px solid #dee2e6; padding: 8px; text-align: left; }
     table td { border: 1px solid #dee2e6; padding: 8px; }
@@ -91,17 +92,27 @@
     .editable-input { width: 100%; border: 1px solid #ffd666 !important; background: #fffbe6; padding: 4px; }
     .negativo { color: var(--danger); font-weight: bold; }
     .positivo { color: var(--success); font-weight: bold; }
+
+    /* --- NOVOS ESTILOS PARA CALCULADORA --- */
+    .hidden { display: none !important; }
+    .row { display: flex; gap: 10px; }
+    .col { flex: 1; }
+    .resultado-box { background: #2c3e50; color: #fff; padding: 15px; border-radius: 6px; margin-top: 15px; font-size: 12px; }
+    .res-line { display: flex; justify-content: space-between; border-bottom: 1px solid #455a64; padding: 4px 0; }
+    .res-destaque { font-size: 16px; font-weight: bold; color: #2ecc71; text-align: center; margin-top: 10px; padding-top: 5px; border-top: 1px solid #fff; }
+    details { background: #f8f9fa; padding: 10px; border-radius: 4px; border: 1px solid #dee2e6; margin-top: 10px; }
+    summary { font-weight: bold; cursor: pointer; font-size: 11px; color: #666; }
   </style>
 </head>
 <body>
 
 <div id="loginScreen">
     <div class="login-box">
-        <img src="logo.jpg" alt="Logo Grupo Marbe" class="login-logo">
+        <img src="https://via.placeholder.com/150x50?text=MARBE+APP" alt="Logo Grupo Marbe" class="login-logo">
         <input type="text" id="loginUser" class="login-input" placeholder="Usuário">
         <input type="password" id="loginPass" class="login-input" placeholder="Senha">
         <button class="login-btn" onclick="fazerLogin()">ENTRAR</button>
-        <p style="font-size:12px; color:#888; margin-top:15px">Sistema Interno v31.42</p>
+        <p style="font-size:12px; color:#888; margin-top:15px">Sistema v32.0</p>
     </div>
 </div>
 
@@ -117,17 +128,128 @@
   </div>
 
   <div id="calc" class="section active">
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-      <div><label>Diâmetro (mm)</label><input type="number" id="d"></div>
-      <div><label>Comprimento (mm)</label><input type="number" id="l"></div>
+    
+    <label>Geometria da Peça</label>
+    <select id="tipoPeca" onchange="mudarInputsCalculo()">
+        <option value="retangular">Retangular / Placa (C x L x E)</option>
+        <option value="quadrada">Quadrada (Lado x E)</option>
+        <option value="redonda">Redonda Maciça (Disco/Cilindro)</option>
+        <option value="tubo">Tubo / Bucha (Furo no meio)</option>
+        <option value="oring">Anel O-Ring</option>
+        <option value="esfera">Esfera / Bola</option>
+        <option value="cone">Cone / Batente</option>
+        <option value="peso_direto">★ JÁ SEI O PESO (Modo Direto)</option>
+        <option value="revestimento">Revestimento (Legado)</option>
+    </select>
+
+    <div id="area-inputs" style="background: #f9f9f9; padding: 10px; border-radius: 5px; border:1px solid #eee;">
+        
+        <div id="input-retangular" class="grupo-input">
+            <div class="row">
+                <div class="col"><label>Comp. (mm)</label><input type="number" id="ret-comp"></div>
+                <div class="col"><label>Largura (mm)</label><input type="number" id="ret-larg"></div>
+            </div>
+            <label>Espessura (mm)</label><input type="number" id="ret-esp">
+        </div>
+
+        <div id="input-quadrada" class="grupo-input hidden">
+            <div class="row">
+                <div class="col"><label>Lado (mm)</label><input type="number" id="quad-lado"></div>
+                <div class="col"><label>Espessura (mm)</label><input type="number" id="quad-esp"></div>
+            </div>
+        </div>
+
+        <div id="input-redonda" class="grupo-input hidden">
+            <div class="row">
+                <div class="col"><label>Diâmetro (mm)</label><input type="number" id="red-diam"></div>
+                <div class="col"><label>Alt/Esp (mm)</label><input type="number" id="red-esp"></div>
+            </div>
+        </div>
+
+        <div id="input-tubo" class="grupo-input hidden">
+            <div class="row">
+                <div class="col"><label>Ø Externo</label><input type="number" id="tubo-ext"></div>
+                <div class="col"><label>Ø Interno</label><input type="number" id="tubo-int"></div>
+            </div>
+            <label>Comprimento (mm)</label><input type="number" id="tubo-comp">
+        </div>
+
+        <div id="input-oring" class="grupo-input hidden">
+            <div class="row">
+                <div class="col"><label>Ø Interno</label><input type="number" id="oring-di"></div>
+                <div class="col"><label>Esp. Fio</label><input type="number" id="oring-fio"></div>
+            </div>
+        </div>
+
+        <div id="input-esfera" class="grupo-input hidden">
+            <label>Diâmetro da Esfera (mm)</label><input type="number" id="esf-diam">
+        </div>
+
+        <div id="input-cone" class="grupo-input hidden">
+            <div class="row">
+                <div class="col"><label>Ø Maior</label><input type="number" id="cone-maior"></div>
+                <div class="col"><label>Ø Menor</label><input type="number" id="cone-menor"></div>
+            </div>
+            <label>Altura (mm)</label><input type="number" id="cone-alt">
+        </div>
+
+        <div id="input-peso_direto" class="grupo-input hidden">
+            <label style="color:var(--primary)">Peso da Peça (em GRAMAS)</label>
+            <input type="number" id="peso-input" placeholder="Ex: 250">
+        </div>
+
+        <div id="input-revestimento" class="grupo-input hidden">
+            <div class="row">
+                <div class="col"><label>Diâmetro</label><input type="number" id="d"></div>
+                <div class="col"><label>Comprimento</label><input type="number" id="l"></div>
+            </div>
+            <label>Camada (mm)</label><input type="number" id="e">
+        </div>
     </div>
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-      <div><label>Camada (mm)</label><input type="number" id="e"></div>
-      <div><label>Horas Trab.</label><input type="number" id="h" value="10"></div>
+
+    <div style="margin-top:10px; border-top: 1px dashed #ccc; padding-top:10px;">
+        <div class="row">
+            <div class="col">
+                <label>Peças/Hora</label>
+                <input type="number" id="pecasHora" value="4">
+            </div>
+            <div class="col">
+                <label>% Perda (Flash)</label>
+                <input type="number" id="percPerda" value="30">
+            </div>
+        </div>
+        
+        <label>Material Utilizado</label>
+        <select id="matSelect"></select>
+
+        <details>
+            <summary>Editar Custos & Markup</summary>
+            <div class="row">
+                <div class="col"><label>Markup (Venda)</label><input type="number" id="markup" value="2.5"></div>
+                <div class="col"><label>Densidade</label><input type="number" id="densidade" value="1.2"></div>
+            </div>
+            <div class="row">
+                 <div class="col"><label>Custo Hora (Global)</label><input type="number" id="custoHoraInput" disabled style="background:#eee"></div>
+            </div>
+            <small style="color:#888">*Para mudar Custo Hora, vá na aba Custos.</small>
+        </details>
     </div>
-    <label>Material</label><select id="matSelect"></select>
-    <label>Tipo</label><select id="tipoServ"><option value="0.045">PEÇA NOVA</option><option value="0.065">REFORMA</option></select>
-    <button class="btn" style="background:var(--success)" onclick="calcular()">CALCULAR E ADICIONAR</button>
+
+    <button class="btn" style="background:var(--info)" onclick="simularCalculo()">SIMULAR CUSTO</button>
+
+    <div id="boxResultado" class="resultado-box hidden">
+        <div class="res-line"><span>Item:</span> <span id="resDesc">...</span></div>
+        <div class="res-line"><span>Peso Líquido:</span> <span id="resPesoLiq">0g</span></div>
+        <div class="res-line" style="color:#f1c40f"><span>Peso Bruto (c/ perda):</span> <span id="resPesoBruto">0g</span></div>
+        <hr style="border-color:#455a64">
+        <div class="res-line"><span>Custo Matéria:</span> <span id="resCustoMat">R$ 0,00</span></div>
+        <div class="res-line"><span>Custo Mão de Obra:</span> <span id="resCustoMO">R$ 0,00</span></div>
+        <div class="res-line"><span>Custo Produção:</span> <span id="resCustoTot">R$ 0,00</span></div>
+        <div class="res-destaque" id="resPrecoVenda">R$ 0,00</div>
+        
+        <button class="btn" style="background:var(--success); margin-top:10px; border:1px solid white;" onclick="adicionarAoOrcamento()">ADICIONAR AO ORÇAMENTO</button>
+    </div>
+
   </div>
 
   <div id="orc" class="section">
@@ -152,6 +274,10 @@
   <div id="suprimentos" class="section"><h3>Resumo de Borracha (Necessidade)</h3><div id="dashboardSuprimentos"></div></div>
   
   <div id="cfg" class="section">
+      <h3>Configurações de Custo</h3>
+      <label>Valor da Hora Técnica (R$)</label>
+      <input type="number" id="valorHoraGlobal" onchange="window.marbeDB.custos.vh=parseFloat(this.value); window.salvarNuvem(); updateUI();">
+      
       <h3>Materiais Cadastrados</h3>
       <div id="listaCustos"></div>
       <hr>
@@ -164,13 +290,12 @@
 <script>
   let itensTemp = [];
   let idEdicao = null;
+  let ultimoCalculo = null; // Armazena o objeto calculado para adicionar depois
 
   // --- FUNÇÃO DE LOGIN ---
   function fazerLogin() {
       const u = document.getElementById('loginUser').value;
       const p = document.getElementById('loginPass').value;
-
-      // CREDENCIAIS (Pode alterar aqui)
       if (u === 'Abel' && p === '201000') {
           document.getElementById('loginScreen').style.display = 'none';
           document.getElementById('appContainer').style.display = 'block';
@@ -186,13 +311,151 @@
   }
 
   function updateUI() {
+    // Atualiza Dropdown Materiais
     const sel = document.getElementById('matSelect');
     if(sel && window.marbeDB.custos && window.marbeDB.custos.mats) {
+        // Salva seleção atual se houver
+        const currentVal = sel.value; 
         sel.innerHTML = window.marbeDB.custos.mats.map(m => `<option value="${m.p}">${m.n}</option>`).join('');
+        if(currentVal) sel.value = currentVal;
     }
+    
+    // Atualiza input de Custo Hora Global
+    if(window.marbeDB.custos) {
+        document.getElementById('valorHoraGlobal').value = window.marbeDB.custos.vh || 50;
+        document.getElementById('custoHoraInput').value = window.marbeDB.custos.vh || 50;
+    }
+
     renderOrcamentos(); renderPedidos(); renderBoletos(); renderCustos();
   }
 
+  // --- LÓGICA DA CALCULADORA INTEGRADA ---
+  function mudarInputsCalculo() {
+      document.querySelectorAll('.grupo-input').forEach(el => el.classList.add('hidden'));
+      document.getElementById('boxResultado').classList.add('hidden');
+      const tipo = document.getElementById('tipoPeca').value;
+      document.getElementById('input-' + tipo).classList.remove('hidden');
+  }
+
+  function simularCalculo() {
+      const tipo = document.getElementById('tipoPeca').value;
+      const pecasHora = parseFloat(document.getElementById('pecasHora').value);
+      const perdaPerc = parseFloat(document.getElementById('percPerda').value) || 0;
+      const densidade = parseFloat(document.getElementById('densidade').value) || 1.2;
+      const markup = parseFloat(document.getElementById('markup').value) || 2.5;
+      
+      // Pega custo da borracha do Select
+      const selMat = document.getElementById('matSelect');
+      if(selMat.selectedIndex < 0) return alert("Cadastre materiais na aba Custos primeiro!");
+      const custoKg = parseFloat(selMat.value);
+      const nomeMat = selMat.options[selMat.selectedIndex].text;
+      
+      // Pega custo hora global
+      const valorHora = window.marbeDB.custos.vh || 50;
+
+      if(!pecasHora) return alert("Informe peças por hora.");
+
+      let volumeCm3 = 0;
+      let pesoDiretoG = 0;
+      let descMedidas = "";
+
+      // LÓGICA GEOMÉTRICA
+      if (tipo === 'peso_direto') {
+          pesoDiretoG = parseFloat(document.getElementById('peso-input').value);
+          if(!pesoDiretoG) return alert("Informe o peso.");
+          descMedidas = "Peso " + pesoDiretoG + "g";
+      } 
+      else if (tipo === 'revestimento') {
+          // Lógica Legada do Código Antigo
+          const d=parseFloat(document.getElementById('d').value), l=parseFloat(document.getElementById('l').value), e=parseFloat(document.getElementById('e').value);
+          if(!d || !l || !e) return alert("Preencha medidas.");
+          // Fórmula antiga aproximada para revestimento cilindrico
+          // PesoUnit antigo era: ceil((PI * (d+e) * e * l) * 0.0000012)
+          // Vamos converter para gramas exatas primeiro
+          // Vol aprox casca cilindrica: (PI * (d+e) * e * l) -> mm3
+          volumeCm3 = (Math.PI * (d + e) * e * l) / 1000; 
+          descMedidas = `Rev. ${d}x${l}mm`;
+      }
+      else {
+          // Lógica Nova Precisa
+          if (tipo === 'retangular') {
+              let c = parseFloat(document.getElementById('ret-comp').value), larg = parseFloat(document.getElementById('ret-larg').value), esp = parseFloat(document.getElementById('ret-esp').value);
+              if(c && larg && esp) { volumeCm3 = (c*larg*esp)/1000; descMedidas = `${c}x${larg}x${esp}mm`; }
+          } else if (tipo === 'quadrada') {
+              let ld = parseFloat(document.getElementById('quad-lado').value), esp = parseFloat(document.getElementById('quad-esp').value);
+              if(ld && esp) { volumeCm3 = (ld*ld*esp)/1000; descMedidas = `${ld}x${ld}x${esp}mm`; }
+          } else if (tipo === 'redonda') {
+              let d = parseFloat(document.getElementById('red-diam').value), esp = parseFloat(document.getElementById('red-esp').value);
+              if(d && esp) { volumeCm3 = (Math.PI * Math.pow(d/2, 2) * esp)/1000; descMedidas = `Ø${d} x ${esp}mm`; }
+          } else if (tipo === 'tubo') {
+              let ext = parseFloat(document.getElementById('tubo-ext').value), int = parseFloat(document.getElementById('tubo-int').value), c = parseFloat(document.getElementById('tubo-comp').value);
+              if(ext && int && c) {
+                  let area = (Math.PI * Math.pow(ext/2, 2)) - (Math.PI * Math.pow(int/2, 2));
+                  volumeCm3 = (area * c)/1000; descMedidas = `Ø${ext}xØ${int} x ${c}mm`;
+              }
+          } else if (tipo === 'oring') {
+              let di = parseFloat(document.getElementById('oring-di').value), fio = parseFloat(document.getElementById('oring-fio').value);
+              if(di && fio) {
+                  let rFio=fio/2, rMed=(di+fio)/2;
+                  volumeCm3 = (Math.PI * Math.pow(rFio, 2) * (2*Math.PI*rMed))/1000; descMedidas = `O-Ring Ø${di} x ${fio}mm`;
+              }
+          } else if (tipo === 'esfera') {
+              let d = parseFloat(document.getElementById('esf-diam').value);
+              if(d) { volumeCm3 = (4/3 * Math.PI * Math.pow(d/2, 3))/1000; descMedidas = `Esfera Ø${d}mm`; }
+          } else if (tipo === 'cone') {
+              let dm = parseFloat(document.getElementById('cone-maior').value), dmn = parseFloat(document.getElementById('cone-menor').value), h = parseFloat(document.getElementById('cone-alt').value);
+              if(dm && dmn && h) {
+                  let r1=dm/2, r2=dmn/2;
+                  volumeCm3 = ((Math.PI*h)/3 * (Math.pow(r1,2) + r1*r2 + Math.pow(r2,2)))/1000; descMedidas = `Cone ${dm}/${dmn} x ${h}mm`;
+              }
+          }
+      }
+
+      if(volumeCm3 === 0 && pesoDiretoG === 0) return alert("Preencha as medidas corretamente.");
+
+      // CÁLCULO FINANCEIRO
+      let pesoLiq = (tipo === 'peso_direto') ? pesoDiretoG : (volumeCm3 * densidade);
+      let fatorPerda = 1 + (perdaPerc / 100);
+      let pesoBrutoG = pesoLiq * fatorPerda;
+      let pesoBrutoKg = pesoBrutoG / 1000;
+
+      let custoMat = pesoBrutoKg * custoKg;
+      let custoMO = valorHora / pecasHora;
+      let custoProd = custoMat + custoMO;
+      let precoVenda = custoProd * markup;
+
+      // ARMAZENA PARA ADICIONAR DEPOIS
+      ultimoCalculo = {
+          n: `${document.getElementById('tipoPeca').options[document.getElementById('tipoPeca').selectedIndex].text} (${descMedidas})`,
+          mat: nomeMat,
+          med: descMedidas,
+          q: 1,
+          v: precoVenda,
+          kg_unit: pesoBrutoKg // Peso Bruto em KG para estoque
+      };
+
+      // EXIBE RESULTADO
+      document.getElementById('resDesc').innerText = descMedidas;
+      document.getElementById('resPesoLiq').innerText = pesoLiq.toFixed(1) + ' g';
+      document.getElementById('resPesoBruto').innerText = pesoBrutoG.toFixed(1) + ' g';
+      document.getElementById('resCustoMat').innerText = window.fmtMoney(custoMat);
+      document.getElementById('resCustoMO').innerText = window.fmtMoney(custoMO);
+      document.getElementById('resCustoTot').innerText = window.fmtMoney(custoProd);
+      document.getElementById('resPrecoVenda').innerText = window.fmtMoney(precoVenda);
+
+      document.getElementById('boxResultado').classList.remove('hidden');
+  }
+
+  function adicionarAoOrcamento() {
+      if(!ultimoCalculo) return;
+      itensTemp.push({...ultimoCalculo}); // Clona o objeto
+      renderTabelaAtual();
+      tab('orc');
+      document.getElementById('boxResultado').classList.add('hidden');
+      ultimoCalculo = null;
+  }
+
+  // --- FUNÇÕES EXISTENTES DO SISTEMA ---
   async function buscaCNPJ(v) {
     const cnpj = v.replace(/\D/g, ''); if (cnpj.length !== 14) return;
     try {
@@ -201,26 +464,6 @@
       document.getElementById('razao').value = d.razao_social || "";
       document.getElementById('endereco').value = d.logradouro ? `${d.logradouro}, ${d.numero} - ${d.bairro}, ${d.municipio} - ${d.uf}` : "";
     } catch (e) {}
-  }
-
-  function calcular() {
-    const d=parseFloat(document.getElementById('d').value), 
-          l=parseFloat(document.getElementById('l').value), 
-          e=parseFloat(document.getElementById('e').value), 
-          pk=parseFloat(document.getElementById('matSelect').value), 
-          h=parseFloat(document.getElementById('h').value);
-
-    if(isNaN(d) || isNaN(l) || isNaN(e)) return alert("Preencha as medidas corretamente.");
-    if(document.getElementById('matSelect').selectedIndex < 0) return alert("Cadastre e selecione um material em Custos primeiro.");
-    
-    const matNome = document.getElementById('matSelect').options[document.getElementById('matSelect').selectedIndex].text;
-    
-    // CÁLCULO DA BORRACHA CORRIGIDO
-    const pesoUnit = Math.ceil((Math.PI * (d + e) * e * l) * 0.0000012);
-    const unit = (((pesoUnit*pk*1.1)+(h*window.marbeDB.custos.vh))*2.5)*(1+(parseFloat(document.getElementById('tipoServ').value)));
-    
-    itensTemp.push({ n: "Revestimento " + matNome, mat: matNome, med: d + "x" + l + "mm", e: e + "mm", h: h, q: 1, v: unit, kg_unit: pesoUnit });
-    renderTabelaAtual(); tab('orc');
   }
 
   function renderTabelaAtual() {
@@ -330,8 +573,8 @@
         doc.text(`PRAZO ENTREGA: ${clean(d.prazo)}`, 20, 27);
         doc.autoTable({ 
             startY: 32, 
-            head: [['ITEM', 'MAT.', 'QTD', 'HORAS', 'PESO BRUTO']], 
-            body: d.itens.map(i => [clean(i.n), clean(i.mat), i.q, (i.h || 0) + "H", (i.kg_unit * 1.2 * i.q).toFixed(2) + " KG"]),
+            head: [['ITEM', 'MAT.', 'QTD', 'KG TOTAL (c/ Perda)']], 
+            body: d.itens.map(i => [clean(i.n), clean(i.mat), i.q, (i.kg_unit * i.q).toFixed(3) + " KG"]),
             theme: 'grid'
         });
     } else {
@@ -341,8 +584,8 @@
         doc.text(`ENDERECO: ${clean(d.endereco)}`, 20, 35);
         doc.autoTable({ 
             startY: 40, 
-            head: [['DESCRICAO', 'MEDIDAS', 'QTD', 'TOTAL']], 
-            body: d.itens.map(i => [clean(i.n), i.med, i.q, window.fmtMoney(i.v*i.q)]),
+            head: [['DESCRICAO', 'QTD', 'TOTAL']], 
+            body: d.itens.map(i => [clean(i.n), i.q, window.fmtMoney(i.v*i.q)]),
             theme: 'striped'
         });
         const fY = doc.lastAutoTable.finalY + 10;
@@ -356,7 +599,9 @@
   function renderSuprimentos() {
     const necessidade = {};
     (window.marbeDB.pedidos || []).forEach(p => p.itens.forEach(it => {
-        const mat = it.mat || "Nao identificado"; necessidade[mat] = (necessidade[mat] || 0) + (it.kg_unit * 1.2 * it.q);
+        const mat = it.mat || "Nao identificado"; 
+        // Aqui usa o kg_unit que já calculamos com a perda
+        necessidade[mat] = (necessidade[mat] || 0) + (it.kg_unit * it.q);
     }));
     let html = `<table><thead><tr><th>Material</th><th>Preciso</th><th>Estoque</th><th>Saldo</th></tr></thead><tbody>`;
     Object.keys(necessidade).forEach(mat => {
@@ -372,7 +617,7 @@
           <div style="display:flex; gap:5px; margin-bottom:5px;">
             <input value="${m.n}" readonly style="flex:2; background:#eee">
             <input value="${window.fmtMoney(m.p)}" readonly style="flex:1; background:#eee">
-            <button onclick="window.marbeDB.custos.mats.splice(${i},1); window.salvarNuvem()" style="background:red; color:white; border:none; padding:5px; border-radius:4px; font-weight:bold">X</button>
+            <button onclick="window.marbeDB.custos.mats.splice(${i},1); window.salvarNuvem(); updateUI();" style="background:red; color:white; border:none; padding:5px; border-radius:4px; font-weight:bold">X</button>
           </div>`).join('');
     }
   }
@@ -383,6 +628,7 @@
         if(!window.marbeDB.custos.mats) window.marbeDB.custos.mats = [];
         window.marbeDB.custos.mats.push({n, p}); window.salvarNuvem(); 
         document.getElementById('matNome').value=""; document.getElementById('matPreco').value=""; 
+        updateUI();
     }
   }
 
