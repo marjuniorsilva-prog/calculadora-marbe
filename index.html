@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema v32.0 (Borracha Prensada)</title>
+  <title>Sistema v32.1 (Revestimento Ajustado)</title>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -112,7 +112,7 @@
         <input type="text" id="loginUser" class="login-input" placeholder="Usuário">
         <input type="password" id="loginPass" class="login-input" placeholder="Senha">
         <button class="login-btn" onclick="fazerLogin()">ENTRAR</button>
-        <p style="font-size:12px; color:#888; margin-top:15px">Sistema v32.0</p>
+        <p style="font-size:12px; color:#888; margin-top:15px">Sistema v32.1</p>
     </div>
 </div>
 
@@ -139,7 +139,7 @@
         <option value="esfera">Esfera / Bola</option>
         <option value="cone">Cone / Batente</option>
         <option value="peso_direto">★ JÁ SEI O PESO (Modo Direto)</option>
-        <option value="revestimento">Revestimento (Legado)</option>
+        <option value="revestimento">Revestimento (Rolo/Cilindro)</option>
     </select>
 
     <div id="area-inputs" style="background: #f9f9f9; padding: 10px; border-radius: 5px; border:1px solid #eee;">
@@ -200,19 +200,24 @@
 
         <div id="input-revestimento" class="grupo-input hidden">
             <div class="row">
-                <div class="col"><label>Diâmetro</label><input type="number" id="d"></div>
-                <div class="col"><label>Comprimento</label><input type="number" id="l"></div>
+                <div class="col"><label>Diâmetro (mm)</label><input type="number" id="rev-diam"></div>
+                <div class="col"><label>Comprimento (mm)</label><input type="number" id="rev-comp"></div>
             </div>
-            <label>Camada (mm)</label><input type="number" id="e">
+            <label>Camada de Borracha (mm)</label><input type="number" id="rev-camada">
         </div>
     </div>
 
     <div style="margin-top:10px; border-top: 1px dashed #ccc; padding-top:10px;">
         <div class="row">
-            <div class="col">
+            <div class="col" id="colPecasHora">
                 <label>Peças/Hora</label>
                 <input type="number" id="pecasHora" value="4">
             </div>
+            <div class="col hidden" id="colHorasGastas">
+                <label style="color:#d35400">Horas Gastas (Total)</label>
+                <input type="number" id="horasGastas" value="1" placeholder="Ex: 8">
+            </div>
+            
             <div class="col">
                 <label>% Perda (Flash)</label>
                 <input type="number" id="percPerda" value="30">
@@ -231,7 +236,6 @@
             <div class="row">
                  <div class="col"><label>Custo Hora (Global)</label><input type="number" id="custoHoraInput" disabled style="background:#eee"></div>
             </div>
-            <small style="color:#888">*Para mudar Custo Hora, vá na aba Custos.</small>
         </details>
     </div>
 
@@ -290,9 +294,8 @@
 <script>
   let itensTemp = [];
   let idEdicao = null;
-  let ultimoCalculo = null; // Armazena o objeto calculado para adicionar depois
+  let ultimoCalculo = null; 
 
-  // --- FUNÇÃO DE LOGIN ---
   function fazerLogin() {
       const u = document.getElementById('loginUser').value;
       const p = document.getElementById('loginPass').value;
@@ -311,103 +314,98 @@
   }
 
   function updateUI() {
-    // Atualiza Dropdown Materiais
     const sel = document.getElementById('matSelect');
     if(sel && window.marbeDB.custos && window.marbeDB.custos.mats) {
-        // Salva seleção atual se houver
         const currentVal = sel.value; 
         sel.innerHTML = window.marbeDB.custos.mats.map(m => `<option value="${m.p}">${m.n}</option>`).join('');
         if(currentVal) sel.value = currentVal;
     }
-    
-    // Atualiza input de Custo Hora Global
     if(window.marbeDB.custos) {
         document.getElementById('valorHoraGlobal').value = window.marbeDB.custos.vh || 50;
         document.getElementById('custoHoraInput').value = window.marbeDB.custos.vh || 50;
     }
-
     renderOrcamentos(); renderPedidos(); renderBoletos(); renderCustos();
   }
 
-  // --- LÓGICA DA CALCULADORA INTEGRADA ---
+  // --- LÓGICA CALCULADORA ---
   function mudarInputsCalculo() {
       document.querySelectorAll('.grupo-input').forEach(el => el.classList.add('hidden'));
       document.getElementById('boxResultado').classList.add('hidden');
       const tipo = document.getElementById('tipoPeca').value;
       document.getElementById('input-' + tipo).classList.remove('hidden');
+
+      // Alterna entre Peças/Hora e Horas Gastas
+      if(tipo === 'revestimento') {
+          document.getElementById('colPecasHora').classList.add('hidden');
+          document.getElementById('colHorasGastas').classList.remove('hidden');
+      } else {
+          document.getElementById('colPecasHora').classList.remove('hidden');
+          document.getElementById('colHorasGastas').classList.add('hidden');
+      }
   }
 
   function simularCalculo() {
       const tipo = document.getElementById('tipoPeca').value;
-      const pecasHora = parseFloat(document.getElementById('pecasHora').value);
       const perdaPerc = parseFloat(document.getElementById('percPerda').value) || 0;
       const densidade = parseFloat(document.getElementById('densidade').value) || 1.2;
       const markup = parseFloat(document.getElementById('markup').value) || 2.5;
       
-      // Pega custo da borracha do Select
       const selMat = document.getElementById('matSelect');
       if(selMat.selectedIndex < 0) return alert("Cadastre materiais na aba Custos primeiro!");
       const custoKg = parseFloat(selMat.value);
       const nomeMat = selMat.options[selMat.selectedIndex].text;
-      
-      // Pega custo hora global
       const valorHora = window.marbeDB.custos.vh || 50;
-
-      if(!pecasHora) return alert("Informe peças por hora.");
 
       let volumeCm3 = 0;
       let pesoDiretoG = 0;
       let descMedidas = "";
 
-      // LÓGICA GEOMÉTRICA
+      // GEOMETRIA
       if (tipo === 'peso_direto') {
           pesoDiretoG = parseFloat(document.getElementById('peso-input').value);
           if(!pesoDiretoG) return alert("Informe o peso.");
           descMedidas = "Peso " + pesoDiretoG + "g";
       } 
       else if (tipo === 'revestimento') {
-          // Lógica Legada do Código Antigo
-          const d=parseFloat(document.getElementById('d').value), l=parseFloat(document.getElementById('l').value), e=parseFloat(document.getElementById('e').value);
-          if(!d || !l || !e) return alert("Preencha medidas.");
-          // Fórmula antiga aproximada para revestimento cilindrico
-          // PesoUnit antigo era: ceil((PI * (d+e) * e * l) * 0.0000012)
-          // Vamos converter para gramas exatas primeiro
-          // Vol aprox casca cilindrica: (PI * (d+e) * e * l) -> mm3
-          volumeCm3 = (Math.PI * (d + e) * e * l) / 1000; 
-          descMedidas = `Rev. ${d}x${l}mm`;
+          const d = parseFloat(document.getElementById('rev-diam').value);
+          const c = parseFloat(document.getElementById('rev-comp').value);
+          const e = parseFloat(document.getElementById('rev-camada').value);
+          if(d && c && e) {
+             // Fórmula aproximada de casca cilindrica
+             // Volume = (PI * (diametro + camada) * camada * comprimento)
+             volumeCm3 = (Math.PI * (d + e) * e * c) / 1000;
+             descMedidas = `Rev. Ø${d}x${c}mm (Camada ${e}mm)`;
+          }
       }
-      else {
-          // Lógica Nova Precisa
-          if (tipo === 'retangular') {
-              let c = parseFloat(document.getElementById('ret-comp').value), larg = parseFloat(document.getElementById('ret-larg').value), esp = parseFloat(document.getElementById('ret-esp').value);
-              if(c && larg && esp) { volumeCm3 = (c*larg*esp)/1000; descMedidas = `${c}x${larg}x${esp}mm`; }
-          } else if (tipo === 'quadrada') {
-              let ld = parseFloat(document.getElementById('quad-lado').value), esp = parseFloat(document.getElementById('quad-esp').value);
-              if(ld && esp) { volumeCm3 = (ld*ld*esp)/1000; descMedidas = `${ld}x${ld}x${esp}mm`; }
-          } else if (tipo === 'redonda') {
-              let d = parseFloat(document.getElementById('red-diam').value), esp = parseFloat(document.getElementById('red-esp').value);
-              if(d && esp) { volumeCm3 = (Math.PI * Math.pow(d/2, 2) * esp)/1000; descMedidas = `Ø${d} x ${esp}mm`; }
-          } else if (tipo === 'tubo') {
-              let ext = parseFloat(document.getElementById('tubo-ext').value), int = parseFloat(document.getElementById('tubo-int').value), c = parseFloat(document.getElementById('tubo-comp').value);
-              if(ext && int && c) {
-                  let area = (Math.PI * Math.pow(ext/2, 2)) - (Math.PI * Math.pow(int/2, 2));
-                  volumeCm3 = (area * c)/1000; descMedidas = `Ø${ext}xØ${int} x ${c}mm`;
-              }
-          } else if (tipo === 'oring') {
-              let di = parseFloat(document.getElementById('oring-di').value), fio = parseFloat(document.getElementById('oring-fio').value);
-              if(di && fio) {
-                  let rFio=fio/2, rMed=(di+fio)/2;
-                  volumeCm3 = (Math.PI * Math.pow(rFio, 2) * (2*Math.PI*rMed))/1000; descMedidas = `O-Ring Ø${di} x ${fio}mm`;
-              }
-          } else if (tipo === 'esfera') {
-              let d = parseFloat(document.getElementById('esf-diam').value);
-              if(d) { volumeCm3 = (4/3 * Math.PI * Math.pow(d/2, 3))/1000; descMedidas = `Esfera Ø${d}mm`; }
-          } else if (tipo === 'cone') {
-              let dm = parseFloat(document.getElementById('cone-maior').value), dmn = parseFloat(document.getElementById('cone-menor').value), h = parseFloat(document.getElementById('cone-alt').value);
-              if(dm && dmn && h) {
-                  let r1=dm/2, r2=dmn/2;
-                  volumeCm3 = ((Math.PI*h)/3 * (Math.pow(r1,2) + r1*r2 + Math.pow(r2,2)))/1000; descMedidas = `Cone ${dm}/${dmn} x ${h}mm`;
-              }
+      else if (tipo === 'retangular') {
+          let c = parseFloat(document.getElementById('ret-comp').value), larg = parseFloat(document.getElementById('ret-larg').value), esp = parseFloat(document.getElementById('ret-esp').value);
+          if(c && larg && esp) { volumeCm3 = (c*larg*esp)/1000; descMedidas = `${c}x${larg}x${esp}mm`; }
+      } else if (tipo === 'quadrada') {
+          let ld = parseFloat(document.getElementById('quad-lado').value), esp = parseFloat(document.getElementById('quad-esp').value);
+          if(ld && esp) { volumeCm3 = (ld*ld*esp)/1000; descMedidas = `${ld}x${ld}x${esp}mm`; }
+      } else if (tipo === 'redonda') {
+          let d = parseFloat(document.getElementById('red-diam').value), esp = parseFloat(document.getElementById('red-esp').value);
+          if(d && esp) { volumeCm3 = (Math.PI * Math.pow(d/2, 2) * esp)/1000; descMedidas = `Ø${d} x ${esp}mm`; }
+      } else if (tipo === 'tubo') {
+          let ext = parseFloat(document.getElementById('tubo-ext').value), int = parseFloat(document.getElementById('tubo-int').value), c = parseFloat(document.getElementById('tubo-comp').value);
+          if(ext && int && c) {
+              let area = (Math.PI * Math.pow(ext/2, 2)) - (Math.PI * Math.pow(int/2, 2));
+              volumeCm3 = (area * c)/1000; descMedidas = `Ø${ext}xØ${int} x ${c}mm`;
+          }
+      } else if (tipo === 'oring') {
+          let di = parseFloat(document.getElementById('oring-di').value), fio = parseFloat(document.getElementById('oring-fio').value);
+          if(di && fio) {
+              let rFio=fio/2, rMed=(di+fio)/2;
+              volumeCm3 = (Math.PI * Math.pow(rFio, 2) * (2*Math.PI*rMed))/1000; descMedidas = `O-Ring Ø${di} x ${fio}mm`;
+          }
+      } else if (tipo === 'esfera') {
+          let d = parseFloat(document.getElementById('esf-diam').value);
+          if(d) { volumeCm3 = (4/3 * Math.PI * Math.pow(d/2, 3))/1000; descMedidas = `Esfera Ø${d}mm`; }
+      } else if (tipo === 'cone') {
+          let dm = parseFloat(document.getElementById('cone-maior').value), dmn = parseFloat(document.getElementById('cone-menor').value), h = parseFloat(document.getElementById('cone-alt').value);
+          if(dm && dmn && h) {
+              let r1=dm/2, r2=dmn/2;
+              volumeCm3 = ((Math.PI*h)/3 * (Math.pow(r1,2) + r1*r2 + Math.pow(r2,2)))/1000; descMedidas = `Cone ${dm}/${dmn} x ${h}mm`;
           }
       }
 
@@ -419,22 +417,27 @@
       let pesoBrutoG = pesoLiq * fatorPerda;
       let pesoBrutoKg = pesoBrutoG / 1000;
 
+      // Custo Mão de Obra (DIFERENÇA AQUI)
+      let custoMO = 0;
+      if (tipo === 'revestimento') {
+          const hGastas = parseFloat(document.getElementById('horasGastas').value) || 0;
+          if(!hGastas) return alert("Informe as horas gastas.");
+          custoMO = valorHora * hGastas;
+      } else {
+          const pecasHora = parseFloat(document.getElementById('pecasHora').value);
+          if(!pecasHora) return alert("Informe peças por hora.");
+          custoMO = valorHora / pecasHora;
+      }
+
       let custoMat = pesoBrutoKg * custoKg;
-      let custoMO = valorHora / pecasHora;
       let custoProd = custoMat + custoMO;
       let precoVenda = custoProd * markup;
 
-      // ARMAZENA PARA ADICIONAR DEPOIS
       ultimoCalculo = {
           n: `${document.getElementById('tipoPeca').options[document.getElementById('tipoPeca').selectedIndex].text} (${descMedidas})`,
-          mat: nomeMat,
-          med: descMedidas,
-          q: 1,
-          v: precoVenda,
-          kg_unit: pesoBrutoKg // Peso Bruto em KG para estoque
+          mat: nomeMat, med: descMedidas, q: 1, v: precoVenda, kg_unit: pesoBrutoKg 
       };
 
-      // EXIBE RESULTADO
       document.getElementById('resDesc').innerText = descMedidas;
       document.getElementById('resPesoLiq').innerText = pesoLiq.toFixed(1) + ' g';
       document.getElementById('resPesoBruto').innerText = pesoBrutoG.toFixed(1) + ' g';
@@ -448,14 +451,13 @@
 
   function adicionarAoOrcamento() {
       if(!ultimoCalculo) return;
-      itensTemp.push({...ultimoCalculo}); // Clona o objeto
-      renderTabelaAtual();
-      tab('orc');
+      itensTemp.push({...ultimoCalculo}); 
+      renderTabelaAtual(); tab('orc');
       document.getElementById('boxResultado').classList.add('hidden');
       ultimoCalculo = null;
   }
 
-  // --- FUNÇÕES EXISTENTES DO SISTEMA ---
+  // --- FUNÇÕES DE ORÇAMENTO E BANCO DE DADOS (Inalteradas) ---
   async function buscaCNPJ(v) {
     const cnpj = v.replace(/\D/g, ''); if (cnpj.length !== 14) return;
     try {
@@ -483,7 +485,6 @@
 
   function salvarOrcamento() {
     if(itensTemp.length === 0) return alert("Adicione pelo menos um item ao orçamento.");
-    
     const orcData = { 
         os: idEdicao ? idEdicao.os : window.marbeDB.os, 
         cliente: document.getElementById('razao').value || "CLIENTE NÃO INFORMADO", 
@@ -495,7 +496,6 @@
         pagamento: document.getElementById('pagamento').value, 
         total: itensTemp.reduce((a,b)=>a+(b.v*b.q),0) 
     };
-
     if(idEdicao) {
         if(idEdicao.origem === 'pedidos') window.marbeDB.pedidos[idEdicao.index] = orcData;
         else window.marbeDB.orçamentos[idEdicao.index] = orcData;
@@ -507,11 +507,7 @@
         window.marbeDB.orçamentos.push(orcData); 
         window.marbeDB.os++;
     }
-
-    window.salvarNuvem(); 
-    itensTemp = []; 
-    renderTabelaAtual(); 
-    tab('historico');
+    window.salvarNuvem(); itensTemp = []; renderTabelaAtual(); tab('historico');
   }
 
   function renderOrcamentos() {
@@ -567,7 +563,6 @@
     const { jsPDF } = window.jspdf; const doc = new jsPDF(); const d = window.marbeDB[base][index];
     const clean = (t) => t ? t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase() : "";
     doc.setFontSize(10); doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 20, 15);
-    
     if(tipo === 'PRODUCAO') {
         doc.text(`VIA PRODUCAO - OS: ${d.os}`, 20, 22);
         doc.text(`PRAZO ENTREGA: ${clean(d.prazo)}`, 20, 27);
@@ -600,7 +595,6 @@
     const necessidade = {};
     (window.marbeDB.pedidos || []).forEach(p => p.itens.forEach(it => {
         const mat = it.mat || "Nao identificado"; 
-        // Aqui usa o kg_unit que já calculamos com a perda
         necessidade[mat] = (necessidade[mat] || 0) + (it.kg_unit * it.q);
     }));
     let html = `<table><thead><tr><th>Material</th><th>Preciso</th><th>Estoque</th><th>Saldo</th></tr></thead><tbody>`;
