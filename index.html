@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema v32.2 (Logo OK)</title>
+  <title>Sistema v33.0 (Cola e Impostos)</title>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -27,12 +27,6 @@
       const data = snapshot.val();
       if (data) { 
           window.marbeDB = data; 
-          if(!window.marbeDB.orçamentos) window.marbeDB.orçamentos = [];
-          if(!window.marbeDB.pedidos) window.marbeDB.pedidos = [];
-          if(!window.marbeDB.financeiro) window.marbeDB.financeiro = [];
-          if(!window.marbeDB.estoque) window.marbeDB.estoque = {};
-          if(!window.marbeDB.custos) window.marbeDB.custos = {vh: 50, mats: []};
-          if(!window.marbeDB.custos.mats) window.marbeDB.custos.mats = [];
           updateUI(); 
       }
     });
@@ -63,14 +57,12 @@
     :root { --primary: #2c7be5; --success: #28a745; --danger: #d9534f; --info: #17a2b8; --dark: #333; --prod: #6f42c1; --warning: #ffc107; }
     body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; margin: 0; padding: 5px; color: #333; }
     
-    /* LOGIN */
     #loginScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
     .login-box { width: 100%; max-width: 350px; text-align: center; }
     .login-logo { max-width: 100%; height: auto; margin-bottom: 30px; }
     .login-input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; box-sizing: border-box; }
     .login-btn { width: 100%; padding: 12px; background: #002B49; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
 
-    /* LAYOUT GERAL */
     .container { max-width: 1000px; background: #fff; padding: 15px; border-radius: 8px; margin: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: none; }
     .tabs { display: flex; gap: 4px; margin-bottom: 15px; flex-wrap: wrap; }
     .tab-btn { flex: 1; padding: 10px; border: none; background: #e9ecef; cursor: pointer; font-weight: bold; border-radius: 6px; font-size: 10px; text-transform: uppercase; min-width: 70px; transition: 0.2s; }
@@ -79,12 +71,10 @@
     .section.active { display: block; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     
-    /* FORMULARIOS */
     label { display: block; margin-top: 10px; font-weight: 600; font-size: 11px; color: #555; }
     input, select, textarea { width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
     .btn { width: 100%; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; color: white; text-align: center; display: block; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     
-    /* TABELAS E CARDS */
     table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
     table th { background: #f8f9fa; border: 1px solid #dee2e6; padding: 8px; text-align: left; }
     table td { border: 1px solid #dee2e6; padding: 8px; }
@@ -93,7 +83,7 @@
     .negativo { color: var(--danger); font-weight: bold; }
     .positivo { color: var(--success); font-weight: bold; }
 
-    /* --- NOVOS ESTILOS PARA CALCULADORA --- */
+    /* ESTILOS CALCULADORA */
     .hidden { display: none !important; }
     .row { display: flex; gap: 10px; }
     .col { flex: 1; }
@@ -112,7 +102,7 @@
         <input type="text" id="loginUser" class="login-input" placeholder="Usuário">
         <input type="password" id="loginPass" class="login-input" placeholder="Senha">
         <button class="login-btn" onclick="fazerLogin()">ENTRAR</button>
-        <p style="font-size:12px; color:#888; margin-top:15px">Sistema v32.2</p>
+        <p style="font-size:12px; color:#888; margin-top:15px">Sistema v33.0</p>
     </div>
 </div>
 
@@ -143,7 +133,6 @@
     </select>
 
     <div id="area-inputs" style="background: #f9f9f9; padding: 10px; border-radius: 5px; border:1px solid #eee;">
-        
         <div id="input-retangular" class="grupo-input">
             <div class="row">
                 <div class="col"><label>Comp. (mm)</label><input type="number" id="ret-comp"></div>
@@ -227,6 +216,12 @@
         <label>Material Utilizado</label>
         <select id="matSelect"></select>
 
+        <label style="color:var(--prod)">Tipo de Serviço (Imposto)</label>
+        <select id="tipoServicoCalc" style="border-color:var(--prod); background-color:#f3e5f5; font-weight:bold;">
+            <option value="4.5">PEÇA NOVA (4.5%)</option>
+            <option value="6.5">REFORMA (6.5%)</option>
+        </select>
+
         <details>
             <summary>Editar Custos & Markup</summary>
             <div class="row">
@@ -246,9 +241,15 @@
         <div class="res-line"><span>Peso Líquido:</span> <span id="resPesoLiq">0g</span></div>
         <div class="res-line" style="color:#f1c40f"><span>Peso Bruto (c/ perda):</span> <span id="resPesoBruto">0g</span></div>
         <hr style="border-color:#455a64">
+        
         <div class="res-line"><span>Custo Matéria:</span> <span id="resCustoMat">R$ 0,00</span></div>
+        <div class="res-line" id="linhaCola"><span>Custo Cola (10%):</span> <span id="resCustoCola">R$ 0,00</span></div>
         <div class="res-line"><span>Custo Mão de Obra:</span> <span id="resCustoMO">R$ 0,00</span></div>
-        <div class="res-line"><span>Custo Produção:</span> <span id="resCustoTot">R$ 0,00</span></div>
+        <div class="res-line" style="font-weight:bold"><span>Custo Produção:</span> <span id="resCustoTot">R$ 0,00</span></div>
+        
+        <div class="res-line" style="margin-top:5px; border-top:1px dashed #777; padding-top:5px;"><span>Markup Aplicado:</span> <span id="resMarkup"></span></div>
+        <div class="res-line"><span>Imposto (<span id="resTaxa"></span>%):</span> <span id="resValorImposto">R$ 0,00</span></div>
+        
         <div class="res-destaque" id="resPrecoVenda">R$ 0,00</div>
         
         <button class="btn" style="background:var(--success); margin-top:10px; border:1px solid white;" onclick="adicionarAoOrcamento()">ADICIONAR AO ORÇAMENTO</button>
@@ -334,7 +335,6 @@
       const tipo = document.getElementById('tipoPeca').value;
       document.getElementById('input-' + tipo).classList.remove('hidden');
 
-      // Alterna entre Peças/Hora e Horas Gastas
       if(tipo === 'revestimento') {
           document.getElementById('colPecasHora').classList.add('hidden');
           document.getElementById('colHorasGastas').classList.remove('hidden');
@@ -356,6 +356,10 @@
       const nomeMat = selMat.options[selMat.selectedIndex].text;
       const valorHora = window.marbeDB.custos.vh || 50;
 
+      // Pegar Taxa de Imposto
+      const taxaImposto = parseFloat(document.getElementById('tipoServicoCalc').value);
+      const nomeServico = document.getElementById('tipoServicoCalc').options[document.getElementById('tipoServicoCalc').selectedIndex].text;
+
       let volumeCm3 = 0;
       let pesoDiretoG = 0;
       let descMedidas = "";
@@ -371,8 +375,6 @@
           const c = parseFloat(document.getElementById('rev-comp').value);
           const e = parseFloat(document.getElementById('rev-camada').value);
           if(d && c && e) {
-             // Fórmula aproximada de casca cilindrica
-             // Volume = (PI * (diametro + camada) * camada * comprimento)
              volumeCm3 = (Math.PI * (d + e) * e * c) / 1000;
              descMedidas = `Rev. Ø${d}x${c}mm (Camada ${e}mm)`;
           }
@@ -417,7 +419,20 @@
       let pesoBrutoG = pesoLiq * fatorPerda;
       let pesoBrutoKg = pesoBrutoG / 1000;
 
-      // Custo Mão de Obra (DIFERENÇA AQUI)
+      // 1. Custo Matéria Prima (Borracha)
+      let custoMateria = pesoBrutoKg * custoKg;
+
+      // 2. Custo Cola (Apenas para Revestimento: 10% da Borracha)
+      let custoCola = 0;
+      if (tipo === 'revestimento') {
+          custoCola = custoMateria * 0.10;
+          document.getElementById('linhaCola').classList.remove('hidden');
+          document.getElementById('resCustoCola').innerText = window.fmtMoney(custoCola);
+      } else {
+          document.getElementById('linhaCola').classList.add('hidden');
+      }
+
+      // 3. Custo Mão de Obra
       let custoMO = 0;
       if (tipo === 'revestimento') {
           const hGastas = parseFloat(document.getElementById('horasGastas').value) || 0;
@@ -429,22 +444,39 @@
           custoMO = valorHora / pecasHora;
       }
 
-      let custoMat = pesoBrutoKg * custoKg;
-      let custoProd = custoMat + custoMO;
-      let precoVenda = custoProd * markup;
+      // 4. Custo Produção Total
+      let custoProd = custoMateria + custoCola + custoMO;
+      
+      // 5. Markup (Venda Bruta)
+      let precoBase = custoProd * markup;
+
+      // 6. Imposto (Sobre o Preço Bruto)
+      let valorImposto = precoBase * (taxaImposto / 100);
+
+      // 7. Preço Final
+      let precoFinal = precoBase + valorImposto;
 
       ultimoCalculo = {
-          n: `${document.getElementById('tipoPeca').options[document.getElementById('tipoPeca').selectedIndex].text} (${descMedidas})`,
-          mat: nomeMat, med: descMedidas, q: 1, v: precoVenda, kg_unit: pesoBrutoKg 
+          n: `${document.getElementById('tipoPeca').options[document.getElementById('tipoPeca').selectedIndex].text} - ${nomeServico}`,
+          mat: nomeMat, 
+          med: descMedidas, 
+          q: 1, 
+          v: precoFinal, 
+          kg_unit: pesoBrutoKg 
       };
 
       document.getElementById('resDesc').innerText = descMedidas;
       document.getElementById('resPesoLiq').innerText = pesoLiq.toFixed(1) + ' g';
       document.getElementById('resPesoBruto').innerText = pesoBrutoG.toFixed(1) + ' g';
-      document.getElementById('resCustoMat').innerText = window.fmtMoney(custoMat);
+      document.getElementById('resCustoMat').innerText = window.fmtMoney(custoMateria);
       document.getElementById('resCustoMO').innerText = window.fmtMoney(custoMO);
       document.getElementById('resCustoTot').innerText = window.fmtMoney(custoProd);
-      document.getElementById('resPrecoVenda').innerText = window.fmtMoney(precoVenda);
+      
+      document.getElementById('resMarkup').innerText = markup + "x (" + window.fmtMoney(precoBase) + ")";
+      document.getElementById('resTaxa').innerText = taxaImposto;
+      document.getElementById('resValorImposto').innerText = window.fmtMoney(valorImposto);
+
+      document.getElementById('resPrecoVenda').innerText = window.fmtMoney(precoFinal);
 
       document.getElementById('boxResultado').classList.remove('hidden');
   }
@@ -457,7 +489,7 @@
       ultimoCalculo = null;
   }
 
-  // --- FUNÇÕES DE ORÇAMENTO E BANCO DE DADOS ---
+  // --- FUNÇÕES DE ORÇAMENTO E BANCO DE DADOS (Inalteradas) ---
   async function buscaCNPJ(v) {
     const cnpj = v.replace(/\D/g, ''); if (cnpj.length !== 14) return;
     try {
