@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema v33.1 (Final)</title>
+  <title>Sistema v33.2 (Com Retorno)</title>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -102,7 +102,7 @@
         <input type="text" id="loginUser" class="login-input" placeholder="Usuário">
         <input type="password" id="loginPass" class="login-input" placeholder="Senha">
         <button class="login-btn" onclick="fazerLogin()">ENTRAR</button>
-        <p style="font-size:12px; color:#888; margin-top:15px">Sistema v33.1</p>
+        <p style="font-size:12px; color:#888; margin-top:15px">Sistema v33.2</p>
     </div>
 </div>
 
@@ -354,7 +354,7 @@
       // LÓGICA RIGOROSA DE PERDA
       let perdaPerc = 0;
       if (tipo !== 'revestimento') {
-         perdaPerc = parseFloat(document.getElementById('percPerda').value) || 0;
+          perdaPerc = parseFloat(document.getElementById('percPerda').value) || 0;
       }
 
       const densidade = parseFloat(document.getElementById('densidade').value) || 1.2;
@@ -385,8 +385,8 @@
           const c = parseFloat(document.getElementById('rev-comp').value);
           const e = parseFloat(document.getElementById('rev-camada').value);
           if(d && c && e) {
-             volumeCm3 = (Math.PI * (d + e) * e * c) / 1000;
-             descMedidas = `Rev. Ø${d}x${c}mm (Camada ${e}mm)`;
+              volumeCm3 = (Math.PI * (d + e) * e * c) / 1000;
+              descMedidas = `Rev. Ø${d}x${c}mm (Camada ${e}mm)`;
           }
       }
       else if (tipo === 'retangular') {
@@ -580,6 +580,7 @@
     window.marbeDB.pedidos.push(orc); window.salvarNuvem(); tab('pedidos');
   }
 
+  // --- NOVA FUNÇÃO RENDER PEDIDOS (COM O BOTÃO DE ESTORNO) ---
   function renderPedidos() {
     document.getElementById('listaPedidos').innerHTML = (window.marbeDB.pedidos || []).map((p, i) => `
       <div class="card-list">
@@ -588,6 +589,10 @@
             <button class="btn" style="background:var(--info); width:auto; padding:8px; margin:0; flex:1" onclick="editarExistente('pedidos', ${i})">EDITAR/DESC.</button>
             <button class="btn" style="background:var(--dark); width:auto; padding:8px; margin:0; flex:1" onclick="gerarPDF('PRODUCAO', ${i}, 'pedidos')">PRODUÇÃO</button>
         </div>
+        
+        <button class="btn" style="background:var(--danger); margin-top:5px; padding:8px;" onclick="estornarVenda(${i})">↩ CANCELAR VENDA (VOLTAR)</button>
+        <hr style="border:0; border-top:1px dashed #ccc; margin:10px 0;">
+
         <input type="text" id="nf_${i}" placeholder="Nº NF" style="margin-top:5px">
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
             <input type="number" id="parc_${i}" placeholder="Qtd Parc.">
@@ -595,6 +600,22 @@
         </div>
         <button class="btn" style="background:var(--success)" onclick="faturar(${i})">FATURAR E ENTREGAR</button>
       </div>`).join('');
+  }
+
+  // --- NOVA FUNÇÃO DE LÓGICA DE ESTORNO ---
+  function estornarVenda(i) {
+      if(!confirm("Deseja CANCELAR essa venda e voltar para Orçamento? O item sairá desta lista.")) return;
+      
+      const item = window.marbeDB.pedidos.splice(i, 1)[0];
+      
+      if(!window.marbeDB.orçamentos) window.marbeDB.orçamentos = [];
+      window.marbeDB.orçamentos.push(item);
+      
+      window.salvarNuvem();
+      updateUI();
+      
+      alert("Venda estornada! O item voltou para a aba HISTÓRICO.");
+      tab('historico');
   }
 
   function faturar(i) {
