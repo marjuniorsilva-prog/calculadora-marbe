@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema v33.6 (Final c/ CNPJ)</title>
+  <title>Sistema v34.1 (Ajuste Revestimento)</title>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -102,7 +102,7 @@
         <input type="text" id="loginUser" class="login-input" placeholder="Usuário">
         <input type="password" id="loginPass" class="login-input" placeholder="Senha">
         <button class="login-btn" onclick="fazerLogin()">ENTRAR</button>
-        <p style="font-size:12px; color:#888; margin-top:15px">Sistema v33.6</p>
+        <p style="font-size:12px; color:#888; margin-top:15px">Sistema v34.1</p>
     </div>
 </div>
 
@@ -262,6 +262,13 @@
     <label>CNPJ Cliente</label><input type="text" id="cnpj" onblur="buscaCNPJ(this.value)">
     <label>Razão Social</label><input type="text" id="razao">
     <label>Endereço Completo</label><input type="text" id="endereco">
+    
+    <div style="background:#fff3cd; padding:8px; border:1px solid #ffeeba; border-radius:4px; margin-top:10px; margin-bottom:5px; display:flex; align-items:center; gap:5px;">
+        <label style="margin:0; color:#856404; min-width:120px;">Desconto Global (%):</label>
+        <input type="number" id="descPorc" style="width:70px; margin:0;" placeholder="%">
+        <button class="btn" style="background:#ffc107; color:#000; margin:0; width:auto; padding:8px 15px;" onclick="aplicarDesconto()">APLICAR %</button>
+    </div>
+
     <table><thead><tr><th>Descrição</th><th>Material</th><th>Qtd</th><th>Unit. (R$)</th><th>X</th></tr></thead><tbody id="corpoAtual"></tbody></table>
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
         <div><label>Frete</label><select id="frete"><option>POR CONTA DO CLIENTE</option><option>POR CONTA DA EMPRESA</option></select></div>
@@ -328,7 +335,21 @@
     renderOrcamentos(); renderPedidos(); renderBoletos(); renderCustos();
   }
 
-  // --- LÓGICA CALCULADORA ---
+  function aplicarDesconto() {
+      const p = parseFloat(document.getElementById('descPorc').value);
+      if(!p || p <= 0) return alert("Digite uma porcentagem válida (Ex: 5)");
+      if(itensTemp.length === 0) return alert("Não há itens na lista para aplicar desconto.");
+
+      if(confirm(`Tem certeza que deseja aplicar ${p}% de desconto em TODOS os itens da lista?\nIsso reduzirá o valor unitário e total.`)) {
+          itensTemp.forEach(it => {
+              it.v = it.v * (1 - (p / 100));
+          });
+          renderTabelaAtual(); 
+          alert("Desconto aplicado com sucesso!");
+          document.getElementById('descPorc').value = ""; 
+      }
+  }
+
   function mudarInputsCalculo() {
       document.querySelectorAll('.grupo-input').forEach(el => el.classList.add('hidden'));
       document.getElementById('boxResultado').classList.add('hidden');
@@ -338,12 +359,10 @@
       if(tipo === 'revestimento') {
           document.getElementById('colPecasHora').classList.add('hidden');
           document.getElementById('colHorasGastas').classList.remove('hidden');
-          // OCULTA O CAMPO DE PERDA NO MODO REVESTIMENTO
           document.getElementById('colPerda').classList.add('hidden');
       } else {
           document.getElementById('colPecasHora').classList.remove('hidden');
           document.getElementById('colHorasGastas').classList.add('hidden');
-          // EXIBE O CAMPO DE PERDA NOS OUTROS MODOS
           document.getElementById('colPerda').classList.remove('hidden');
       }
   }
@@ -351,7 +370,6 @@
   function simularCalculo() {
       const tipo = document.getElementById('tipoPeca').value;
       
-      // LÓGICA RIGOROSA DE PERDA
       let perdaPerc = 0;
       if (tipo !== 'revestimento') {
           perdaPerc = parseFloat(document.getElementById('percPerda').value) || 0;
@@ -366,7 +384,6 @@
       const nomeMat = selMat.options[selMat.selectedIndex].text;
       const valorHora = window.marbeDB.custos.vh || 50;
 
-      // Pegar Taxa de Imposto
       const taxaImposto = parseFloat(document.getElementById('tipoServicoCalc').value);
       const nomeServico = document.getElementById('tipoServicoCalc').options[document.getElementById('tipoServicoCalc').selectedIndex].text;
 
@@ -374,7 +391,6 @@
       let pesoDiretoG = 0;
       let descMedidas = "";
 
-      // GEOMETRIA
       if (tipo === 'peso_direto') {
           pesoDiretoG = parseFloat(document.getElementById('peso-input').value);
           if(!pesoDiretoG) return alert("Informe o peso.");
@@ -429,10 +445,7 @@
       let pesoBrutoG = pesoLiq * fatorPerda;
       let pesoBrutoKg = pesoBrutoG / 1000;
 
-      // 1. Custo Matéria Prima (Borracha)
       let custoMateria = pesoBrutoKg * custoKg;
-
-      // 2. Custo Cola (Apenas para Revestimento: 10% da Borracha)
       let custoCola = 0;
       if (tipo === 'revestimento') {
           custoCola = custoMateria * 0.10;
@@ -442,7 +455,6 @@
           document.getElementById('linhaCola').classList.add('hidden');
       }
 
-      // 3. Custo Mão de Obra
       let custoMO = 0;
       if (tipo === 'revestimento') {
           const hGastas = parseFloat(document.getElementById('horasGastas').value) || 0;
@@ -454,19 +466,11 @@
           custoMO = valorHora / pecasHora;
       }
 
-      // 4. Custo Produção Total
       let custoProd = custoMateria + custoCola + custoMO;
-      
-      // 5. Markup (Venda Bruta)
       let precoBase = custoProd * markup;
-
-      // 6. Imposto (Sobre o Preço Bruto)
       let valorImposto = precoBase * (taxaImposto / 100);
-
-      // 7. Preço Final
       let precoFinal = precoBase + valorImposto;
 
-      // AQUI É A MÁGICA: JÁ SALVA A DESCRIÇÃO COM A MEDIDA JUNTO
       ultimoCalculo = {
           n: `${document.getElementById('tipoPeca').options[document.getElementById('tipoPeca').selectedIndex].text} - ${nomeServico} ${descMedidas}`,
           mat: nomeMat, 
@@ -485,17 +489,13 @@
           document.getElementById('lblPesoBruto').innerText = `Peso Bruto (+${perdaPerc}%):`;
       }
       document.getElementById('resPesoBruto').innerText = pesoBrutoG.toFixed(1) + ' g';
-      
       document.getElementById('resCustoMat').innerText = window.fmtMoney(custoMateria);
       document.getElementById('resCustoMO').innerText = window.fmtMoney(custoMO);
       document.getElementById('resCustoTot').innerText = window.fmtMoney(custoProd);
-      
       document.getElementById('resMarkup').innerText = markup + "x (" + window.fmtMoney(precoBase) + ")";
       document.getElementById('resTaxa').innerText = taxaImposto;
       document.getElementById('resValorImposto').innerText = window.fmtMoney(valorImposto);
-
       document.getElementById('resPrecoVenda').innerText = window.fmtMoney(precoFinal);
-
       document.getElementById('boxResultado').classList.remove('hidden');
   }
 
@@ -507,7 +507,6 @@
       ultimoCalculo = null;
   }
 
-  // --- FUNÇÕES DE ORÇAMENTO E BANCO DE DADOS (Inalteradas) ---
   async function buscaCNPJ(v) {
     const cnpj = v.replace(/\D/g, ''); if (cnpj.length !== 14) return;
     try {
@@ -524,13 +523,9 @@
         total += it.v * it.q;
         return `<tr>
             <td><input class="editable-input" value="${it.n}" onchange="itensTemp[${i}].n=this.value"></td>
-            
             <td style="font-size:9px">${it.mat}</td>
-            
             <td><input type="number" class="editable-input" style="width:40px" value="${it.q}" onchange="itensTemp[${i}].q=parseInt(this.value); renderTabelaAtual()"></td>
-            
             <td><input type="number" class="editable-input" style="width:80px" value="${it.v.toFixed(2)}" onchange="itensTemp[${i}].v=parseFloat(this.value); renderTabelaAtual()"></td>
-            
             <td onclick="itensTemp.splice(${i},1);renderTabelaAtual()" style="cursor:pointer; color:red; font-weight:bold">X</td>
         </tr>`;
     }).join('');
@@ -607,15 +602,11 @@
 
   function estornarVenda(i) {
       if(!confirm("Deseja CANCELAR essa venda e voltar para Orçamento? O item sairá desta lista.")) return;
-      
       const item = window.marbeDB.pedidos.splice(i, 1)[0];
-      
       if(!window.marbeDB.orçamentos) window.marbeDB.orçamentos = [];
       window.marbeDB.orçamentos.push(item);
-      
       window.salvarNuvem();
       updateUI();
-      
       alert("Venda estornada! O item voltou para a aba HISTÓRICO.");
       tab('historico');
   }
@@ -636,9 +627,6 @@
     const { jsPDF } = window.jspdf; const doc = new jsPDF(); const d = window.marbeDB[base][index];
     const clean = (t) => t ? t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase() : "";
     
-    // ============================================
-    // CABEÇALHO DA EMPRESA (SB) - AGORA COM CNPJ CORRETO
-    // ============================================
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 105, 15, {align: "center"});
@@ -646,10 +634,8 @@
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.text("RUA SAO CARLOS, 84 - VILA MARIANA - RIBEIRAO PRETO / SP", 105, 20, {align: "center"});
-    // CNPJ ATUALIZADO AQUI
     doc.text("CNPJ: 61.149.312/0001-56", 105, 24, {align: "center"}); 
 
-    // LINHA SEPARADORA
     doc.setLineWidth(0.5);
     doc.line(20, 27, 190, 27);
     
@@ -659,13 +645,23 @@
         doc.autoTable({ 
             startY: 45, 
             head: [['ITEM', 'MAT.', 'QTD', 'KG TOTAL (c/ Perda)']], 
-            body: d.itens.map(i => [clean(i.n), clean(i.mat), i.q, (i.kg_unit * i.q).toFixed(3) + " KG"]),
+            body: d.itens.map(i => {
+                let pesoFinal = i.kg_unit * i.q;
+                // SE FOR REVESTIMENTO, ACRESCENTA 20%
+                if(i.n.toUpperCase().includes("REVESTIMENTO") || i.n.toUpperCase().includes("REV.")) {
+                    pesoFinal = pesoFinal * 1.2;
+                }
+                return [
+                    clean(i.n), 
+                    clean(i.mat), 
+                    i.q, 
+                    pesoFinal.toFixed(3) + " KG"
+                ];
+            }),
             theme: 'grid'
         });
     } else {
-        // ============================================
-        // DADOS DO CLIENTE - CORRIGIDO
-        // ============================================
+        // PDF CLIENTE (MATERIAL DE VOLTA!)
         doc.setFontSize(10);
         doc.text(`ORCAMENTO - OS: ${d.os} | DATA: ${new Date().toLocaleDateString('pt-BR')}`, 20, 35);
         doc.text(`CLIENTE: ${clean(d.cliente)}`, 20, 40);
@@ -673,20 +669,18 @@
         
         doc.text(`ENDERECO:`, 20, 50);
         
-        // AQUI ESTÁ O AJUSTE INTELIGENTE DO ENDEREÇO
-        // Se o endereço for maior que 140 unidades, ele quebra a linha automaticamente
         const splitEnd = doc.splitTextToSize(clean(d.endereco), 140);
         doc.text(splitEnd, 45, 50); 
         
-        // Ajusta a altura da tabela baseado em quantas linhas o endereço ocupou
         let tableY = 60; 
         if(splitEnd.length > 1) tableY += (splitEnd.length - 1) * 4;
 
         doc.autoTable({ 
             startY: tableY, 
-            head: [['DESCRICAO', 'QTD', 'V. UNIT', 'V. TOTAL']], 
+            head: [['DESCRICAO', 'MATERIAL', 'QTD', 'V. UNIT', 'V. TOTAL']], 
             body: d.itens.map(i => [
                 clean(i.n), 
+                clean(i.mat), // MATERIAL DE VOLTA AQUI
                 i.q, 
                 window.fmtMoney(i.v), 
                 window.fmtMoney(i.v * i.q)
@@ -695,9 +689,10 @@
             theme: 'striped',
             columnStyles: {
                 0: { cellWidth: 'auto' }, 
-                1: { cellWidth: 15, halign: 'center' }, 
-                2: { cellWidth: 35, halign: 'right' },  
-                3: { cellWidth: 35, halign: 'right' }   
+                1: { cellWidth: 30 }, 
+                2: { cellWidth: 15, halign: 'center' }, 
+                3: { cellWidth: 30, halign: 'right' },  
+                4: { cellWidth: 30, halign: 'right' }   
             },
             styles: { fontSize: 9, cellPadding: 2 }
         });
