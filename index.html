@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema v34.2 (Com Edição de Custo)</title>
+  <title>Sistema v34.2 (Com Edição de Custo e Produção)</title>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -115,6 +115,7 @@
     <button class="tab-btn" onclick="tab('pedidos')" style="background:var(--dark); color:white;">Pedidos/NF</button>
     <button class="tab-btn" onclick="tab('financeiro')" style="background:var(--success); color:white;">Boletos</button>
     <button class="tab-btn" onclick="tab('cfg')">Custos</button>
+    <button class="tab-btn" onclick="tab('producao')" style="background:#8e44ad; color:white;">Produção</button>
   </div>
 
   <div id="calc" class="section active">
@@ -285,6 +286,11 @@
   <div id="financeiro" class="section"><div id="listaBoletos"></div></div>
   <div id="suprimentos" class="section"><h3>Resumo de Borracha (Necessidade)</h3><div id="dashboardSuprimentos"></div></div>
   
+  <div id="producao" class="section">
+    <h3>Relatório de Tempo de Produção (Carga de Máquina)</h3>
+    <div id="dashboardProducao"></div>
+  </div>
+  
   <div id="cfg" class="section">
       <h3>Configurações de Custo</h3>
       <label>Valor da Hora Técnica (R$)</label>
@@ -319,6 +325,7 @@
     document.querySelectorAll('.section, .tab-btn').forEach(e => e.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     if(id === 'suprimentos') renderSuprimentos();
+    if(id === 'producao') renderProducao();
   }
 
   function updateUI() {
@@ -332,7 +339,8 @@
         document.getElementById('valorHoraGlobal').value = window.marbeDB.custos.vh || 50;
         document.getElementById('custoHoraInput').value = window.marbeDB.custos.vh || 50;
     }
-    renderOrcamentos(); renderPedidos(); renderBoletos(); renderCustos();
+    renderOrcamentos(); renderPedidos(); renderBoletos(); renderCustos(); 
+    if(typeof renderProducao === 'function') renderProducao();
   }
 
   function aplicarDesconto() {
@@ -471,13 +479,24 @@
       let valorImposto = precoBase * (taxaImposto / 100);
       let precoFinal = precoBase + valorImposto;
 
+      // CÁLCULO DE TEMPO EM MINUTOS
+      let minPorPeca = 0;
+      if (tipo === 'revestimento') {
+          const hGastas = parseFloat(document.getElementById('horasGastas').value) || 0;
+          minPorPeca = hGastas * 60;
+      } else {
+          const pecasHora = parseFloat(document.getElementById('pecasHora').value) || 1;
+          minPorPeca = 60 / pecasHora;
+      }
+
       ultimoCalculo = {
           n: `${document.getElementById('tipoPeca').options[document.getElementById('tipoPeca').selectedIndex].text} - ${nomeServico} ${descMedidas}`,
           mat: nomeMat, 
           med: descMedidas, 
           q: 1, 
           v: precoFinal, 
-          kg_unit: pesoBrutoKg 
+          kg_unit: pesoBrutoKg,
+          tempo_min: minPorPeca
       };
 
       document.getElementById('resDesc').innerText = descMedidas;
@@ -647,7 +666,6 @@
             head: [['ITEM', 'MAT.', 'QTD', 'KG TOTAL (c/ Perda)']], 
             body: d.itens.map(i => {
                 let pesoFinal = i.kg_unit * i.q;
-                // SE FOR REVESTIMENTO, ACRESCENTA 20%
                 if(i.n.toUpperCase().includes("REVESTIMENTO") || i.n.toUpperCase().includes("REV.")) {
                     pesoFinal = pesoFinal * 1.2;
                 }
@@ -661,7 +679,6 @@
             theme: 'grid'
         });
     } else {
-        // PDF CLIENTE (MATERIAL DE VOLTA!)
         doc.setFontSize(10);
         doc.text(`ORCAMENTO - OS: ${d.os} | DATA: ${new Date().toLocaleDateString('pt-BR')}`, 20, 35);
         doc.text(`CLIENTE: ${clean(d.cliente)}`, 20, 40);
@@ -680,7 +697,7 @@
             head: [['DESCRICAO', 'MATERIAL', 'QTD', 'V. UNIT', 'V. TOTAL']], 
             body: d.itens.map(i => [
                 clean(i.n), 
-                clean(i.mat), // MATERIAL DE VOLTA AQUI
+                clean(i.mat), 
                 i.q, 
                 window.fmtMoney(i.v), 
                 window.fmtMoney(i.v * i.q)
@@ -720,6 +737,45 @@
         html += `<tr><td>${mat}</td><td>${prec.toFixed(2)}kg</td><td><input type="number" value="${comp}" onchange="window.marbeDB.estoque['${mat}']=parseFloat(this.value); window.salvarNuvem();" style="width:60px"></td><td class="${saldo < 0 ? 'negativo' : 'positivo'}">${saldo.toFixed(2)}</td></tr>`;
     });
     document.getElementById('dashboardSuprimentos').innerHTML = Object.keys(necessidade).length ? html + "</tbody></table>" : "<p>Sem pedidos pendentes.</p>";
+  }
+
+  function renderProducao() {
+    let html = `<table><thead><tr><th>OS - Cliente</th><th>Item</th><th>Qtd</th><th>Tempo Unit.</th><th>Tempo Total</th></tr></thead><tbody>`;
+    let totalGeralMinutos = 0;
+
+    (window.marbeDB.pedidos || []).forEach(p => {
+        p.itens.forEach(it => {
+            let minUnit = it.tempo_min || 0; 
+            let minTotal = minUnit * it.q;
+            totalGeralMinutos += minTotal;
+
+            let formatTempo = (min) => {
+                if (min === 0) return "N/D";
+                let h = Math.floor(min / 60);
+                let m = Math.round(min % 60);
+                return h > 0 ? `${h}h ${m}m` : `${m}m`;
+            };
+
+            html += `<tr>
+                <td style="font-size:10px"><b>OS ${p.os}</b><br>${p.cliente.substring(0,15)}</td>
+                <td style="font-size:10px">${it.n}</td>
+                <td style="text-align:center">${it.q}</td>
+                <td>${formatTempo(minUnit)}</td>
+                <td style="font-weight:bold; color:var(--primary)">${formatTempo(minTotal)}</td>
+            </tr>`;
+        });
+    });
+
+    let hTot = Math.floor(totalGeralMinutos / 60);
+    let mTot = Math.round(totalGeralMinutos % 60);
+    
+    html += `</tbody></table>
+    <div style="margin-top:15px; padding:10px; background:#e8f4f8; border-radius:6px; text-align:right;">
+        <strong>TEMPO TOTAL DE PRODUÇÃO (PEDIDOS ATIVOS):</strong> 
+        <span style="font-size:16px; color:var(--primary)">${hTot}h ${mTot}m</span>
+    </div>`;
+
+    document.getElementById('dashboardProducao').innerHTML = (window.marbeDB.pedidos && window.marbeDB.pedidos.length) ? html : "<p>Nenhum pedido na fila de produção no momento.</p>";
   }
 
   function renderCustos() {
