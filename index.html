@@ -662,34 +662,57 @@
         doc.text(`VIA PRODUCAO - OS: ${d.os}`, 20, 35);
         doc.text(`PRAZO ENTREGA: ${clean(d.prazo)}`, 20, 40);
         
+        let totalTempoMin = 0;
+        let totalPesoBase = 0;
+        let totalPeso20 = 0;
+
+        let formatT = (m) => {
+            if (!m) return "N/D";
+            let hh = Math.floor(m / 60);
+            let mm = Math.round(m % 60);
+            return hh > 0 ? `${hh}h ${mm}m` : `${mm}m`;
+        };
+
         doc.autoTable({ 
             startY: 45, 
-            head: [['ITEM', 'MAT.', 'QTD', 'KG TOTAL', 'TEMPO']], 
+            head: [['ITEM', 'MAT.', 'QTD', 'T. UNIT', 'T. TOTAL', 'PESO TOT.', 'PESO (+20%)']], 
             body: d.itens.map(i => {
-                let pesoFinal = i.kg_unit * i.q;
-                if(i.n.toUpperCase().includes("REVESTIMENTO") || i.n.toUpperCase().includes("REV.")) {
-                    pesoFinal = pesoFinal * 1.2;
-                }
-                
-                // Formatação do tempo para o PDF
-                let tempoStr = "N/D";
-                if (i.tempo_min) {
-                    let minTotal = i.tempo_min * i.q;
-                    let h = Math.floor(minTotal / 60);
-                    let m = Math.round(minTotal % 60);
-                    tempoStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
-                }
+                let q = i.q || 1;
+                let tUnit = i.tempo_min || 0;
+                let tTot = tUnit * q;
+                totalTempoMin += tTot;
+
+                let pBaseTot = (i.kg_unit || 0) * q;
+                let p20Tot = pBaseTot * 1.20;
+
+                totalPesoBase += pBaseTot;
+                totalPeso20 += p20Tot;
 
                 return [
                     clean(i.n), 
                     clean(i.mat), 
-                    i.q, 
-                    pesoFinal.toFixed(3) + " KG",
-                    tempoStr // Nova coluna de tempo
+                    q, 
+                    formatT(tUnit),
+                    formatT(tTot),
+                    pBaseTot.toFixed(3) + " KG",
+                    p20Tot.toFixed(3) + " KG"
                 ];
             }),
-            theme: 'grid'
+            theme: 'grid',
+            styles: { fontSize: 8, cellPadding: 2 }
         });
+
+        // RESUMO NO RODAPÉ DO PDF
+        let finalY = doc.lastAutoTable.finalY + 10;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.text(`RESUMO DA ORDEM DE SERVICO:`, 20, finalY);
+        
+        doc.setFont("helvetica", "normal");
+        doc.text(`TEMPO TOTAL DE MAQUINA: ${formatT(totalTempoMin)}`, 20, finalY + 6);
+        doc.text(`PESO TOTAL DE BORRACHA: ${totalPesoBase.toFixed(3)} KG`, 20, finalY + 12);
+        doc.text(`PESO TOTAL C/ 20% (PERDA): ${totalPeso20.toFixed(3)} KG`, 20, finalY + 18);
+        
     } else {
         doc.setFontSize(10);
         doc.text(`ORCAMENTO - OS: ${d.os} | DATA: ${new Date().toLocaleDateString('pt-BR')}`, 20, 35);
