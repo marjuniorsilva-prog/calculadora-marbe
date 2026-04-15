@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema v34.3 (Com Edição de Custo e PDF Produção)</title>
+  <title>Sistema v34.5 (Custo Bruto Manta + 10% Sobra Total)</title>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -102,7 +102,7 @@
         <input type="text" id="loginUser" class="login-input" placeholder="Usuário">
         <input type="password" id="loginPass" class="login-input" placeholder="Senha">
         <button class="login-btn" onclick="fazerLogin()">ENTRAR</button>
-        <p style="font-size:12px; color:#888; margin-top:15px">Sistema v34.3</p>
+        <p style="font-size:12px; color:#888; margin-top:15px">Sistema v34.5</p>
     </div>
 </div>
 
@@ -241,7 +241,7 @@
     <div id="boxResultado" class="resultado-box hidden">
         <div class="res-line"><span>Item:</span> <span id="resDesc">...</span></div>
         <div class="res-line"><span>Peso Líquido:</span> <span id="resPesoLiq">0g</span></div>
-        <div class="res-line" style="color:#f1c40f"><span id="lblPesoBruto">Peso Bruto:</span> <span id="resPesoBruto">0g</span></div>
+        <div class="res-line" style="color:#f1c40f"><span id="lblPesoBruto">Peso Bruto Cobrado:</span> <span id="resPesoBruto">0g</span></div>
         <hr style="border-color:#455a64">
         
         <div class="res-line"><span>Custo Matéria:</span> <span id="resCustoMat">R$ 0,00</span></div>
@@ -376,6 +376,7 @@
       }
   }
 
+  // ATUALIZAÇÃO 34.5: Cálculo de Volume de Revestimento usa a Manta Bruta com +10% no Comprimento Total
   function simularCalculo() {
       const tipo = document.getElementById('tipoPeca').value;
       
@@ -415,8 +416,22 @@
           if(ferro && acabado && comp) {
               if (acabado <= ferro) return alert("O Ø Acabado deve ser MAIOR que o Ø Ferro.");
               
-              const camada = (acabado - ferro) / 2;
-              volumeCm3 = (Math.PI * (ferro + camada) * camada * comp) / 1000;
+              // 1. Achar a espessura da base
+              const espBase = (acabado - ferro) / 2;
+              
+              // 2. Aplicar regra de usinagem
+              const sobraUsinagem = espBase <= 30 ? 5 : 10;
+              const espFinal = espBase + sobraUsinagem;
+              
+              // 3. Aplicar regra de 10% de sobra no comprimento total (multiplicador 1.10)
+              const larguraMantaBruta = comp * 1.10; 
+              
+              // 4. Comprimento (Perímetro do ferro)
+              const comprimentoManta = ferro * Math.PI;
+
+              // VOLUME COBRADO (Manta Bruta em cm3) = Espessura x Largura x Comprimento / 1000
+              volumeCm3 = (espFinal * larguraMantaBruta * comprimentoManta) / 1000;
+              
               descMedidas = `Rev. Ø${acabado}x${comp}mm (Ferro Ø${ferro})`;
               
               // Guarda as info para a fábrica
@@ -457,6 +472,7 @@
 
       if(volumeCm3 === 0 && pesoDiretoG === 0) return alert("Preencha as medidas corretamente.");
 
+      // CÁLCULO FINANCEIRO
       let pesoLiq = (tipo === 'peso_direto') ? pesoDiretoG : (volumeCm3 * densidade);
       let fatorPerda = 1 + (perdaPerc / 100);
       let pesoBrutoG = pesoLiq * fatorPerda;
@@ -509,13 +525,16 @@
       };
 
       document.getElementById('resDesc').innerText = descMedidas;
-      document.getElementById('resPesoLiq').innerText = pesoLiq.toFixed(1) + ' g';
       
+      // Ajuste de exibição para revestimento (já é peso bruto total cobrado)
       if(tipo === 'revestimento') {
-          document.getElementById('lblPesoBruto').innerText = "Peso Bruto (s/ perda):";
+          document.getElementById('resPesoLiq').innerText = "- (Manta Bruta Calculada)";
+          document.getElementById('lblPesoBruto').innerText = "Peso Cobrado (Manta Bruta):";
       } else {
+          document.getElementById('resPesoLiq').innerText = pesoLiq.toFixed(1) + ' g';
           document.getElementById('lblPesoBruto').innerText = `Peso Bruto (+${perdaPerc}%):`;
       }
+      
       document.getElementById('resPesoBruto').innerText = pesoBrutoG.toFixed(1) + ' g';
       document.getElementById('resCustoMat').innerText = window.fmtMoney(custoMateria);
       document.getElementById('resCustoMO').innerText = window.fmtMoney(custoMO);
@@ -651,7 +670,7 @@
     window.marbeDB.pedidos.splice(i, 1); window.salvarNuvem(); tab('financeiro');
   }
 
-  // ATUALIZAÇÃO 34.3: Regra de Fracionamento ajustada conforme pedido do usuário
+  // ATUALIZAÇÃO 34.5: PDF refletindo largura de manta com 10% total de sobra
   function gerarPDF(tipo, index, base) {
     const { jsPDF } = window.jspdf; const doc = new jsPDF(); const d = window.marbeDB[base][index];
     const clean = (t) => t ? t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase() : "";
@@ -688,7 +707,7 @@
 
         doc.autoTable({ 
             startY: 45, 
-            head: [['ITEM', 'MAT.', 'QTD', 'T. UNIT', 'T. TOTAL', 'PESO TOT.', 'PESO (+20%)']], 
+            head: [['ITEM', 'MAT.', 'QTD', 'T. UNIT', 'T. TOTAL', 'PESO TOT. DA MANTA (COBRADO)']], 
             body: d.itens.map(i => {
                 let q = i.q || 1;
                 let tUnit = i.tempo_min || 0;
@@ -701,7 +720,6 @@
                 totalPesoBase += pBaseTot;
                 totalPeso20 += p20Tot;
 
-                // Salva pra desenhar o quadro de mantas depois
                 if(i.meta && i.meta.tipo === 'revestimento') {
                     arrayDeMantas.push({n: i.n, mat: i.mat, meta: i.meta, qtd_pedida: q});
                 }
@@ -712,8 +730,7 @@
                     q, 
                     formatT(tUnit),
                     formatT(tTot),
-                    pBaseTot.toFixed(3) + " KG",
-                    p20Tot.toFixed(3) + " KG"
+                    pBaseTot.toFixed(3) + " KG" // Mostra o peso da manta cobrada direto
                 ];
             }),
             theme: 'grid',
@@ -722,7 +739,6 @@
 
         let finalY = doc.lastAutoTable.finalY + 10;
         
-        // Quadro de Mantas com Regra de Fracionamento Atualizada
         if (arrayDeMantas.length > 0) {
             doc.setFillColor(245, 245, 245);
             doc.rect(20, finalY, 170, 8, 'F');
@@ -736,18 +752,16 @@
                 const { dFerro, dAcabado, lRolo } = r.meta;
                 const espBase = (dAcabado - dFerro) / 2;
                 
-                // Regra de Usinagem: Até 30mm (+5mm) / Acima de 30mm (+10mm)
                 const sobraUsinagem = espBase <= 30 ? 5 : 10;
                 const espFinal = espBase + sobraUsinagem;
 
-                // Regra de Fracionamento v34.3:
-                // Até 30 = 1 manta | 31 a 49 = 2 mantas | 50+ = 3 mantas
                 let qtdMantas = 1;
                 if (espBase > 30 && espBase <= 49) qtdMantas = 2;
                 else if (espBase >= 50) qtdMantas = 3;
 
                 const espPorManta = espFinal / qtdMantas;
-                const larguraManta = lRolo * 1.30;
+                // Largura com 10% de sobra no comprimento total (multiplica por 1.10)
+                const larguraManta = lRolo * 1.10; 
                 const comprimentoManta = dFerro * Math.PI;
                 const totalMantas = qtdMantas * r.qtd_pedida;
 
@@ -770,8 +784,7 @@
         
         doc.setFont("helvetica", "normal");
         doc.text(`TEMPO TOTAL DE MAQUINA: ${formatT(totalTempoMin)}`, 20, finalY + 6);
-        doc.text(`PESO TOTAL DE BORRACHA: ${totalPesoBase.toFixed(3)} KG`, 20, finalY + 12);
-        doc.text(`PESO TOTAL C/ 20% (PERDA): ${totalPeso20.toFixed(3)} KG`, 20, finalY + 18);
+        doc.text(`PESO TOTAL DE BORRACHA (MANTAS): ${totalPesoBase.toFixed(3)} KG`, 20, finalY + 12);
         
     } else {
         doc.setFontSize(10);
