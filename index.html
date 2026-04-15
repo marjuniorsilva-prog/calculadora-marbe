@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema v34.10 (Layout de Descrição de Revestimento)</title>
+  <title>Sistema v34.11 (Cronograma e Compras ERP)</title>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -22,11 +22,19 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
     window.marbeDB = { os: 330, orçamentos: [], pedidos: [], financeiro: [], custos: {vh: 50, mats: []}, estoque: {} };
+    window.filtrosIniciados = false;
 
     onValue(ref(db, 'sistema/'), (snapshot) => {
       const data = snapshot.val();
       if (data) { 
           window.marbeDB = data; 
+          if(!window.filtrosIniciados) {
+              let hoje = new Date();
+              let seteAtras = new Date(); seteAtras.setDate(hoje.getDate() - 7);
+              document.getElementById('filtroInicio').value = seteAtras.toISOString().split('T')[0];
+              document.getElementById('filtroFim').value = hoje.toISOString().split('T')[0];
+              window.filtrosIniciados = true;
+          }
           updateUI(); 
       }
     });
@@ -54,7 +62,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
   
   <style>
-    :root { --primary: #2c7be5; --success: #28a745; --danger: #d9534f; --info: #17a2b8; --dark: #333; --prod: #6f42c1; --warning: #ffc107; }
+    :root { --primary: #2c7be5; --success: #28a745; --danger: #d9534f; --info: #17a2b8; --dark: #333; --prod: #6f42c1; --warning: #ffc107; --compra: #e67e22; }
     body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; margin: 0; padding: 5px; color: #333; }
     
     #loginScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
@@ -83,7 +91,6 @@
     .negativo { color: var(--danger); font-weight: bold; }
     .positivo { color: var(--success); font-weight: bold; }
 
-    /* ESTILOS CALCULADORA */
     .hidden { display: none !important; }
     .row { display: flex; gap: 10px; }
     .col { flex: 1; }
@@ -102,7 +109,7 @@
         <input type="text" id="loginUser" class="login-input" placeholder="Usuário">
         <input type="password" id="loginPass" class="login-input" placeholder="Senha">
         <button class="login-btn" onclick="fazerLogin()">ENTRAR</button>
-        <p style="font-size:12px; color:#888; margin-top:15px">Sistema v34.10</p>
+        <p style="font-size:12px; color:#888; margin-top:15px">Sistema v34.11</p>
     </div>
 </div>
 
@@ -282,13 +289,27 @@
     <button id="btnCancelaEdit" class="btn" style="background:var(--danger); display:none;" onclick="cancelarEdicao()">CANCELAR EDIÇÃO</button>
   </div>
 
-  <div id="historico" class="section"><div id="listaOrcamentos"></div></div>
+  <div id="historico" class="section">
+      <div style="background:#fff; padding:10px; border-radius:6px; border:1px solid #ddd; margin-bottom:15px;">
+          <div style="font-weight:bold; font-size:11px; margin-bottom:5px; color:var(--primary)">FILTRO DE DATA (Padrão: Últimos 7 dias)</div>
+          <div style="display:flex; gap:10px;">
+              <input type="date" id="filtroInicio">
+              <input type="date" id="filtroFim">
+              <button class="btn" style="background:var(--dark); margin:0; width:auto; padding:0 20px" onclick="renderOrcamentos()">BUSCAR</button>
+          </div>
+      </div>
+      <div id="listaOrcamentos"></div>
+  </div>
+  
   <div id="pedidos" class="section"><div id="listaPedidos"></div></div>
   <div id="financeiro" class="section"><div id="listaBoletos"></div></div>
   <div id="suprimentos" class="section"><h3>Resumo de Borracha (Necessidade)</h3><div id="dashboardSuprimentos"></div></div>
   
   <div id="producao" class="section">
-    <h3>Relatório de Tempo de Produção (Carga de Máquina)</h3>
+    <h3>Cronograma de Entregas (Pedidos Ativos)</h3>
+    <div id="dashboardCronograma"></div>
+
+    <h3 style="margin-top:30px;">Relatório de Tempo de Produção (Carga de Máquina)</h3>
     <div id="dashboardProducao"></div>
   </div>
   
@@ -306,10 +327,29 @@
   </div>
 </div>
 
+<div id="modal-fechar" style="position:fixed; inset:0; background:rgba(0,0,0,0.8); display:none; z-index:10000; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#fff; width:100%; max-width:400px; padding:20px; border-radius:8px;">
+        <h3 style="margin-top:0; color:var(--primary)">Enviar p/ Produção</h3>
+        <p style="font-size:12px; color:#666; margin-bottom:15px;">Defina as datas para gerar o Cronograma.</p>
+        
+        <label>Data de Entrada (Hoje)</label>
+        <input type="date" id="modal-data-entrada">
+        
+        <label>Data Limite (Prazo de Entrega)</label>
+        <input type="date" id="modal-data-limite">
+        
+        <div style="display:flex; gap:10px; margin-top:20px;">
+            <button class="btn" style="background:#ccc; color:#333" onclick="document.getElementById('modal-fechar').style.display='none'">CANCELAR</button>
+            <button class="btn" style="background:var(--success)" onclick="confirmarFechamento()">CONFIRMAR</button>
+        </div>
+    </div>
+</div>
+
 <script>
   let itensTemp = [];
   let idEdicao = null;
   let ultimoCalculo = null; 
+  let idxFechar = null;
 
   function fazerLogin() {
       const u = document.getElementById('loginUser').value;
@@ -424,7 +464,6 @@
               // Linha Neutra (Diâmetro Médio)
               volumeCm3 = (Math.PI * (ferro + espFinal) * espFinal * larguraCobrada) / 1000;
               
-              // ATUALIZAÇÃO V34.10: Novo Formato de Descrição Limpa e Profissional
               descMedidas = `Serviço de Revestimento Ø${ferro}xØ${acabado}x${comp}mm (camada ${espBase}mm)`;
               
               metaRevest = { dFerro: ferro, dAcabado: acabado, lRolo: comp, tipo: 'revestimento' };
@@ -505,7 +544,6 @@
           minPorPeca = 60 / pecasHora;
       }
 
-      // ATUALIZAÇÃO V34.10: Se for revestimento, o nome será a própria string limpa.
       let nomeFinalItem = (tipo === 'revestimento') 
           ? descMedidas 
           : `${document.getElementById('tipoPeca').options[document.getElementById('tipoPeca').selectedIndex].text} - ${nomeServico} ${descMedidas}`;
@@ -564,7 +602,6 @@
     let total = 0;
     document.getElementById('corpoAtual').innerHTML = itensTemp.map((it, i) => {
         total += it.v * it.q;
-        // O campo 'it.n' é renderizado dentro do <input class="editable-input">
         return `<tr>
             <td><input class="editable-input" value="${it.n}" onchange="itensTemp[${i}].n=this.value"></td>
             <td style="font-size:9px">${it.mat}</td>
@@ -587,9 +624,17 @@
         frete: document.getElementById('frete').value, 
         prazo: document.getElementById('prazo').value, 
         pagamento: document.getElementById('pagamento').value, 
-        total: itensTemp.reduce((a,b)=>a+(b.v*b.q),0) 
+        total: itensTemp.reduce((a,b)=>a+(b.v*b.q),0),
+        data_criacao: new Date().toISOString() // Salva a data atual
     };
     if(idEdicao) {
+        // Preserva data antiga na edição se houver
+        if (idEdicao.origem === 'pedidos' && window.marbeDB.pedidos[idEdicao.index].data_criacao) {
+            orcData.data_criacao = window.marbeDB.pedidos[idEdicao.index].data_criacao;
+        } else if (idEdicao.origem === 'orçamentos' && window.marbeDB.orçamentos[idEdicao.index].data_criacao) {
+            orcData.data_criacao = window.marbeDB.orçamentos[idEdicao.index].data_criacao;
+        }
+        
         if(idEdicao.origem === 'pedidos') window.marbeDB.pedidos[idEdicao.index] = orcData;
         else window.marbeDB.orçamentos[idEdicao.index] = orcData;
         idEdicao = null; 
@@ -604,23 +649,61 @@
   }
 
   function renderOrcamentos() {
-    document.getElementById('listaOrcamentos').innerHTML = (window.marbeDB.orçamentos || []).map((o, i) => `
-      <div class="card-list">
-        <strong>OS: ${o.os} - ${o.cliente}</strong><br>
-        <span style="font-size:12px; color:#666">${window.fmtMoney(o.total)}</span><br>
-        <div style="display:flex; gap:5px; margin-top:5px;">
-            <button class="btn" style="background:var(--info); padding:8px; margin:0; font-size:10px;" onclick="gerarPDF('CLIENTE', ${i}, 'orçamentos')">PDF</button>
-            <button class="btn" style="background:var(--prod); padding:8px; margin:0; font-size:10px;" onclick="gerarPDF('PRODUCAO', ${i}, 'orçamentos')">PROD</button>
-            <button class="btn" style="background:var(--dark); padding:8px; margin:0; font-size:10px;" onclick="editarExistente('orçamentos', ${i})">EDITAR</button>
-            <button class="btn" style="background:var(--success); padding:8px; margin:0; font-size:10px;" onclick="fecharPedido(${i})">FECHAR</button>
-        </div>
-      </div>`).join('');
+    let dataInicioStr = document.getElementById('filtroInicio').value;
+    let dataFimStr = document.getElementById('filtroFim').value;
+    
+    let dataInicio = dataInicioStr ? new Date(dataInicioStr + "T00:00:00") : new Date(0);
+    let dataFim = dataFimStr ? new Date(dataFimStr + "T23:59:59") : new Date();
+
+    let html = '';
+    (window.marbeDB.orçamentos || []).forEach((o, i) => {
+        let exibir = false;
+        if (!o.data_criacao) exibir = true; // Orçamentos muito antigos sem data aparecem sempre
+        else {
+            let dataOrc = new Date(o.data_criacao);
+            if (dataOrc >= dataInicio && dataOrc <= dataFim) exibir = true;
+        }
+        
+        if (exibir) {
+            let dataFormatada = o.data_criacao ? new Date(o.data_criacao).toLocaleDateString('pt-BR') : "Antigo";
+            html += `
+              <div class="card-list">
+                <strong>OS: ${o.os} - ${o.cliente}</strong> <span style="float:right; font-size:10px; color:#888">${dataFormatada}</span><br>
+                <span style="font-size:12px; color:#666">${window.fmtMoney(o.total)}</span><br>
+                <div style="display:flex; gap:5px; margin-top:5px;">
+                    <button class="btn" style="background:var(--info); padding:8px; margin:0; font-size:10px;" onclick="gerarPDF('CLIENTE', ${i}, 'orçamentos')">PDF</button>
+                    <button class="btn" style="background:var(--prod); padding:8px; margin:0; font-size:10px;" onclick="gerarPDF('PRODUCAO', ${i}, 'orçamentos')">PROD</button>
+                    <button class="btn" style="background:var(--dark); padding:8px; margin:0; font-size:10px;" onclick="editarExistente('orçamentos', ${i})">EDITAR</button>
+                    <button class="btn" style="background:var(--success); padding:8px; margin:0; font-size:10px;" onclick="fecharPedido(${i})">FECHAR</button>
+                </div>
+              </div>`;
+        }
+    });
+    
+    document.getElementById('listaOrcamentos').innerHTML = html || "<p style='text-align:center; padding:20px; color:#888'>Nenhum orçamento encontrado neste período.</p>";
   }
 
   function fecharPedido(i) {
-    const orc = window.marbeDB.orçamentos.splice(i, 1)[0];
-    if(!window.marbeDB.pedidos) window.marbeDB.pedidos = [];
-    window.marbeDB.pedidos.push(orc); window.salvarNuvem(); tab('pedidos');
+      idxFechar = i;
+      let hoje = new Date().toISOString().split('T')[0];
+      document.getElementById('modal-data-entrada').value = hoje;
+      document.getElementById('modal-data-limite').value = ""; 
+      document.getElementById('modal-fechar').style.display = 'flex';
+  }
+
+  function confirmarFechamento() {
+      let orc = window.marbeDB.orçamentos.splice(idxFechar, 1)[0];
+      
+      // Salva as datas do cronograma
+      orc.data_entrada = document.getElementById('modal-data-entrada').value;
+      orc.data_limite = document.getElementById('modal-data-limite').value;
+      
+      if(!window.marbeDB.pedidos) window.marbeDB.pedidos = [];
+      window.marbeDB.pedidos.push(orc);
+      window.salvarNuvem();
+      
+      document.getElementById('modal-fechar').style.display = 'none';
+      tab('pedidos');
   }
 
   function renderPedidos() {
@@ -628,8 +711,9 @@
       <div class="card-list">
         <strong>OS: ${p.os} - ${p.cliente}</strong> | ${window.fmtMoney(p.total)}<br>
         <div style="display:flex; gap:5px; margin:5px 0;">
-            <button class="btn" style="background:var(--info); width:auto; padding:8px; margin:0; flex:1" onclick="editarExistente('pedidos', ${i})">EDITAR/DESC.</button>
+            <button class="btn" style="background:var(--info); width:auto; padding:8px; margin:0; flex:1" onclick="editarExistente('pedidos', ${i})">EDITAR</button>
             <button class="btn" style="background:var(--prod); width:auto; padding:8px; margin:0; flex:1" onclick="gerarPDF('PRODUCAO', ${i}, 'pedidos')">PRODUÇÃO</button>
+            <button class="btn" style="background:var(--compra); width:auto; padding:8px; margin:0; flex:1" onclick="gerarPDF('COMPRA', ${i}, 'pedidos')">COMPRA MAT.</button>
         </div>
         
         <button class="btn" style="background:var(--danger); margin-top:5px; padding:8px;" onclick="estornarVenda(${i})">↩ CANCELAR VENDA (VOLTAR)</button>
@@ -683,7 +767,79 @@
     doc.setLineWidth(0.5);
     doc.line(20, 27, 190, 27);
     
-    if(tipo === 'PRODUCAO') {
+    if (tipo === 'COMPRA') {
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text(`PEDIDO DE COMPRA DE MATERIA-PRIMA`, 20, 35);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`OS: ${d.os}   |   DATA DO PEDIDO: ${new Date().toLocaleDateString('pt-BR')}`, 20, 42);
+        
+        let finalY = 50;
+        let totalPesoCompra = 0;
+        let arrayDeMantas = [];
+
+        d.itens.forEach(i => {
+            let q = i.q || 1;
+            let pBaseUnit = (i.kg_unit || 0);
+            totalPesoCompra += (pBaseUnit * q * 1.20); 
+            if(i.meta && i.meta.tipo === 'revestimento') {
+                arrayDeMantas.push({n: i.n, mat: i.mat, meta: i.meta, qtd_pedida: q});
+            }
+        });
+
+        if (arrayDeMantas.length > 0) {
+            doc.setFillColor(245, 245, 245);
+            doc.rect(20, finalY, 170, 8, 'F');
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.text(`ESPECIFICACOES DE CORTE (FABRICA DE MANTAS)`, 22, finalY + 5.5);
+            finalY += 12;
+
+            arrayDeMantas.forEach(r => {
+                const { dFerro, dAcabado, lRolo } = r.meta;
+                const espBase = (dAcabado - dFerro) / 2;
+                const sobraUsinagem = espBase <= 30 ? 5 : 10;
+                const espFinal = espBase + sobraUsinagem;
+
+                let qtdMantas = 1;
+                if (espBase > 30 && espBase <= 49) qtdMantas = 2;
+                else if (espBase >= 50) qtdMantas = 3;
+
+                const espPorManta = espFinal / qtdMantas;
+                const larguraFolgaCorte = lRolo * 1.10; 
+                const comprimentoManta = ((dFerro + espFinal) * Math.PI) * 1.10; 
+                const totalMantas = qtdMantas * r.qtd_pedida;
+
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(9);
+                doc.text(`Material: ${clean(r.mat)}`, 20, finalY);
+                finalY += 5;
+                doc.setFont("helvetica", "normal");
+                doc.text(`Qtd. de Mantas: ${totalMantas} un.`, 25, finalY);
+                finalY += 5;
+                doc.text(`Espessura Final: ${espPorManta.toFixed(1)} mm`, 25, finalY);
+                finalY += 5;
+                doc.text(`Medida p/ Corte (+10% Folga): Largura ${larguraFolgaCorte.toFixed(1)}mm  x  Comprimento ${comprimentoManta.toFixed(1)}mm`, 25, finalY);
+                finalY += 10;
+            });
+        } else {
+            doc.setFontSize(10);
+            doc.text(`Nenhum revestimento de rolo encontrado nesta OS.`, 20, finalY);
+            finalY += 10;
+        }
+
+        doc.setLineWidth(0.5);
+        doc.line(20, finalY, 190, finalY);
+        finalY += 8;
+
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(230, 126, 34); // Cor Laranja de Compra
+        doc.text(`PESO TOTAL P/ COMPRA (JA C/ 20% APROVEITAMENTO): ${totalPesoCompra.toFixed(3)} KG`, 20, finalY);
+        doc.setTextColor(0,0,0);
+
+    } else if(tipo === 'PRODUCAO') {
         doc.text(`VIA PRODUCAO - OS: ${d.os}`, 20, 35);
         doc.text(`PRAZO ENTREGA: ${clean(d.prazo)}`, 20, 40);
         
@@ -753,7 +909,6 @@
                 
                 const larguraFolgaCorte = lRolo * 1.10; 
                 const comprimentoManta = ((dFerro + espFinal) * Math.PI) * 1.10; 
-                
                 const totalMantas = qtdMantas * r.qtd_pedida;
 
                 doc.setFont("helvetica", "bold");
@@ -826,7 +981,9 @@
         doc.text(`FRETE: ${clean(d.frete)} | PRAZO: ${clean(d.prazo)}`, 20, fY + 5);
         doc.text(`PAGAMENTO: ${clean(d.pagamento)}`, 20, fY + 10);
     }
-    window.abrirPDFMobile(doc.output('blob'), d.os);
+    
+    let nomeArq = tipo === 'COMPRA' ? `PEDIDO_COMPRA_OS_${d.os}` : `${tipo}_OS_${d.os}`;
+    window.abrirPDFMobile(doc.output('blob'), nomeArq);
   }
 
   function renderSuprimentos() {
@@ -844,7 +1001,36 @@
   }
 
   function renderProducao() {
-    let html = `<table><thead><tr><th>OS - Cliente</th><th>Item</th><th>Qtd</th><th>Tempo Unit.</th><th>Tempo Total</th></tr></thead><tbody>`;
+    // 1. Tabela de Cronograma (Entregas)
+    let htmlCron = `<table><thead><tr><th>OS - Cliente</th><th>Entrada Produção</th><th>Prazo Limite</th><th>Status</th></tr></thead><tbody>`;
+    let hojeStr = new Date().toISOString().split('T')[0];
+    
+    (window.marbeDB.pedidos || []).forEach(p => {
+        let ent = p.data_entrada ? p.data_entrada.split('-').reverse().join('/') : "N/D";
+        let lim = p.data_limite ? p.data_limite.split('-').reverse().join('/') : "N/D";
+        
+        let status = "Em Produção";
+        let cor = "color:var(--dark)";
+        
+        if (p.data_limite) {
+            if (p.data_limite < hojeStr) { status = "ATRASADO!"; cor = "color:var(--danger); font-weight:bold;"; }
+            else if (p.data_limite === hojeStr) { status = "ENTREGAR HOJE"; cor = "color:var(--warning); font-weight:bold;"; }
+            else { status = "No Prazo"; cor = "color:var(--success); font-weight:bold;"; }
+        }
+        
+        htmlCron += `<tr>
+            <td style="font-size:10px"><b>OS ${p.os}</b><br>${p.cliente.substring(0,15)}</td>
+            <td style="text-align:center">${ent}</td>
+            <td style="text-align:center">${lim}</td>
+            <td style="${cor}; text-align:center">${status}</td>
+        </tr>`;
+    });
+    htmlCron += `</tbody></table>`;
+    document.getElementById('dashboardCronograma').innerHTML = (window.marbeDB.pedidos && window.marbeDB.pedidos.length) ? htmlCron : "<p style='color:#888'>Nenhum pedido ativo no momento.</p>";
+
+
+    // 2. Tabela de Tempos
+    let htmlTempos = `<table><thead><tr><th>OS - Cliente</th><th>Item</th><th>Qtd</th><th>Tempo Unit.</th><th>Tempo Total</th></tr></thead><tbody>`;
     let totalGeralMinutos = 0;
 
     (window.marbeDB.pedidos || []).forEach(p => {
@@ -860,7 +1046,7 @@
                 return h > 0 ? `${h}h ${m}m` : `${m}m`;
             };
 
-            html += `<tr>
+            htmlTempos += `<tr>
                 <td style="font-size:10px"><b>OS ${p.os}</b><br>${p.cliente.substring(0,15)}</td>
                 <td style="font-size:10px">${it.n}</td>
                 <td style="text-align:center">${it.q}</td>
@@ -873,13 +1059,13 @@
     let hTot = Math.floor(totalGeralMinutos / 60);
     let mTot = Math.round(totalGeralMinutos % 60);
     
-    html += `</tbody></table>
+    htmlTempos += `</tbody></table>
     <div style="margin-top:15px; padding:10px; background:#e8f4f8; border-radius:6px; text-align:right;">
         <strong>TEMPO TOTAL DE PRODUÇÃO (PEDIDOS ATIVOS):</strong> 
         <span style="font-size:16px; color:var(--primary)">${hTot}h ${mTot}m</span>
     </div>`;
 
-    document.getElementById('dashboardProducao').innerHTML = (window.marbeDB.pedidos && window.marbeDB.pedidos.length) ? html : "<p>Nenhum pedido na fila de produção no momento.</p>";
+    document.getElementById('dashboardProducao').innerHTML = (window.marbeDB.pedidos && window.marbeDB.pedidos.length) ? htmlTempos : "<p style='color:#888'>Nenhum pedido na fila de produção no momento.</p>";
   }
 
   function renderCustos() {
