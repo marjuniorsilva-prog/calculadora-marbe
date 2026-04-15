@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema v34.9 (Corte da Manta pela Linha Neutra)</title>
+  <title>Sistema v34.9 (Corte da Manta com 10% de Folga Total)</title>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -421,6 +421,7 @@
               
               const larguraCobrada = comp; 
               
+              // Linha Neutra (Diâmetro Médio)
               volumeCm3 = (Math.PI * (ferro + espFinal) * espFinal * larguraCobrada) / 1000;
               
               descMedidas = `Rev. Ø${acabado}x${comp}mm (Ferro Ø${ferro})`;
@@ -659,7 +660,6 @@
     window.marbeDB.pedidos.splice(i, 1); window.salvarNuvem(); tab('financeiro');
   }
 
-  // ATUALIZAÇÃO 34.9: PDF de Produção usando a Linha Neutra (Diâmetro Médio)
   function gerarPDF(tipo, index, base) {
     const { jsPDF } = window.jspdf; const doc = new jsPDF(); const d = window.marbeDB[base][index];
     const clean = (t) => t ? t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase() : "";
@@ -744,10 +744,9 @@
 
                 const espPorManta = espFinal / qtdMantas;
                 
-                // Medida de Corte na Fábrica (+10% no Comprimento)
                 const larguraFolgaCorte = lRolo * 1.10; 
-                // CÁLCULO DA LINHA NEUTRA (D_Medio = D_Ferro + Espessura Final)
-                const comprimentoManta = (dFerro + espFinal) * Math.PI; 
+                // CÁLCULO DA LINHA NEUTRA (+10% Folga Produção)
+                const comprimentoManta = ((dFerro + espFinal) * Math.PI) * 1.10; 
                 
                 const totalMantas = qtdMantas * r.qtd_pedida;
 
