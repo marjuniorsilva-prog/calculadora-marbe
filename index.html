@@ -190,10 +190,10 @@
 
         <div id="input-revestimento" class="grupo-input hidden">
             <div class="row">
-                <div class="col"><label>Diâmetro (mm)</label><input type="number" id="rev-diam"></div>
-                <div class="col"><label>Comprimento (mm)</label><input type="number" id="rev-comp"></div>
+                <div class="col"><label>Ø Ferro (mm)</label><input type="number" id="rev-ferro"></div>
+                <div class="col"><label>Ø Acabado (mm)</label><input type="number" id="rev-acabado"></div>
             </div>
-            <label>Camada de Borracha (mm)</label><input type="number" id="rev-camada">
+            <label>Comprimento do Rolo (mm)</label><input type="number" id="rev-comp">
         </div>
     </div>
 
@@ -375,6 +375,7 @@
       }
   }
 
+  // MODIFICAÇÃO: Cálculo financeiro e extração de dados da Manta
   function simularCalculo() {
       const tipo = document.getElementById('tipoPeca').value;
       
@@ -398,6 +399,9 @@
       let volumeCm3 = 0;
       let pesoDiretoG = 0;
       let descMedidas = "";
+      
+      // Nova variável para guardar dados do revestimento
+      let metaRevest = null; 
 
       if (tipo === 'peso_direto') {
           pesoDiretoG = parseFloat(document.getElementById('peso-input').value);
@@ -405,12 +409,19 @@
           descMedidas = "Peso " + pesoDiretoG + "g";
       } 
       else if (tipo === 'revestimento') {
-          const d = parseFloat(document.getElementById('rev-diam').value);
-          const c = parseFloat(document.getElementById('rev-comp').value);
-          const e = parseFloat(document.getElementById('rev-camada').value);
-          if(d && c && e) {
-              volumeCm3 = (Math.PI * (d + e) * e * c) / 1000;
-              descMedidas = `Rev. Ø${d}x${c}mm (Camada ${e}mm)`;
+          const ferro = parseFloat(document.getElementById('rev-ferro').value);
+          const acabado = parseFloat(document.getElementById('rev-acabado').value);
+          const comp = parseFloat(document.getElementById('rev-comp').value);
+          
+          if(ferro && acabado && comp) {
+              if (acabado <= ferro) return alert("O Ø Acabado deve ser MAIOR que o Ø Ferro.");
+              
+              const camada = (acabado - ferro) / 2;
+              volumeCm3 = (Math.PI * (ferro + camada) * camada * comp) / 1000;
+              descMedidas = `Rev. Ø${acabado}x${comp}mm (Ferro Ø${ferro})`;
+              
+              // Guarda as info para a fábrica
+              metaRevest = { dFerro: ferro, dAcabado: acabado, lRolo: comp, tipo: 'revestimento' };
           }
       }
       else if (tipo === 'retangular') {
@@ -479,7 +490,6 @@
       let valorImposto = precoBase * (taxaImposto / 100);
       let precoFinal = precoBase + valorImposto;
 
-      // CÁLCULO DE TEMPO EM MINUTOS
       let minPorPeca = 0;
       if (tipo === 'revestimento') {
           const hGastas = parseFloat(document.getElementById('horasGastas').value) || 0;
@@ -496,7 +506,8 @@
           q: 1, 
           v: precoFinal, 
           kg_unit: pesoBrutoKg,
-          tempo_min: minPorPeca
+          tempo_min: minPorPeca,
+          meta: metaRevest // Salva os dados de revestimento para usar no PDF
       };
 
       document.getElementById('resDesc').innerText = descMedidas;
@@ -604,7 +615,7 @@
         <strong>OS: ${p.os} - ${p.cliente}</strong> | ${window.fmtMoney(p.total)}<br>
         <div style="display:flex; gap:5px; margin:5px 0;">
             <button class="btn" style="background:var(--info); width:auto; padding:8px; margin:0; flex:1" onclick="editarExistente('pedidos', ${i})">EDITAR/DESC.</button>
-            <button class="btn" style="background:var(--dark); width:auto; padding:8px; margin:0; flex:1" onclick="gerarPDF('PRODUCAO', ${i}, 'pedidos')">PRODUÇÃO</button>
+            <button class="btn" style="background:var(--prod); width:auto; padding:8px; margin:0; flex:1" onclick="gerarPDF('PRODUCAO', ${i}, 'pedidos')">PRODUÇÃO</button>
         </div>
         
         <button class="btn" style="background:var(--danger); margin-top:5px; padding:8px;" onclick="estornarVenda(${i})">↩ CANCELAR VENDA (VOLTAR)</button>
@@ -642,6 +653,7 @@
     window.marbeDB.pedidos.splice(i, 1); window.salvarNuvem(); tab('financeiro');
   }
 
+  // MODIFICAÇÃO: Lógica do PDF de Produção (Mantas)
   function gerarPDF(tipo, index, base) {
     const { jsPDF } = window.jspdf; const doc = new jsPDF(); const d = window.marbeDB[base][index];
     const clean = (t) => t ? t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase() : "";
@@ -673,6 +685,9 @@
             return hh > 0 ? `${hh}h ${mm}m` : `${mm}m`;
         };
 
+        // Extrai dados de revestimento, se houver
+        let arrayDeMantas = [];
+
         doc.autoTable({ 
             startY: 45, 
             head: [['ITEM', 'MAT.', 'QTD', 'T. UNIT', 'T. TOTAL', 'PESO TOT.', 'PESO (+20%)']], 
@@ -688,6 +703,11 @@
                 totalPesoBase += pBaseTot;
                 totalPeso20 += p20Tot;
 
+                // Salva pra desenhar o quadro de mantas depois
+                if(i.meta && i.meta.tipo === 'revestimento') {
+                    arrayDeMantas.push({n: i.n, mat: i.mat, meta: i.meta, qtd_pedida: q});
+                }
+
                 return [
                     clean(i.n), 
                     clean(i.mat), 
@@ -702,8 +722,46 @@
             styles: { fontSize: 8, cellPadding: 2 }
         });
 
-        // RESUMO NO RODAPÉ DO PDF
         let finalY = doc.lastAutoTable.finalY + 10;
+        
+        // NOVO: Quadro de Mantas (Só imprime se houver itens de revestimento)
+        if (arrayDeMantas.length > 0) {
+            doc.setFillColor(245, 245, 245);
+            doc.rect(20, finalY, 170, 8, 'F');
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.text(`CORTE DE MATERIAL (FABRICA) - EXCLUSIVO PARA ROLOS`, 22, finalY + 5.5);
+            
+            finalY += 12;
+            
+            arrayDeMantas.forEach(r => {
+                const { dFerro, dAcabado, lRolo } = r.meta;
+                const espBase = (dAcabado - dFerro) / 2;
+                const sobraUsinagem = espBase <= 30 ? 5 : 10;
+                const espFinal = espBase + sobraUsinagem;
+
+                let qtdMantas = 1;
+                if (espBase > 15 && espBase <= 49) qtdMantas = 2;
+                else if (espBase >= 50) qtdMantas = 3;
+
+                const espPorManta = espFinal / qtdMantas;
+                const larguraManta = lRolo * 1.30;
+                const comprimentoManta = dFerro * Math.PI;
+                const totalMantas = qtdMantas * r.qtd_pedida;
+
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(8);
+                doc.text(`Ref: ${clean(r.n)} (${clean(r.mat)})`, 20, finalY);
+                finalY += 4;
+                doc.setFont("helvetica", "normal");
+                doc.text(`Qtd. de Mantas a pedir: ${totalMantas} manta(s) de ${espPorManta.toFixed(1)}mm de espessura.`, 25, finalY);
+                finalY += 4;
+                doc.text(`Medidas Abertas: Largura ${larguraManta.toFixed(1)}mm  x  Comprimento (Perimetro) ${comprimentoManta.toFixed(1)}mm.`, 25, finalY);
+                finalY += 8;
+            });
+        }
+
+        finalY += 5;
         doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
         doc.text(`RESUMO DA ORDEM DE SERVICO:`, 20, finalY);
