@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema v34.11 (Cronograma e Compras ERP)</title>
+  <title>Sistema v34.12 (Cronograma e Compras ERP)</title>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -21,7 +21,7 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    window.marbeDB = { os: 330, orçamentos: [], pedidos: [], financeiro: [], custos: {vh: 50, mats: []}, estoque: {} };
+    window.marbeDB = { os: 619, orçamentos: [], pedidos: [], financeiro: [], custos: {vh: 50, mats: []}, estoque: {}, clientes: [] };
     window.filtrosIniciados = false;
 
     onValue(ref(db, 'sistema/'), (snapshot) => {
@@ -109,7 +109,7 @@
         <input type="text" id="loginUser" class="login-input" placeholder="Usuário">
         <input type="password" id="loginPass" class="login-input" placeholder="Senha">
         <button class="login-btn" onclick="fazerLogin()">ENTRAR</button>
-        <p style="font-size:12px; color:#888; margin-top:15px">Sistema v34.11</p>
+        <p style="font-size:12px; color:#888; margin-top:15px">Sistema v34.12</p>
     </div>
 </div>
 
@@ -222,6 +222,12 @@
             </div>
         </div>
         
+        <label style="color:var(--primary)">Máquina / Torno (Valor da Hora)</label>
+        <select id="tipoTorno" style="border-color:var(--primary); font-weight:bold; margin-bottom:10px;">
+            <option value="60">Torno Pequeno (R$ 60,00/h)</option>
+            <option value="80">Torno Grande (R$ 80,00/h)</option>
+        </select>
+
         <label>Material Utilizado</label>
         <select id="matSelect"></select>
 
@@ -254,7 +260,7 @@
         <div class="res-line"><span>Custo Matéria:</span> <span id="resCustoMat">R$ 0,00</span></div>
         <div class="res-line" id="linhaCola"><span>Custo Cola (10%):</span> <span id="resCustoCola">R$ 0,00</span></div>
         <div class="res-line"><span>Custo Mão de Obra:</span> <span id="resCustoMO">R$ 0,00</span></div>
-        <div class="res-line" style="font-weight:bold"><span>Custo Produção:</span> <span id="resCustoTot">R$ 0,00</span></div>
+        <div class="res-line" style="font-weight:bold"><span>Custo Production:</span> <span id="resCustoTot">R$ 0,00</span></div>
         
         <div class="res-line" style="margin-top:5px; border-top:1px dashed #777; padding-top:5px;"><span>Markup Aplicado:</span> <span id="resMarkup"></span></div>
         <div class="res-line"><span>Imposto (<span id="resTaxa"></span>%):</span> <span id="resValorImposto">R$ 0,00</span></div>
@@ -269,7 +275,8 @@
   <div id="orc" class="section">
     <label>OS em Edição: <strong id="osEdicaoLabel">Nova</strong></label>
     <label>CNPJ Cliente</label><input type="text" id="cnpj" onblur="buscaCNPJ(this.value)">
-    <label>Razão Social</label><input type="text" id="razao">
+    <label>Razão Social</label><input type="text" id="razao" list="listaClientesDatalist" onchange="autoPreencherCliente(this.value)" placeholder="Digite para buscar ou preencha novo">
+    <datalist id="listaClientesDatalist"></datalist>
     <label>Endereço Completo</label><input type="text" id="endereco">
     
     <div style="background:#fff3cd; padding:8px; border:1px solid #ffeeba; border-radius:4px; margin-top:10px; margin-bottom:5px; display:flex; align-items:center; gap:5px;">
@@ -382,6 +389,7 @@
     }
     renderOrcamentos(); renderPedidos(); renderBoletos(); renderCustos(); 
     if(typeof renderProducao === 'function') renderProducao();
+    atualizarListaClientes();
   }
 
   function aplicarDesconto() {
@@ -431,7 +439,8 @@
       if(selMat.selectedIndex < 0) return alert("Cadastre materiais na aba Custos primeiro!");
       const custoKg = parseFloat(selMat.value);
       const nomeMat = selMat.options[selMat.selectedIndex].text;
-      const valorHora = window.marbeDB.custos.vh || 50;
+      
+      const valorHora = parseFloat(document.getElementById('tipoTorno').value);
 
       const taxaImposto = parseFloat(document.getElementById('tipoServicoCalc').value);
       const nomeServico = document.getElementById('tipoServicoCalc').options[document.getElementById('tipoServicoCalc').selectedIndex].text;
@@ -595,7 +604,34 @@
       const d = await r.json();
       document.getElementById('razao').value = d.razao_social || "";
       document.getElementById('endereco').value = d.logradouro ? `${d.logradouro}, ${d.numero} - ${d.bairro}, ${d.municipio} - ${d.uf}` : "";
+      
+      // Salva automaticamente no banco de dados se for novo
+      salvarClienteDb(d.razao_social, v, document.getElementById('endereco').value);
     } catch (e) {}
+  }
+
+  function salvarClienteDb(razao, cnpj, endereco) {
+    if(!window.marbeDB.clientes) window.marbeDB.clientes = [];
+    const existe = window.marbeDB.clientes.find(c => c.razao === razao);
+    if(!existe && razao) {
+        window.marbeDB.clientes.push({ razao, cnpj, endereco });
+        window.salvarNuvem();
+        atualizarListaClientes();
+    }
+  }
+
+  function atualizarListaClientes() {
+    if(!window.marbeDB.clientes) return;
+    document.getElementById('listaClientesDatalist').innerHTML = window.marbeDB.clientes.map(c => `<option value="${c.razao}">`).join('');
+  }
+
+  function autoPreencherCliente(razaoEscolhida) {
+    if(!window.marbeDB.clientes) return;
+    const c = window.marbeDB.clientes.find(x => x.razao === razaoEscolhida);
+    if(c) {
+        document.getElementById('cnpj').value = c.cnpj;
+        document.getElementById('endereco').value = c.endereco;
+    }
   }
 
   function renderTabelaAtual() {
@@ -615,20 +651,30 @@
 
   function salvarOrcamento() {
     if(itensTemp.length === 0) return alert("Adicione pelo menos um item ao orçamento.");
+    
+    const razaoComercial = document.getElementById('razao').value || "CLIENTE NÃO INFORMADO";
+    const cnpjComercial = document.getElementById('cnpj').value || "";
+    const enderecoComercial = document.getElementById('endereco').value || "";
+
     const orcData = { 
         os: idEdicao ? idEdicao.os : window.marbeDB.os, 
-        cliente: document.getElementById('razao').value || "CLIENTE NÃO INFORMADO", 
-        cnpj: document.getElementById('cnpj').value || "", 
-        endereco: document.getElementById('endereco').value || "", 
+        cliente: razaoComercial, 
+        cnpj: cnpjComercial, 
+        endereco: enderecoComercial, 
         itens: JSON.parse(JSON.stringify(itensTemp)), 
         frete: document.getElementById('frete').value, 
         prazo: document.getElementById('prazo').value, 
         pagamento: document.getElementById('pagamento').value, 
         total: itensTemp.reduce((a,b)=>a+(b.v*b.q),0),
-        data_criacao: new Date().toISOString() // Salva a data atual
+        data_criacao: new Date().toISOString()
     };
+
+    // Força o salvamento preventivo do cliente no banco interno de listagem se digitado manualmente
+    if (razaoComercial !== "CLIENTE NÃO INFORMADO") {
+        salvarClienteDb(razaoComercial, cnpjComercial, enderecoComercial);
+    }
+
     if(idEdicao) {
-        // Preserva data antiga na edição se houver
         if (idEdicao.origem === 'pedidos' && window.marbeDB.pedidos[idEdicao.index].data_criacao) {
             orcData.data_criacao = window.marbeDB.pedidos[idEdicao.index].data_criacao;
         } else if (idEdicao.origem === 'orçamentos' && window.marbeDB.orçamentos[idEdicao.index].data_criacao) {
@@ -658,7 +704,7 @@
     let html = '';
     (window.marbeDB.orçamentos || []).forEach((o, i) => {
         let exibir = false;
-        if (!o.data_criacao) exibir = true; // Orçamentos muito antigos sem data aparecem sempre
+        if (!o.data_criacao) exibir = true;
         else {
             let dataOrc = new Date(o.data_criacao);
             if (dataOrc >= dataInicio && dataOrc <= dataFim) exibir = true;
@@ -694,7 +740,6 @@
   function confirmarFechamento() {
       let orc = window.marbeDB.orçamentos.splice(idxFechar, 1)[0];
       
-      // Salva as datas do cronograma
       orc.data_entrada = document.getElementById('modal-data-entrada').value;
       orc.data_limite = document.getElementById('modal-data-limite').value;
       
@@ -835,7 +880,7 @@
 
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(230, 126, 34); // Cor Laranja de Compra
+        doc.setTextColor(230, 126, 34);
         doc.text(`PESO TOTAL P/ COMPRA (JA C/ 20% APROVEITAMENTO): ${totalPesoCompra.toFixed(3)} KG`, 20, finalY);
         doc.setTextColor(0,0,0);
 
@@ -1001,7 +1046,6 @@
   }
 
   function renderProducao() {
-    // 1. Tabela de Cronograma (Entregas)
     let htmlCron = `<table><thead><tr><th>OS - Cliente</th><th>Entrada Produção</th><th>Prazo Limite</th><th>Status</th></tr></thead><tbody>`;
     let hojeStr = new Date().toISOString().split('T')[0];
     
@@ -1028,8 +1072,6 @@
     htmlCron += `</tbody></table>`;
     document.getElementById('dashboardCronograma').innerHTML = (window.marbeDB.pedidos && window.marbeDB.pedidos.length) ? htmlCron : "<p style='color:#888'>Nenhum pedido ativo no momento.</p>";
 
-
-    // 2. Tabela de Tempos
     let htmlTempos = `<table><thead><tr><th>OS - Cliente</th><th>Item</th><th>Qtd</th><th>Tempo Unit.</th><th>Tempo Total</th></tr></thead><tbody>`;
     let totalGeralMinutos = 0;
 
@@ -1076,7 +1118,6 @@
             <input value="${window.fmtMoney(m.p)}" readonly style="flex:1; background:#eee">
             
             <button onclick="editarPrecoMaterial(${i})" style="background:var(--warning); color:black; border:none; padding:5px; border-radius:4px; font-weight:bold; font-size:10px; margin-right:2px;">EDIT</button>
-
             <button onclick="window.marbeDB.custos.mats.splice(${i},1); window.salvarNuvem(); updateUI();" style="background:red; color:white; border:none; padding:5px; border-radius:4px; font-weight:bold">X</button>
           </div>`).join('');
     }
