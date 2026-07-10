@@ -281,6 +281,12 @@
     <datalist id="listaClientesDatalist"></datalist>
     <label>Endereço Completo</label><input type="text" id="endereco">
     
+    <!-- Área de Alerta de CRM ao selecionar cliente (invisível por padrão) -->
+    <div id="crmAlertaOrcamento" style="display:none; background:#e8f4f8; padding:8px; border-left:4px solid var(--info); border-radius:4px; margin-top:10px; font-size:11px;">
+        <strong style="color:var(--info);">Info CRM:</strong> <span id="crmContato"></span> | <span id="crmWhatsapp"></span><br>
+        <span id="crmObs" style="color:#666; font-style:italic;"></span>
+    </div>
+    
     <div style="background:#fff3cd; padding:8px; border:1px solid #ffeeba; border-radius:4px; margin-top:10px; margin-bottom:5px; display:flex; align-items:center; gap:5px;">
         <label style="margin:0; color:#856404; min-width:120px;">Desconto Global (%):</label>
         <input type="number" id="descPorc" style="width:70px; margin:0;" placeholder="%">
@@ -307,66 +313,66 @@
               <button class="btn" style="background:var(--dark); margin:0; width:auto; padding:0 20px" onclick="renderOrcamentos()">BUSCAR</button>
           </div>
       </div>
-<div id="clientesTab" class="section">
-    <h3 style="color:var(--primary); margin-top:0;">Gestão de Clientes B2B</h3>
-    
-    <!-- Formulário de Cadastro e Edição -->
-    <div style="background:#f9f9f9; padding:15px; border-radius:6px; border:1px solid #ddd; margin-bottom:20px;">
-        <div class="row">
-            <div class="col" style="flex:2">
-                <label>Razão Social</label>
-                <input type="text" id="cadCliRazao" placeholder="Ex: Indústria Exemplo LTDA">
-            </div>
-            <div class="col" style="flex:1">
-                <label>CNPJ</label>
-                <input type="text" id="cadCliCnpj" onblur="buscaCNPJCadastro(this.value)" placeholder="Somente números">
-            </div>
-        </div>
-        
-        <label>Endereço Completo</label>
-        <input type="text" id="cadCliEndereco" placeholder="Rua, Número, Bairro, Cidade - UF">
-        
-        <div class="row">
-            <div class="col">
-                <label>Nome do Contato</label>
-                <input type="text" id="cadCliContato" placeholder="Ex: João (Engenharia)">
-            </div>
-            <div class="col">
-                <label>WhatsApp</label>
-                <input type="text" id="cadCliWhatsapp" placeholder="(16) 99999-9999">
-            </div>
-            <div class="col">
-                <label>E-mail</label>
-                <input type="text" id="cadCliEmail" placeholder="compras@exemplo.com.br">
-            </div>
-        </div>
-        
-        <label>Observações / Requisitos Técnicos</label>
-        <textarea id="cadCliObs" rows="2" placeholder="Ex: Exige certificado de dureza (Shore A) na entrega. Apenas transportadora X."></textarea>
-        
-        <!-- Campo oculto para a lógica saber se é um cliente novo ou edição de um existente -->
-        <input type="hidden" id="cadCliIndex" value="-1">
-        
-        <div class="row" style="margin-top:10px;">
-            <div class="col">
-                <button class="btn" style="background:#ccc; color:#333;" onclick="limparFormCliente()">LIMPAR</button>
-            </div>
-            <div class="col" style="flex:2">
-                <button class="btn" style="background:var(--success);" onclick="salvarClienteCRM()">SALVAR CLIENTE</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Lista de Clientes e Barra de Busca -->
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap: 10px;">
-        <h3 style="margin:0;">Clientes Cadastrados</h3>
-        <input type="text" id="buscaCliente" placeholder="Buscar por nome ou CNPJ..." style="width:100%; max-width:250px; margin:0;" onkeyup="renderListaClientes()">
-    </div>
-    
-    <!-- Onde o JavaScript vai injetar os cards dos clientes -->
-    <div id="dashboardClientes"></div>
-</div>
       <div id="listaOrcamentos"></div>
+  </div>
+
+  <!-- AQUI ESTÁ A ABA CLIENTES CORRIGIDA E SEPARADA -->
+  <div id="clientesTab" class="section">
+      <h3 style="color:var(--primary); margin-top:0;">Gestão de Clientes B2B</h3>
+      
+      <!-- Formulário de Cadastro e Edição -->
+      <div style="background:#f9f9f9; padding:15px; border-radius:6px; border:1px solid #ddd; margin-bottom:20px;">
+          <div class="row">
+              <div class="col" style="flex:2">
+                  <label>Razão Social <span style="color:red">*</span></label>
+                  <input type="text" id="cadCliRazao" placeholder="Ex: Indústria Exemplo LTDA">
+              </div>
+              <div class="col" style="flex:1">
+                  <label>CNPJ</label>
+                  <input type="text" id="cadCliCnpj" onblur="buscaCNPJCadastro(this.value)" placeholder="Somente números">
+              </div>
+          </div>
+          
+          <label>Endereço Completo</label>
+          <input type="text" id="cadCliEndereco" placeholder="Rua, Número, Bairro, Cidade - UF">
+          
+          <div class="row">
+              <div class="col">
+                  <label>Nome do Contato</label>
+                  <input type="text" id="cadCliContato" placeholder="Ex: João (Engenharia)">
+              </div>
+              <div class="col">
+                  <label>WhatsApp</label>
+                  <input type="text" id="cadCliWhatsapp" placeholder="(16) 99999-9999">
+              </div>
+          </div>
+          <label>E-mail</label>
+          <input type="text" id="cadCliEmail" placeholder="compras@exemplo.com.br">
+          
+          <label>Observações / Requisitos Técnicos</label>
+          <textarea id="cadCliObs" rows="2" placeholder="Ex: Exige certificado de dureza (Shore A) na entrega. Apenas transportadora X."></textarea>
+          
+          <!-- Campo oculto para a lógica saber se é um cliente novo ou edição de um existente -->
+          <input type="hidden" id="cadCliIndex" value="-1">
+          
+          <div class="row" style="margin-top:10px;">
+              <div class="col">
+                  <button class="btn" style="background:#ccc; color:#333;" onclick="limparFormCliente()">LIMPAR</button>
+              </div>
+              <div class="col" style="flex:2">
+                  <button class="btn" style="background:var(--success);" onclick="salvarClienteCRM()">SALVAR CLIENTE</button>
+              </div>
+          </div>
+      </div>
+
+      <!-- Lista de Clientes e Barra de Busca -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap: 10px;">
+          <h3 style="margin:0;">Clientes Cadastrados</h3>
+          <input type="text" id="buscaCliente" placeholder="Buscar por nome ou CNPJ..." style="width:100%; max-width:250px; margin:0;" onkeyup="renderListaClientes()">
+      </div>
+      
+      <!-- Onde o JavaScript vai injetar os cards dos clientes -->
+      <div id="dashboardClientes"></div>
   </div>
   
   <div id="pedidos" class="section"><div id="listaPedidos"></div></div>
@@ -419,11 +425,8 @@
   let ultimoCalculo = null; 
   let idxFechar = null;
 
-  // --- ALTERAÇÕES DE LOGIN / LOGOUT ADICIONADAS AQUI ---
-
   function addHistoryState() {
       try {
-          // Adiciona estado no histórico para armadilhar o botão de voltar
           history.pushState({ appLogado: true }, null, window.location.href);
       } catch(e) {}
   }
@@ -453,26 +456,23 @@
       document.getElementById('loginPass').value = '';
   }
 
-  // Verifica ao carregar a página se a pessoa já estava logada
   if (localStorage.getItem('marbe_logado') === 'true') {
       iniciarSessao();
   }
 
-  // Intercepta o botão voltar nativo do celular/PC
   window.addEventListener('popstate', function(event) {
       if (localStorage.getItem('marbe_logado') === 'true') {
-          // Se tentar voltar e estiver logado, ele joga o estado do app novamente no histórico, evitando sair da tela.
           addHistoryState();
       }
   });
 
-  // --- FIM DAS ALTERAÇÕES DE LOGIN / LOGOUT ---
 
   function tab(id) {
     document.querySelectorAll('.section, .tab-btn').forEach(e => e.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     if(id === 'suprimentos') renderSuprimentos();
     if(id === 'producao') renderProducao();
+    if(id === 'clientesTab') renderListaClientes();
   }
 
   function updateUI() {
@@ -489,7 +489,156 @@
     renderOrcamentos(); renderPedidos(); renderBoletos(); renderCustos(); 
     if(typeof renderProducao === 'function') renderProducao();
     atualizarListaClientes();
+    if(document.getElementById('clientesTab').classList.contains('active')) renderListaClientes();
   }
+
+  // ---- NOVA LÓGICA DE CLIENTES (CRM) ----
+
+  async function buscaCNPJCadastro(v) {
+    const cnpj = v.replace(/\D/g, ''); if (cnpj.length !== 14) return;
+    try {
+      const r = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+      const d = await r.json();
+      if(!document.getElementById('cadCliRazao').value) document.getElementById('cadCliRazao').value = d.razao_social || "";
+      if(!document.getElementById('cadCliEndereco').value) document.getElementById('cadCliEndereco').value = d.logradouro ? `${d.logradouro}, ${d.numero} - ${d.bairro}, ${d.municipio} - ${d.uf}` : "";
+    } catch (e) {}
+  }
+
+  function limparFormCliente() {
+      document.getElementById('cadCliRazao').value = '';
+      document.getElementById('cadCliCnpj').value = '';
+      document.getElementById('cadCliEndereco').value = '';
+      document.getElementById('cadCliContato').value = '';
+      document.getElementById('cadCliWhatsapp').value = '';
+      document.getElementById('cadCliEmail').value = '';
+      document.getElementById('cadCliObs').value = '';
+      document.getElementById('cadCliIndex').value = '-1';
+  }
+
+  function salvarClienteCRM() {
+      const razao = document.getElementById('cadCliRazao').value;
+      if (!razao) return alert("Razão Social é obrigatória!");
+
+      const cnpj = document.getElementById('cadCliCnpj').value;
+      const index = parseInt(document.getElementById('cadCliIndex').value);
+      
+      const dadosCliente = {
+          razao: razao,
+          cnpj: cnpj,
+          endereco: document.getElementById('cadCliEndereco').value,
+          contato: document.getElementById('cadCliContato').value,
+          whatsapp: document.getElementById('cadCliWhatsapp').value,
+          email: document.getElementById('cadCliEmail').value,
+          obs: document.getElementById('cadCliObs').value
+      };
+
+      if(!window.marbeDB.clientes) window.marbeDB.clientes = [];
+
+      if (index >= 0) {
+          // Atualiza cliente existente
+          window.marbeDB.clientes[index] = dadosCliente;
+      } else {
+          // Checa se já existe pelo CNPJ (se informado) ou nome para evitar duplicação burra
+          const existe = window.marbeDB.clientes.find(c => (cnpj && c.cnpj === cnpj) || c.razao === razao);
+          if (existe) {
+              if(!confirm("Já existe um cliente cadastrado com este Nome ou CNPJ. Deseja cadastrar mesmo assim?")) return;
+          }
+          window.marbeDB.clientes.push(dadosCliente);
+      }
+
+      window.salvarNuvem();
+      atualizarListaClientes();
+      renderListaClientes();
+      limparFormCliente();
+      alert("Cliente salvo com sucesso!");
+  }
+
+  function editarCliente(index) {
+      const c = window.marbeDB.clientes[index];
+      document.getElementById('cadCliRazao').value = c.razao || '';
+      document.getElementById('cadCliCnpj').value = c.cnpj || '';
+      document.getElementById('cadCliEndereco').value = c.endereco || '';
+      document.getElementById('cadCliContato').value = c.contato || '';
+      document.getElementById('cadCliWhatsapp').value = c.whatsapp || '';
+      document.getElementById('cadCliEmail').value = c.email || '';
+      document.getElementById('cadCliObs').value = c.obs || '';
+      document.getElementById('cadCliIndex').value = index;
+      
+      // Rola a tela para cima
+      window.scrollTo(0,0);
+  }
+
+  function excluirCliente(index) {
+      if(confirm(`Tem certeza que deseja excluir o cliente ${window.marbeDB.clientes[index].razao}? (Isso não afeta OS antigas)`)) {
+          window.marbeDB.clientes.splice(index, 1);
+          window.salvarNuvem();
+          atualizarListaClientes();
+          renderListaClientes();
+      }
+  }
+
+  function renderListaClientes() {
+      if(!window.marbeDB.clientes || window.marbeDB.clientes.length === 0) {
+          document.getElementById('dashboardClientes').innerHTML = "<p style='text-align:center; padding:20px; color:#888'>Nenhum cliente cadastrado ainda.</p>";
+          return;
+      }
+
+      const termo = document.getElementById('buscaCliente').value.toLowerCase();
+      let html = '';
+
+      window.marbeDB.clientes.forEach((c, i) => {
+          // Filtro de busca
+          if (termo && !c.razao.toLowerCase().includes(termo) && !(c.cnpj && c.cnpj.includes(termo))) return;
+
+          let infoExtra = '';
+          if(c.contato) infoExtra += `Contato: ${c.contato} `;
+          if(c.whatsapp) infoExtra += `| Whats: ${c.whatsapp}`;
+
+          html += `
+          <div class="card-list" style="border-left-color: var(--primary);">
+              <div style="display:flex; justify-content:space-between;">
+                  <strong style="font-size:12px;">${c.razao}</strong>
+                  <span style="font-size:10px; color:#666;">${c.cnpj || "Sem CNPJ"}</span>
+              </div>
+              <div style="font-size:10px; color:#666; margin-top:4px;">${infoExtra}</div>
+              ${c.obs ? `<div style="font-size:10px; color:#856404; background:#fff3cd; padding:4px; margin-top:4px; border-radius:2px;">${c.obs}</div>` : ''}
+              
+              <div style="display:flex; gap:5px; margin-top:8px;">
+                  <button class="btn" style="background:var(--info); padding:6px; margin:0; font-size:10px;" onclick="editarCliente(${i})">EDITAR</button>
+                  <button class="btn" style="background:var(--danger); padding:6px; margin:0; font-size:10px;" onclick="excluirCliente(${i})">EXCLUIR</button>
+              </div>
+          </div>`;
+      });
+
+      document.getElementById('dashboardClientes').innerHTML = html || "<p style='color:#888'>Nenhum cliente encontrado na busca.</p>";
+  }
+
+  // Turbinando o auto-preenchimento para puxar infos do CRM
+  function autoPreencherCliente(razaoEscolhida) {
+    if(!window.marbeDB.clientes) return;
+    const c = window.marbeDB.clientes.find(x => x.razao === razaoEscolhida);
+    const boxCrm = document.getElementById('crmAlertaOrcamento');
+    
+    if(c) {
+        document.getElementById('cnpj').value = c.cnpj || '';
+        document.getElementById('endereco').value = c.endereco || '';
+        
+        // Exibe os alertas do CRM se existirem
+        if (c.contato || c.whatsapp || c.obs) {
+            document.getElementById('crmContato').innerText = c.contato ? `Contato: ${c.contato}` : '';
+            document.getElementById('crmWhatsapp').innerText = c.whatsapp ? `Whats: ${c.whatsapp}` : '';
+            document.getElementById('crmObs').innerText = c.obs ? `Lembrete: ${c.obs}` : '';
+            boxCrm.style.display = 'block';
+        } else {
+            boxCrm.style.display = 'none';
+        }
+    } else {
+        boxCrm.style.display = 'none';
+    }
+  }
+
+  // ---- FIM DA NOVA LÓGICA DE CLIENTES ----
+
 
   function aplicarDesconto() {
       const p = parseFloat(document.getElementById('descPorc').value);
@@ -724,15 +873,6 @@
     document.getElementById('listaClientesDatalist').innerHTML = window.marbeDB.clientes.map(c => `<option value="${c.razao}">`).join('');
   }
 
-  function autoPreencherCliente(razaoEscolhida) {
-    if(!window.marbeDB.clientes) return;
-    const c = window.marbeDB.clientes.find(x => x.razao === razaoEscolhida);
-    if(c) {
-        document.getElementById('cnpj').value = c.cnpj;
-        document.getElementById('endereco').value = c.endereco;
-    }
-  }
-
   function renderTabelaAtual() {
     let total = 0;
     document.getElementById('corpoAtual').innerHTML = itensTemp.map((it, i) => {
@@ -768,7 +908,6 @@
         data_criacao: new Date().toISOString()
     };
 
-    // Força o salvamento preventivo do cliente no banco interno de listagem se digitado manualmente
     if (razaoComercial !== "CLIENTE NÃO INFORMADO") {
         salvarClienteDb(razaoComercial, cnpjComercial, enderecoComercial);
     }
