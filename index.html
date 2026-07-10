@@ -484,8 +484,8 @@
     if(document.getElementById('clientesTab').classList.contains('active')) renderListaClientes();
   }
 
-  // ---- FUNÇÃO DO ASSISTENTE MATEMÁTICO DE MEMÓRIA ----
-  function verificarSimilaridadeNoHistorico(pesoKgAtual, tempoMinAtual, tipoAtual) {
+  // ---- FUNÇÃO DO ASSISTENTE MATEMÁTICO DE MEMÓRIA (ATUALIZADA) ----
+  function verificarSimilaridadeNoHistorico(pesoKgAtual, tempoMinAtual, tipoAtual, metaAtual) {
       let historicoEncontrado = [];
       const bases = [...(window.marbeDB.pedidos || []), ...(window.marbeDB.orçamentos || [])];
       
@@ -495,14 +495,39 @@
                   let tipoIt = (it.meta && it.meta.tipo === 'revestimento') ? 'revestimento' : 'geral';
                   let tipoReq = (tipoAtual === 'revestimento') ? 'revestimento' : 'geral';
                   
-                  // Analisa apenas se for a mesma categoria de serviço (Rolo vs Rolo, Peça vs Peça)
                   if (tipoIt === tipoReq) {
-                      // Margem de 20% de tolerância no volume/peso para considerar "similar"
-                      let minKg = pesoKgAtual * 0.80;
-                      let maxKg = pesoKgAtual * 1.20;
-                      
-                      if (it.kg_unit >= minKg && it.kg_unit <= maxKg && it.tempo_min > 0) {
-                          historicoEncontrado.push({ os: os.os, cliente: os.cliente, med: it.med, tempo_min: it.tempo_min });
+                      let similar = false;
+
+                      // Se for Revestimento, compara as 3 MEDIDAS com 15% de tolerância
+                      if (tipoReq === 'revestimento' && metaAtual && it.meta) {
+                          let fMin = metaAtual.dFerro * 0.85, fMax = metaAtual.dFerro * 1.15;
+                          let aMin = metaAtual.dAcabado * 0.85, aMax = metaAtual.dAcabado * 1.15;
+                          let cMin = metaAtual.lRolo * 0.85, cMax = metaAtual.lRolo * 1.15;
+
+                          if (
+                              it.meta.dFerro >= fMin && it.meta.dFerro <= fMax &&
+                              it.meta.dAcabado >= aMin && it.meta.dAcabado <= aMax &&
+                              it.meta.lRolo >= cMin && it.meta.lRolo <= cMax &&
+                              it.tempo_min > 0
+                          ) {
+                              similar = true;
+                          }
+                      } 
+                      // Se for peça geral, compara pelo peso/volume com 20% tolerância
+                      else {
+                          let minKg = pesoKgAtual * 0.80;
+                          let maxKg = pesoKgAtual * 1.20;
+                          if (it.kg_unit >= minKg && it.kg_unit <= maxKg && it.tempo_min > 0) {
+                              similar = true;
+                          }
+                      }
+
+                      if (similar) {
+                          // Evita itens duplicados (ex: orçamento que virou pedido com o mesmo item)
+                          let jaExiste = historicoEncontrado.find(h => h.os === os.os && h.med === it.med);
+                          if(!jaExiste) {
+                              historicoEncontrado.push({ os: os.os, cliente: os.cliente, med: it.med, tempo_min: it.tempo_min });
+                          }
                       }
                   }
               });
@@ -510,36 +535,41 @@
       });
 
       if (historicoEncontrado.length > 0) {
-          // Calcula a média de tempo gasto nas peças similares encontradas
           let mediaTempoMin = historicoEncontrado.reduce((acc, curr) => acc + curr.tempo_min, 0) / historicoEncontrado.length;
           let difPerc = Math.abs(tempoMinAtual - mediaTempoMin) / mediaTempoMin;
           
-          // Formata a exibição do tempo para horas/min
           let formatT = (m) => { let hh = Math.floor(m / 60); let mm = Math.round(m % 60); return hh > 0 ? `${hh}h ${mm}m` : `${mm}m`; };
           
-          let ex = historicoEncontrado[historicoEncontrado.length - 1]; // Pega a referência mais recente
-          
           let htmlMsg = `<strong style="font-size:14px">🧠 Assistente de Orçamento:</strong><br>
-                         Encontrei <b>${historicoEncontrado.length}</b> peça(s) de tamanho/volume semelhante no seu histórico.<br>
-                         <span style="color:#555;">Última referência: OS ${ex.os} (${ex.cliente.substring(0,15)}...) - ${ex.med}. Tempo orçado: <b>${formatT(ex.tempo_min)}</b>.</span><br>`;
+                         Encontrei <b>${historicoEncontrado.length}</b> peça(s) com medidas semelhantes no seu histórico.<br>
+                         <ul style="margin: 8px 0; padding-left: 20px; font-size: 11px; color:#444;">`;
 
-          // Se a diferença for maior que 20%, ele alerta
+          // Lista todas as OS compatíveis encontradas (limite visual de 10)
+          let limite = Math.min(historicoEncontrado.length, 10);
+          for(let i=0; i<limite; i++) {
+              let ex = historicoEncontrado[i];
+              htmlMsg += `<li style="margin-bottom:3px;"><b>OS ${ex.os}</b> (${ex.cliente.substring(0,15)}...) | Medida: ${ex.med} ➔ <b style="color:var(--primary)">Tempo Gasto: ${formatT(ex.tempo_min)}</b></li>`;
+          }
+          if(historicoEncontrado.length > 10) htmlMsg += `<li><i>... e mais ${historicoEncontrado.length - 10} registros compatíveis.</i></li>`;
+
+          htmlMsg += `</ul>`;
+
+          // Se a diferença do tempo atual pra média do histórico for maior que 20%, dispara alerta vermelho
           if (difPerc > 0.20) {
               return { 
                   alerta: true, 
-                  html: htmlMsg + `<br><b style="color:#d9534f; font-size:13px;">⚠️ Atenção: Você orçou ${formatT(tempoMinAtual)} agora. Isso está bastante diferente da sua média histórica para este tamanho de peça!</b>` 
+                  html: htmlMsg + `<b style="color:#d9534f; font-size:13px;">⚠️ Atenção: Você orçou ${formatT(tempoMinAtual)} agora. Isso difere bastante da sua média histórica para este tamanho!</b>` 
               };
           } else {
               return { 
                   alerta: false, 
-                  html: htmlMsg + `<br><b style="color:#28a745; font-size:13px;">✅ O tempo de ${formatT(tempoMinAtual)} está totalmente coerente com seu histórico!</b>` 
+                  html: htmlMsg + `<b style="color:#28a745; font-size:13px;">✅ O tempo de ${formatT(tempoMinAtual)} está coerente com o seu histórico!</b>` 
               };
           }
       }
       return null;
   }
   // ----------------------------------------------------
-
 
   async function buscaCNPJCadastro(v) {
     const cnpj = v.replace(/\D/g, ''); if (cnpj.length !== 14) return;
@@ -659,7 +689,6 @@
     } else { boxCrm.style.display = 'none'; }
   }
 
-
   function aplicarDesconto() {
       const p = parseFloat(document.getElementById('descPorc').value);
       if(!p || p <= 0) return alert("Digite uma porcentagem válida (Ex: 5)");
@@ -674,7 +703,7 @@
   function mudarInputsCalculo() {
       document.querySelectorAll('.grupo-input').forEach(el => el.classList.add('hidden'));
       document.getElementById('boxResultado').classList.add('hidden');
-      document.getElementById('alertaMemoria').style.display = 'none'; // Esconde alerta antigo
+      document.getElementById('alertaMemoria').style.display = 'none'; 
       
       const tipo = document.getElementById('tipoPeca').value;
       document.getElementById('input-' + tipo).classList.remove('hidden');
@@ -814,7 +843,7 @@
       };
 
       // --- DISPARO DO ASSISTENTE ---
-      let analiseMemoria = verificarSimilaridadeNoHistorico(pesoBrutoKg, minPorPeca, tipo);
+      let analiseMemoria = verificarSimilaridadeNoHistorico(pesoBrutoKg, minPorPeca, tipo, metaRevest);
       let boxAlerta = document.getElementById('alertaMemoria');
       
       if (analiseMemoria) {
