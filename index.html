@@ -307,6 +307,65 @@
               <button class="btn" style="background:var(--dark); margin:0; width:auto; padding:0 20px" onclick="renderOrcamentos()">BUSCAR</button>
           </div>
       </div>
+<div id="clientesTab" class="section">
+    <h3 style="color:var(--primary); margin-top:0;">Gestão de Clientes B2B</h3>
+    
+    <!-- Formulário de Cadastro e Edição -->
+    <div style="background:#f9f9f9; padding:15px; border-radius:6px; border:1px solid #ddd; margin-bottom:20px;">
+        <div class="row">
+            <div class="col" style="flex:2">
+                <label>Razão Social</label>
+                <input type="text" id="cadCliRazao" placeholder="Ex: Indústria Exemplo LTDA">
+            </div>
+            <div class="col" style="flex:1">
+                <label>CNPJ</label>
+                <input type="text" id="cadCliCnpj" onblur="buscaCNPJCadastro(this.value)" placeholder="Somente números">
+            </div>
+        </div>
+        
+        <label>Endereço Completo</label>
+        <input type="text" id="cadCliEndereco" placeholder="Rua, Número, Bairro, Cidade - UF">
+        
+        <div class="row">
+            <div class="col">
+                <label>Nome do Contato</label>
+                <input type="text" id="cadCliContato" placeholder="Ex: João (Engenharia)">
+            </div>
+            <div class="col">
+                <label>WhatsApp</label>
+                <input type="text" id="cadCliWhatsapp" placeholder="(16) 99999-9999">
+            </div>
+            <div class="col">
+                <label>E-mail</label>
+                <input type="text" id="cadCliEmail" placeholder="compras@exemplo.com.br">
+            </div>
+        </div>
+        
+        <label>Observações / Requisitos Técnicos</label>
+        <textarea id="cadCliObs" rows="2" placeholder="Ex: Exige certificado de dureza (Shore A) na entrega. Apenas transportadora X."></textarea>
+        
+        <!-- Campo oculto para a lógica saber se é um cliente novo ou edição de um existente -->
+        <input type="hidden" id="cadCliIndex" value="-1">
+        
+        <div class="row" style="margin-top:10px;">
+            <div class="col">
+                <button class="btn" style="background:#ccc; color:#333;" onclick="limparFormCliente()">LIMPAR</button>
+            </div>
+            <div class="col" style="flex:2">
+                <button class="btn" style="background:var(--success);" onclick="salvarClienteCRM()">SALVAR CLIENTE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de Clientes e Barra de Busca -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap: 10px;">
+        <h3 style="margin:0;">Clientes Cadastrados</h3>
+        <input type="text" id="buscaCliente" placeholder="Buscar por nome ou CNPJ..." style="width:100%; max-width:250px; margin:0;" onkeyup="renderListaClientes()">
+    </div>
+    
+    <!-- Onde o JavaScript vai injetar os cards dos clientes -->
+    <div id="dashboardClientes"></div>
+</div>
       <div id="listaOrcamentos"></div>
   </div>
   
