@@ -123,6 +123,7 @@
     <button class="tab-btn" onclick="tab('financeiro')" style="background:var(--success); color:white;">Boletos</button>
     <button class="tab-btn" onclick="tab('cfg')">Custos</button>
     <button class="tab-btn" onclick="tab('producao')" style="background:#8e44ad; color:white;">Produção</button>
+    <button class="tab-btn" onclick="fazerLogout()" style="background:var(--danger); color:white;">Sair</button>
   </div>
 
   <div id="calc" class="section active">
@@ -358,16 +359,54 @@
   let ultimoCalculo = null; 
   let idxFechar = null;
 
+  // --- ALTERAÇÕES DE LOGIN / LOGOUT ADICIONADAS AQUI ---
+
+  function addHistoryState() {
+      try {
+          // Adiciona estado no histórico para armadilhar o botão de voltar
+          history.pushState({ appLogado: true }, null, window.location.href);
+      } catch(e) {}
+  }
+
+  function iniciarSessao() {
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('appContainer').style.display = 'block';
+      addHistoryState();
+  }
+
   function fazerLogin() {
       const u = document.getElementById('loginUser').value;
       const p = document.getElementById('loginPass').value;
       if (u === 'Abel' && p === '201000') {
-          document.getElementById('loginScreen').style.display = 'none';
-          document.getElementById('appContainer').style.display = 'block';
+          localStorage.setItem('marbe_logado', 'true');
+          iniciarSessao();
       } else {
           alert("Usuário ou senha incorretos!");
       }
   }
+
+  function fazerLogout() {
+      localStorage.removeItem('marbe_logado');
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('appContainer').style.display = 'none';
+      document.getElementById('loginUser').value = '';
+      document.getElementById('loginPass').value = '';
+  }
+
+  // Verifica ao carregar a página se a pessoa já estava logada
+  if (localStorage.getItem('marbe_logado') === 'true') {
+      iniciarSessao();
+  }
+
+  // Intercepta o botão voltar nativo do celular/PC
+  window.addEventListener('popstate', function(event) {
+      if (localStorage.getItem('marbe_logado') === 'true') {
+          // Se tentar voltar e estiver logado, ele joga o estado do app novamente no histórico, evitando sair da tela.
+          addHistoryState();
+      }
+  });
+
+  // --- FIM DAS ALTERAÇÕES DE LOGIN / LOGOUT ---
 
   function tab(id) {
     document.querySelectorAll('.section, .tab-btn').forEach(e => e.classList.remove('active'));
