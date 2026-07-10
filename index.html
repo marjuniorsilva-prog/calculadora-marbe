@@ -253,6 +253,9 @@
 
     <button class="btn" style="background:var(--info)" onclick="simularCalculo()">SIMULAR CUSTO</button>
 
+    <!-- NOVA CAIXA DO ASSISTENTE DE HISTÓRICO -->
+    <div id="alertaMemoria" style="display:none; padding:12px; border-radius:6px; margin-top:15px; font-size:12px;"></div>
+
     <div id="boxResultado" class="resultado-box hidden">
         <div class="res-line"><span>Item:</span> <span id="resDesc">...</span></div>
         <div class="res-line"><span>Peso Líquido:</span> <span id="resPesoLiq">0g</span></div>
@@ -281,7 +284,7 @@
     <datalist id="listaClientesDatalist"></datalist>
     <label>Endereço Completo</label><input type="text" id="endereco">
     
-    <!-- Área de Alerta de CRM ao selecionar cliente (invisível por padrão) -->
+    <!-- Área de Alerta de CRM ao selecionar cliente -->
     <div id="crmAlertaOrcamento" style="display:none; background:#e8f4f8; padding:8px; border-left:4px solid var(--info); border-radius:4px; margin-top:10px; font-size:11px;">
         <strong style="color:var(--info);">Info CRM:</strong> <span id="crmContato"></span> | <span id="crmWhatsapp"></span><br>
         <span id="crmObs" style="color:#666; font-style:italic;"></span>
@@ -316,7 +319,6 @@
       <div id="listaOrcamentos"></div>
   </div>
 
-  <!-- AQUI ESTÁ A ABA CLIENTES CORRIGIDA E SEPARADA -->
   <div id="clientesTab" class="section">
       <h3 style="color:var(--primary); margin-top:0;">Gestão de Clientes B2B</h3>
       
@@ -352,7 +354,6 @@
           <label>Observações / Requisitos Técnicos</label>
           <textarea id="cadCliObs" rows="2" placeholder="Ex: Exige certificado de dureza (Shore A) na entrega. Apenas transportadora X."></textarea>
           
-          <!-- Campo oculto para a lógica saber se é um cliente novo ou edição de um existente -->
           <input type="hidden" id="cadCliIndex" value="-1">
           
           <div class="row" style="margin-top:10px;">
@@ -365,13 +366,11 @@
           </div>
       </div>
 
-      <!-- Lista de Clientes e Barra de Busca -->
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap: 10px;">
           <h3 style="margin:0;">Clientes Cadastrados</h3>
           <input type="text" id="buscaCliente" placeholder="Buscar por nome ou CNPJ..." style="width:100%; max-width:250px; margin:0;" onkeyup="renderListaClientes()">
       </div>
       
-      <!-- Onde o JavaScript vai injetar os cards dos clientes -->
       <div id="dashboardClientes"></div>
   </div>
   
@@ -426,9 +425,7 @@
   let idxFechar = null;
 
   function addHistoryState() {
-      try {
-          history.pushState({ appLogado: true }, null, window.location.href);
-      } catch(e) {}
+      try { history.pushState({ appLogado: true }, null, window.location.href); } catch(e) {}
   }
 
   function iniciarSessao() {
@@ -456,16 +453,11 @@
       document.getElementById('loginPass').value = '';
   }
 
-  if (localStorage.getItem('marbe_logado') === 'true') {
-      iniciarSessao();
-  }
+  if (localStorage.getItem('marbe_logado') === 'true') { iniciarSessao(); }
 
   window.addEventListener('popstate', function(event) {
-      if (localStorage.getItem('marbe_logado') === 'true') {
-          addHistoryState();
-      }
+      if (localStorage.getItem('marbe_logado') === 'true') { addHistoryState(); }
   });
-
 
   function tab(id) {
     document.querySelectorAll('.section, .tab-btn').forEach(e => e.classList.remove('active'));
@@ -492,7 +484,62 @@
     if(document.getElementById('clientesTab').classList.contains('active')) renderListaClientes();
   }
 
-  // ---- NOVA LÓGICA DE CLIENTES (CRM) ----
+  // ---- FUNÇÃO DO ASSISTENTE MATEMÁTICO DE MEMÓRIA ----
+  function verificarSimilaridadeNoHistorico(pesoKgAtual, tempoMinAtual, tipoAtual) {
+      let historicoEncontrado = [];
+      const bases = [...(window.marbeDB.pedidos || []), ...(window.marbeDB.orçamentos || [])];
+      
+      bases.forEach(os => {
+          if(os.itens) {
+              os.itens.forEach(it => {
+                  let tipoIt = (it.meta && it.meta.tipo === 'revestimento') ? 'revestimento' : 'geral';
+                  let tipoReq = (tipoAtual === 'revestimento') ? 'revestimento' : 'geral';
+                  
+                  // Analisa apenas se for a mesma categoria de serviço (Rolo vs Rolo, Peça vs Peça)
+                  if (tipoIt === tipoReq) {
+                      // Margem de 20% de tolerância no volume/peso para considerar "similar"
+                      let minKg = pesoKgAtual * 0.80;
+                      let maxKg = pesoKgAtual * 1.20;
+                      
+                      if (it.kg_unit >= minKg && it.kg_unit <= maxKg && it.tempo_min > 0) {
+                          historicoEncontrado.push({ os: os.os, cliente: os.cliente, med: it.med, tempo_min: it.tempo_min });
+                      }
+                  }
+              });
+          }
+      });
+
+      if (historicoEncontrado.length > 0) {
+          // Calcula a média de tempo gasto nas peças similares encontradas
+          let mediaTempoMin = historicoEncontrado.reduce((acc, curr) => acc + curr.tempo_min, 0) / historicoEncontrado.length;
+          let difPerc = Math.abs(tempoMinAtual - mediaTempoMin) / mediaTempoMin;
+          
+          // Formata a exibição do tempo para horas/min
+          let formatT = (m) => { let hh = Math.floor(m / 60); let mm = Math.round(m % 60); return hh > 0 ? `${hh}h ${mm}m` : `${mm}m`; };
+          
+          let ex = historicoEncontrado[historicoEncontrado.length - 1]; // Pega a referência mais recente
+          
+          let htmlMsg = `<strong style="font-size:14px">🧠 Assistente de Orçamento:</strong><br>
+                         Encontrei <b>${historicoEncontrado.length}</b> peça(s) de tamanho/volume semelhante no seu histórico.<br>
+                         <span style="color:#555;">Última referência: OS ${ex.os} (${ex.cliente.substring(0,15)}...) - ${ex.med}. Tempo orçado: <b>${formatT(ex.tempo_min)}</b>.</span><br>`;
+
+          // Se a diferença for maior que 20%, ele alerta
+          if (difPerc > 0.20) {
+              return { 
+                  alerta: true, 
+                  html: htmlMsg + `<br><b style="color:#d9534f; font-size:13px;">⚠️ Atenção: Você orçou ${formatT(tempoMinAtual)} agora. Isso está bastante diferente da sua média histórica para este tamanho de peça!</b>` 
+              };
+          } else {
+              return { 
+                  alerta: false, 
+                  html: htmlMsg + `<br><b style="color:#28a745; font-size:13px;">✅ O tempo de ${formatT(tempoMinAtual)} está totalmente coerente com seu histórico!</b>` 
+              };
+          }
+      }
+      return null;
+  }
+  // ----------------------------------------------------
+
 
   async function buscaCNPJCadastro(v) {
     const cnpj = v.replace(/\D/g, ''); if (cnpj.length !== 14) return;
@@ -523,8 +570,7 @@
       const index = parseInt(document.getElementById('cadCliIndex').value);
       
       const dadosCliente = {
-          razao: razao,
-          cnpj: cnpj,
+          razao: razao, cnpj: cnpj,
           endereco: document.getElementById('cadCliEndereco').value,
           contato: document.getElementById('cadCliContato').value,
           whatsapp: document.getElementById('cadCliWhatsapp').value,
@@ -535,21 +581,14 @@
       if(!window.marbeDB.clientes) window.marbeDB.clientes = [];
 
       if (index >= 0) {
-          // Atualiza cliente existente
           window.marbeDB.clientes[index] = dadosCliente;
       } else {
-          // Checa se já existe pelo CNPJ (se informado) ou nome para evitar duplicação burra
           const existe = window.marbeDB.clientes.find(c => (cnpj && c.cnpj === cnpj) || c.razao === razao);
-          if (existe) {
-              if(!confirm("Já existe um cliente cadastrado com este Nome ou CNPJ. Deseja cadastrar mesmo assim?")) return;
-          }
+          if (existe) { if(!confirm("Já existe um cliente cadastrado com este Nome ou CNPJ. Deseja cadastrar mesmo assim?")) return; }
           window.marbeDB.clientes.push(dadosCliente);
       }
 
-      window.salvarNuvem();
-      atualizarListaClientes();
-      renderListaClientes();
-      limparFormCliente();
+      window.salvarNuvem(); atualizarListaClientes(); renderListaClientes(); limparFormCliente();
       alert("Cliente salvo com sucesso!");
   }
 
@@ -563,17 +602,13 @@
       document.getElementById('cadCliEmail').value = c.email || '';
       document.getElementById('cadCliObs').value = c.obs || '';
       document.getElementById('cadCliIndex').value = index;
-      
-      // Rola a tela para cima
       window.scrollTo(0,0);
   }
 
   function excluirCliente(index) {
       if(confirm(`Tem certeza que deseja excluir o cliente ${window.marbeDB.clientes[index].razao}? (Isso não afeta OS antigas)`)) {
           window.marbeDB.clientes.splice(index, 1);
-          window.salvarNuvem();
-          atualizarListaClientes();
-          renderListaClientes();
+          window.salvarNuvem(); atualizarListaClientes(); renderListaClientes();
       }
   }
 
@@ -582,14 +617,11 @@
           document.getElementById('dashboardClientes').innerHTML = "<p style='text-align:center; padding:20px; color:#888'>Nenhum cliente cadastrado ainda.</p>";
           return;
       }
-
       const termo = document.getElementById('buscaCliente').value.toLowerCase();
       let html = '';
 
       window.marbeDB.clientes.forEach((c, i) => {
-          // Filtro de busca
           if (termo && !c.razao.toLowerCase().includes(termo) && !(c.cnpj && c.cnpj.includes(termo))) return;
-
           let infoExtra = '';
           if(c.contato) infoExtra += `Contato: ${c.contato} `;
           if(c.whatsapp) infoExtra += `| Whats: ${c.whatsapp}`;
@@ -602,42 +634,30 @@
               </div>
               <div style="font-size:10px; color:#666; margin-top:4px;">${infoExtra}</div>
               ${c.obs ? `<div style="font-size:10px; color:#856404; background:#fff3cd; padding:4px; margin-top:4px; border-radius:2px;">${c.obs}</div>` : ''}
-              
               <div style="display:flex; gap:5px; margin-top:8px;">
                   <button class="btn" style="background:var(--info); padding:6px; margin:0; font-size:10px;" onclick="editarCliente(${i})">EDITAR</button>
                   <button class="btn" style="background:var(--danger); padding:6px; margin:0; font-size:10px;" onclick="excluirCliente(${i})">EXCLUIR</button>
               </div>
           </div>`;
       });
-
       document.getElementById('dashboardClientes').innerHTML = html || "<p style='color:#888'>Nenhum cliente encontrado na busca.</p>";
   }
 
-  // Turbinando o auto-preenchimento para puxar infos do CRM
   function autoPreencherCliente(razaoEscolhida) {
     if(!window.marbeDB.clientes) return;
     const c = window.marbeDB.clientes.find(x => x.razao === razaoEscolhida);
     const boxCrm = document.getElementById('crmAlertaOrcamento');
     
     if(c) {
-        document.getElementById('cnpj').value = c.cnpj || '';
-        document.getElementById('endereco').value = c.endereco || '';
-        
-        // Exibe os alertas do CRM se existirem
+        document.getElementById('cnpj').value = c.cnpj || ''; document.getElementById('endereco').value = c.endereco || '';
         if (c.contato || c.whatsapp || c.obs) {
             document.getElementById('crmContato').innerText = c.contato ? `Contato: ${c.contato}` : '';
             document.getElementById('crmWhatsapp').innerText = c.whatsapp ? `Whats: ${c.whatsapp}` : '';
             document.getElementById('crmObs').innerText = c.obs ? `Lembrete: ${c.obs}` : '';
             boxCrm.style.display = 'block';
-        } else {
-            boxCrm.style.display = 'none';
-        }
-    } else {
-        boxCrm.style.display = 'none';
-    }
+        } else { boxCrm.style.display = 'none'; }
+    } else { boxCrm.style.display = 'none'; }
   }
-
-  // ---- FIM DA NOVA LÓGICA DE CLIENTES ----
 
 
   function aplicarDesconto() {
@@ -646,18 +666,16 @@
       if(itensTemp.length === 0) return alert("Não há itens na lista para aplicar desconto.");
 
       if(confirm(`Tem certeza que deseja aplicar ${p}% de desconto em TODOS os itens da lista?\nIsso reduzirá o valor unitário e total.`)) {
-          itensTemp.forEach(it => {
-              it.v = it.v * (1 - (p / 100));
-          });
-          renderTabelaAtual(); 
-          alert("Desconto aplicado com sucesso!");
-          document.getElementById('descPorc').value = ""; 
+          itensTemp.forEach(it => { it.v = it.v * (1 - (p / 100)); });
+          renderTabelaAtual(); alert("Desconto aplicado com sucesso!"); document.getElementById('descPorc').value = ""; 
       }
   }
 
   function mudarInputsCalculo() {
       document.querySelectorAll('.grupo-input').forEach(el => el.classList.add('hidden'));
       document.getElementById('boxResultado').classList.add('hidden');
+      document.getElementById('alertaMemoria').style.display = 'none'; // Esconde alerta antigo
+      
       const tipo = document.getElementById('tipoPeca').value;
       document.getElementById('input-' + tipo).classList.remove('hidden');
 
@@ -674,11 +692,8 @@
 
   function simularCalculo() {
       const tipo = document.getElementById('tipoPeca').value;
-      
       let perdaPerc = 0;
-      if (tipo !== 'revestimento') {
-          perdaPerc = parseFloat(document.getElementById('percPerda').value) || 0;
-      }
+      if (tipo !== 'revestimento') { perdaPerc = parseFloat(document.getElementById('percPerda').value) || 0; }
 
       const densidade = parseFloat(document.getElementById('densidade').value) || 1.2;
       const markup = parseFloat(document.getElementById('markup').value) || 2.5;
@@ -689,15 +704,10 @@
       const nomeMat = selMat.options[selMat.selectedIndex].text;
       
       const valorHora = parseFloat(document.getElementById('tipoTorno').value);
-
       const taxaImposto = parseFloat(document.getElementById('tipoServicoCalc').value);
       const nomeServico = document.getElementById('tipoServicoCalc').options[document.getElementById('tipoServicoCalc').selectedIndex].text;
 
-      let volumeCm3 = 0;
-      let pesoDiretoG = 0;
-      let descMedidas = "";
-      
-      let metaRevest = null; 
+      let volumeCm3 = 0; let pesoDiretoG = 0; let descMedidas = ""; let metaRevest = null; 
 
       if (tipo === 'peso_direto') {
           pesoDiretoG = parseFloat(document.getElementById('peso-input').value);
@@ -711,18 +721,12 @@
           
           if(ferro && acabado && comp) {
               if (acabado <= ferro) return alert("O Ø Acabado deve ser MAIOR que o Ø Ferro.");
-              
               const espBase = (acabado - ferro) / 2;
               const sobraUsinagem = espBase <= 30 ? 5 : 10;
               const espFinal = espBase + sobraUsinagem;
               
-              const larguraCobrada = comp; 
-              
-              // Linha Neutra (Diâmetro Médio)
-              volumeCm3 = (Math.PI * (ferro + espFinal) * espFinal * larguraCobrada) / 1000;
-              
+              volumeCm3 = (Math.PI * (ferro + espFinal) * espFinal * comp) / 1000;
               descMedidas = `Serviço de Revestimento Ø${ferro}xØ${acabado}x${comp}mm (camada ${espBase}mm)`;
-              
               metaRevest = { dFerro: ferro, dAcabado: acabado, lRolo: comp, tipo: 'revestimento' };
           }
       }
@@ -806,18 +810,27 @@
           : `${document.getElementById('tipoPeca').options[document.getElementById('tipoPeca').selectedIndex].text} - ${nomeServico} ${descMedidas}`;
 
       ultimoCalculo = {
-          n: nomeFinalItem,
-          mat: nomeMat, 
-          med: descMedidas, 
-          q: 1, 
-          v: precoFinal, 
-          kg_unit: pesoBrutoKg,
-          tempo_min: minPorPeca,
-          meta: metaRevest 
+          n: nomeFinalItem, mat: nomeMat, med: descMedidas, q: 1, v: precoFinal, kg_unit: pesoBrutoKg, tempo_min: minPorPeca, meta: metaRevest 
       };
 
-      document.getElementById('resDesc').innerText = descMedidas;
+      // --- DISPARO DO ASSISTENTE ---
+      let analiseMemoria = verificarSimilaridadeNoHistorico(pesoBrutoKg, minPorPeca, tipo);
+      let boxAlerta = document.getElementById('alertaMemoria');
       
+      if (analiseMemoria) {
+          boxAlerta.innerHTML = analiseMemoria.html;
+          boxAlerta.style.display = 'block';
+          if (analiseMemoria.alerta) {
+              boxAlerta.style.backgroundColor = '#fff3cd'; boxAlerta.style.border = '1px solid #ffeeba';
+          } else {
+              boxAlerta.style.backgroundColor = '#d4edda'; boxAlerta.style.border = '1px solid #c3e6cb';
+          }
+      } else {
+          boxAlerta.style.display = 'none';
+      }
+      // -----------------------------
+
+      document.getElementById('resDesc').innerText = descMedidas;
       if(tipo === 'revestimento') {
           document.getElementById('resPesoLiq').innerText = "- (Manta Bruta s/ sobra)";
           document.getElementById('lblPesoBruto').innerText = "Peso Cobrado (Manta s/ folga):";
@@ -842,6 +855,7 @@
       itensTemp.push({...ultimoCalculo}); 
       renderTabelaAtual(); tab('orc');
       document.getElementById('boxResultado').classList.add('hidden');
+      document.getElementById('alertaMemoria').style.display = 'none';
       ultimoCalculo = null;
   }
 
@@ -852,8 +866,6 @@
       const d = await r.json();
       document.getElementById('razao').value = d.razao_social || "";
       document.getElementById('endereco').value = d.logradouro ? `${d.logradouro}, ${d.numero} - ${d.bairro}, ${d.municipio} - ${d.uf}` : "";
-      
-      // Salva automaticamente no banco de dados se for novo
       salvarClienteDb(d.razao_social, v, document.getElementById('endereco').value);
     } catch (e) {}
   }
@@ -863,8 +875,7 @@
     const existe = window.marbeDB.clientes.find(c => c.razao === razao);
     if(!existe && razao) {
         window.marbeDB.clientes.push({ razao, cnpj, endereco });
-        window.salvarNuvem();
-        atualizarListaClientes();
+        window.salvarNuvem(); atualizarListaClientes();
     }
   }
 
@@ -897,37 +908,24 @@
 
     const orcData = { 
         os: idEdicao ? idEdicao.os : window.marbeDB.os, 
-        cliente: razaoComercial, 
-        cnpj: cnpjComercial, 
-        endereco: enderecoComercial, 
-        itens: JSON.parse(JSON.stringify(itensTemp)), 
-        frete: document.getElementById('frete').value, 
-        prazo: document.getElementById('prazo').value, 
-        pagamento: document.getElementById('pagamento').value, 
-        total: itensTemp.reduce((a,b)=>a+(b.v*b.q),0),
-        data_criacao: new Date().toISOString()
+        cliente: razaoComercial, cnpj: cnpjComercial, endereco: enderecoComercial, 
+        itens: JSON.parse(JSON.stringify(itensTemp)), frete: document.getElementById('frete').value, 
+        prazo: document.getElementById('prazo').value, pagamento: document.getElementById('pagamento').value, 
+        total: itensTemp.reduce((a,b)=>a+(b.v*b.q),0), data_criacao: new Date().toISOString()
     };
 
-    if (razaoComercial !== "CLIENTE NÃO INFORMADO") {
-        salvarClienteDb(razaoComercial, cnpjComercial, enderecoComercial);
-    }
+    if (razaoComercial !== "CLIENTE NÃO INFORMADO") { salvarClienteDb(razaoComercial, cnpjComercial, enderecoComercial); }
 
     if(idEdicao) {
-        if (idEdicao.origem === 'pedidos' && window.marbeDB.pedidos[idEdicao.index].data_criacao) {
-            orcData.data_criacao = window.marbeDB.pedidos[idEdicao.index].data_criacao;
-        } else if (idEdicao.origem === 'orçamentos' && window.marbeDB.orçamentos[idEdicao.index].data_criacao) {
-            orcData.data_criacao = window.marbeDB.orçamentos[idEdicao.index].data_criacao;
-        }
+        if (idEdicao.origem === 'pedidos' && window.marbeDB.pedidos[idEdicao.index].data_criacao) { orcData.data_criacao = window.marbeDB.pedidos[idEdicao.index].data_criacao; } 
+        else if (idEdicao.origem === 'orçamentos' && window.marbeDB.orçamentos[idEdicao.index].data_criacao) { orcData.data_criacao = window.marbeDB.orçamentos[idEdicao.index].data_criacao; }
         
         if(idEdicao.origem === 'pedidos') window.marbeDB.pedidos[idEdicao.index] = orcData;
         else window.marbeDB.orçamentos[idEdicao.index] = orcData;
-        idEdicao = null; 
-        document.getElementById('btnCancelaEdit').style.display = 'none'; 
-        document.getElementById('osEdicaoLabel').innerText = "Nova";
+        idEdicao = null; document.getElementById('btnCancelaEdit').style.display = 'none'; document.getElementById('osEdicaoLabel').innerText = "Nova";
     } else {
         if(!window.marbeDB.orçamentos) window.marbeDB.orçamentos = [];
-        window.marbeDB.orçamentos.push(orcData); 
-        window.marbeDB.os++;
+        window.marbeDB.orçamentos.push(orcData); window.marbeDB.os++;
     }
     window.salvarNuvem(); itensTemp = []; renderTabelaAtual(); tab('historico');
   }
@@ -943,10 +941,7 @@
     (window.marbeDB.orçamentos || []).forEach((o, i) => {
         let exibir = false;
         if (!o.data_criacao) exibir = true;
-        else {
-            let dataOrc = new Date(o.data_criacao);
-            if (dataOrc >= dataInicio && dataOrc <= dataFim) exibir = true;
-        }
+        else { let dataOrc = new Date(o.data_criacao); if (dataOrc >= dataInicio && dataOrc <= dataFim) exibir = true; }
         
         if (exibir) {
             let dataFormatada = o.data_criacao ? new Date(o.data_criacao).toLocaleDateString('pt-BR') : "Antigo";
@@ -968,25 +963,15 @@
   }
 
   function fecharPedido(i) {
-      idxFechar = i;
-      let hoje = new Date().toISOString().split('T')[0];
-      document.getElementById('modal-data-entrada').value = hoje;
-      document.getElementById('modal-data-limite').value = ""; 
-      document.getElementById('modal-fechar').style.display = 'flex';
+      idxFechar = i; let hoje = new Date().toISOString().split('T')[0];
+      document.getElementById('modal-data-entrada').value = hoje; document.getElementById('modal-data-limite').value = ""; document.getElementById('modal-fechar').style.display = 'flex';
   }
 
   function confirmarFechamento() {
       let orc = window.marbeDB.orçamentos.splice(idxFechar, 1)[0];
-      
-      orc.data_entrada = document.getElementById('modal-data-entrada').value;
-      orc.data_limite = document.getElementById('modal-data-limite').value;
-      
-      if(!window.marbeDB.pedidos) window.marbeDB.pedidos = [];
-      window.marbeDB.pedidos.push(orc);
-      window.salvarNuvem();
-      
-      document.getElementById('modal-fechar').style.display = 'none';
-      tab('pedidos');
+      orc.data_entrada = document.getElementById('modal-data-entrada').value; orc.data_limite = document.getElementById('modal-data-limite').value;
+      if(!window.marbeDB.pedidos) window.marbeDB.pedidos = []; window.marbeDB.pedidos.push(orc); window.salvarNuvem();
+      document.getElementById('modal-fechar').style.display = 'none'; tab('pedidos');
   }
 
   function renderPedidos() {
@@ -998,10 +983,8 @@
             <button class="btn" style="background:var(--prod); width:auto; padding:8px; margin:0; flex:1" onclick="gerarPDF('PRODUCAO', ${i}, 'pedidos')">PRODUÇÃO</button>
             <button class="btn" style="background:var(--compra); width:auto; padding:8px; margin:0; flex:1" onclick="gerarPDF('COMPRA', ${i}, 'pedidos')">COMPRA MAT.</button>
         </div>
-        
         <button class="btn" style="background:var(--danger); margin-top:5px; padding:8px;" onclick="estornarVenda(${i})">↩ CANCELAR VENDA (VOLTAR)</button>
         <hr style="border:0; border-top:1px dashed #ccc; margin:10px 0;">
-
         <input type="text" id="nf_${i}" placeholder="Nº NF" style="margin-top:5px">
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
             <input type="number" id="parc_${i}" placeholder="Qtd Parc.">
@@ -1015,11 +998,8 @@
       if(!confirm("Deseja CANCELAR essa venda e voltar para Orçamento? O item sairá desta lista.")) return;
       const item = window.marbeDB.pedidos.splice(i, 1)[0];
       if(!window.marbeDB.orçamentos) window.marbeDB.orçamentos = [];
-      window.marbeDB.orçamentos.push(item);
-      window.salvarNuvem();
-      updateUI();
-      alert("Venda estornada! O item voltou para a aba HISTÓRICO.");
-      tab('historico');
+      window.marbeDB.orçamentos.push(item); window.salvarNuvem(); updateUI();
+      alert("Venda estornada! O item voltou para a aba HISTÓRICO."); tab('historico');
   }
 
   function faturar(i) {
@@ -1038,231 +1018,103 @@
     const { jsPDF } = window.jspdf; const doc = new jsPDF(); const d = window.marbeDB[base][index];
     const clean = (t) => t ? t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase() : "";
     
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 105, 15, {align: "center"});
-    
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.text("RUA SAO CARLOS, 84 - VILA MARIANA - RIBEIRAO PRETO / SP", 105, 20, {align: "center"});
+    doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 105, 15, {align: "center"});
+    doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.text("RUA SAO CARLOS, 84 - VILA MARIANA - RIBEIRAO PRETO / SP", 105, 20, {align: "center"});
     doc.text("CNPJ: 61.149.312/0001-56", 105, 24, {align: "center"}); 
-
-    doc.setLineWidth(0.5);
-    doc.line(20, 27, 190, 27);
+    doc.setLineWidth(0.5); doc.line(20, 27, 190, 27);
     
     if (tipo === 'COMPRA') {
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.text(`PEDIDO DE COMPRA DE MATERIA-PRIMA`, 20, 35);
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
-        doc.text(`OS: ${d.os}   |   DATA DO PEDIDO: ${new Date().toLocaleDateString('pt-BR')}`, 20, 42);
+        doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.text(`PEDIDO DE COMPRA DE MATERIA-PRIMA`, 20, 35);
+        doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`OS: ${d.os}   |   DATA DO PEDIDO: ${new Date().toLocaleDateString('pt-BR')}`, 20, 42);
         
-        let finalY = 50;
-        let totalPesoCompra = 0;
-        let arrayDeMantas = [];
+        let finalY = 50; let totalPesoCompra = 0; let arrayDeMantas = [];
 
         d.itens.forEach(i => {
-            let q = i.q || 1;
-            let pBaseUnit = (i.kg_unit || 0);
-            totalPesoCompra += (pBaseUnit * q * 1.20); 
-            if(i.meta && i.meta.tipo === 'revestimento') {
-                arrayDeMantas.push({n: i.n, mat: i.mat, meta: i.meta, qtd_pedida: q});
-            }
+            let q = i.q || 1; let pBaseUnit = (i.kg_unit || 0); totalPesoCompra += (pBaseUnit * q * 1.20); 
+            if(i.meta && i.meta.tipo === 'revestimento') { arrayDeMantas.push({n: i.n, mat: i.mat, meta: i.meta, qtd_pedida: q}); }
         });
 
         if (arrayDeMantas.length > 0) {
-            doc.setFillColor(245, 245, 245);
-            doc.rect(20, finalY, 170, 8, 'F');
-            doc.setFontSize(10);
-            doc.setFont("helvetica", "bold");
-            doc.text(`ESPECIFICACOES DE CORTE (FABRICA DE MANTAS)`, 22, finalY + 5.5);
+            doc.setFillColor(245, 245, 245); doc.rect(20, finalY, 170, 8, 'F');
+            doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text(`ESPECIFICACOES DE CORTE (FABRICA DE MANTAS)`, 22, finalY + 5.5);
             finalY += 12;
 
             arrayDeMantas.forEach(r => {
                 const { dFerro, dAcabado, lRolo } = r.meta;
-                const espBase = (dAcabado - dFerro) / 2;
-                const sobraUsinagem = espBase <= 30 ? 5 : 10;
-                const espFinal = espBase + sobraUsinagem;
+                const espBase = (dAcabado - dFerro) / 2; const sobraUsinagem = espBase <= 30 ? 5 : 10; const espFinal = espBase + sobraUsinagem;
+                let qtdMantas = 1; if (espBase > 30 && espBase <= 49) qtdMantas = 2; else if (espBase >= 50) qtdMantas = 3;
+                const espPorManta = espFinal / qtdMantas; const larguraFolgaCorte = lRolo * 1.10; 
+                const comprimentoManta = ((dFerro + espFinal) * Math.PI) * 1.10; const totalMantas = qtdMantas * r.qtd_pedida;
 
-                let qtdMantas = 1;
-                if (espBase > 30 && espBase <= 49) qtdMantas = 2;
-                else if (espBase >= 50) qtdMantas = 3;
-
-                const espPorManta = espFinal / qtdMantas;
-                const larguraFolgaCorte = lRolo * 1.10; 
-                const comprimentoManta = ((dFerro + espFinal) * Math.PI) * 1.10; 
-                const totalMantas = qtdMantas * r.qtd_pedida;
-
-                doc.setFont("helvetica", "bold");
-                doc.setFontSize(9);
-                doc.text(`Material: ${clean(r.mat)}`, 20, finalY);
-                finalY += 5;
-                doc.setFont("helvetica", "normal");
-                doc.text(`Qtd. de Mantas: ${totalMantas} un.`, 25, finalY);
-                finalY += 5;
-                doc.text(`Espessura Final: ${espPorManta.toFixed(1)} mm`, 25, finalY);
-                finalY += 5;
-                doc.text(`Medida p/ Corte (+10% Folga): Largura ${larguraFolgaCorte.toFixed(1)}mm  x  Comprimento ${comprimentoManta.toFixed(1)}mm`, 25, finalY);
-                finalY += 10;
+                doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text(`Material: ${clean(r.mat)}`, 20, finalY); finalY += 5;
+                doc.setFont("helvetica", "normal"); doc.text(`Qtd. de Mantas: ${totalMantas} un.`, 25, finalY); finalY += 5;
+                doc.text(`Espessura Final: ${espPorManta.toFixed(1)} mm`, 25, finalY); finalY += 5;
+                doc.text(`Medida p/ Corte (+10% Folga): Largura ${larguraFolgaCorte.toFixed(1)}mm  x  Comprimento ${comprimentoManta.toFixed(1)}mm`, 25, finalY); finalY += 10;
             });
         } else {
-            doc.setFontSize(10);
-            doc.text(`Nenhum revestimento de rolo encontrado nesta OS.`, 20, finalY);
-            finalY += 10;
+            doc.setFontSize(10); doc.text(`Nenhum revestimento de rolo encontrado nesta OS.`, 20, finalY); finalY += 10;
         }
 
-        doc.setLineWidth(0.5);
-        doc.line(20, finalY, 190, finalY);
-        finalY += 8;
-
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(230, 126, 34);
-        doc.text(`PESO TOTAL P/ COMPRA (JA C/ 20% APROVEITAMENTO): ${totalPesoCompra.toFixed(3)} KG`, 20, finalY);
-        doc.setTextColor(0,0,0);
+        doc.setLineWidth(0.5); doc.line(20, finalY, 190, finalY); finalY += 8;
+        doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(230, 126, 34);
+        doc.text(`PESO TOTAL P/ COMPRA (JA C/ 20% APROVEITAMENTO): ${totalPesoCompra.toFixed(3)} KG`, 20, finalY); doc.setTextColor(0,0,0);
 
     } else if(tipo === 'PRODUCAO') {
-        doc.text(`VIA PRODUCAO - OS: ${d.os}`, 20, 35);
-        doc.text(`PRAZO ENTREGA: ${clean(d.prazo)}`, 20, 40);
+        doc.text(`VIA PRODUCAO - OS: ${d.os}`, 20, 35); doc.text(`PRAZO ENTREGA: ${clean(d.prazo)}`, 20, 40);
         
-        let totalTempoMin = 0;
-        let totalPesoBase = 0;
-
-        let formatT = (m) => {
-            if (!m) return "N/D";
-            let hh = Math.floor(m / 60);
-            let mm = Math.round(m % 60);
-            return hh > 0 ? `${hh}h ${mm}m` : `${mm}m`;
-        };
-
+        let totalTempoMin = 0; let totalPesoBase = 0;
+        let formatT = (m) => { if (!m) return "N/D"; let hh = Math.floor(m / 60); let mm = Math.round(m % 60); return hh > 0 ? `${hh}h ${mm}m` : `${mm}m`; };
         let arrayDeMantas = [];
 
         doc.autoTable({ 
-            startY: 45, 
-            head: [['ITEM', 'MAT.', 'QTD', 'T. UNIT', 'T. TOTAL', 'PESO UNIT. COBRADO']], 
+            startY: 45, head: [['ITEM', 'MAT.', 'QTD', 'T. UNIT', 'T. TOTAL', 'PESO UNIT. COBRADO']], 
             body: d.itens.map(i => {
-                let q = i.q || 1;
-                let tUnit = i.tempo_min || 0;
-                let tTot = tUnit * q;
-                totalTempoMin += tTot;
-
-                let pBaseUnit = (i.kg_unit || 0);
-                totalPesoBase += (pBaseUnit * q);
-
-                if(i.meta && i.meta.tipo === 'revestimento') {
-                    arrayDeMantas.push({n: i.n, mat: i.mat, meta: i.meta, qtd_pedida: q});
-                }
-
-                return [
-                    clean(i.n), 
-                    clean(i.mat), 
-                    q, 
-                    formatT(tUnit),
-                    formatT(tTot),
-                    pBaseUnit.toFixed(3) + " KG"
-                ];
-            }),
-            theme: 'grid',
-            styles: { fontSize: 8, cellPadding: 2 }
+                let q = i.q || 1; let tUnit = i.tempo_min || 0; let tTot = tUnit * q; totalTempoMin += tTot;
+                let pBaseUnit = (i.kg_unit || 0); totalPesoBase += (pBaseUnit * q);
+                if(i.meta && i.meta.tipo === 'revestimento') { arrayDeMantas.push({n: i.n, mat: i.mat, meta: i.meta, qtd_pedida: q}); }
+                return [clean(i.n), clean(i.mat), q, formatT(tUnit), formatT(tTot), pBaseUnit.toFixed(3) + " KG"];
+            }), theme: 'grid', styles: { fontSize: 8, cellPadding: 2 }
         });
 
         let finalY = doc.lastAutoTable.finalY + 10;
         
         if (arrayDeMantas.length > 0) {
-            doc.setFillColor(245, 245, 245);
-            doc.rect(20, finalY, 170, 8, 'F');
-            doc.setFontSize(10);
-            doc.setFont("helvetica", "bold");
-            doc.text(`CORTE DE MATERIAL (FABRICA) - INSTRUCOES OPERACIONAIS`, 22, finalY + 5.5);
-            
-            finalY += 12;
+            doc.setFillColor(245, 245, 245); doc.rect(20, finalY, 170, 8, 'F');
+            doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text(`CORTE DE MATERIAL (FABRICA) - INSTRUCOES OPERACIONAIS`, 22, finalY + 5.5); finalY += 12;
             
             arrayDeMantas.forEach(r => {
                 const { dFerro, dAcabado, lRolo } = r.meta;
-                const espBase = (dAcabado - dFerro) / 2;
-                const sobraUsinagem = espBase <= 30 ? 5 : 10;
-                const espFinal = espBase + sobraUsinagem;
+                const espBase = (dAcabado - dFerro) / 2; const sobraUsinagem = espBase <= 30 ? 5 : 10; const espFinal = espBase + sobraUsinagem;
+                let qtdMantas = 1; if (espBase > 30 && espBase <= 49) qtdMantas = 2; else if (espBase >= 50) qtdMantas = 3;
+                const espPorManta = espFinal / qtdMantas; const larguraFolgaCorte = lRolo * 1.10; const comprimentoManta = ((dFerro + espFinal) * Math.PI) * 1.10; const totalMantas = qtdMantas * r.qtd_pedida;
 
-                let qtdMantas = 1;
-                if (espBase > 30 && espBase <= 49) qtdMantas = 2;
-                else if (espBase >= 50) qtdMantas = 3;
-
-                const espPorManta = espFinal / qtdMantas;
-                
-                const larguraFolgaCorte = lRolo * 1.10; 
-                const comprimentoManta = ((dFerro + espFinal) * Math.PI) * 1.10; 
-                const totalMantas = qtdMantas * r.qtd_pedida;
-
-                doc.setFont("helvetica", "bold");
-                doc.setFontSize(8);
-                doc.text(`Ref: ${clean(r.n)} (${clean(r.mat)})`, 20, finalY);
-                finalY += 4;
-                doc.setFont("helvetica", "normal");
-                doc.text(`Pedir a Fabrica: ${totalMantas} manta(s) de ${espPorManta.toFixed(1)}mm de espessura.`, 25, finalY);
-                finalY += 4;
-                doc.text(`Medida p/ Corte: Largura ${larguraFolgaCorte.toFixed(1)}mm  x  Comprimento (Perimetro) ${comprimentoManta.toFixed(1)}mm.`, 25, finalY);
-                finalY += 8;
+                doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.text(`Ref: ${clean(r.n)} (${clean(r.mat)})`, 20, finalY); finalY += 4;
+                doc.setFont("helvetica", "normal"); doc.text(`Pedir a Fabrica: ${totalMantas} manta(s) de ${espPorManta.toFixed(1)}mm de espessura.`, 25, finalY); finalY += 4;
+                doc.text(`Medida p/ Corte: Largura ${larguraFolgaCorte.toFixed(1)}mm  x  Comprimento (Perimetro) ${comprimentoManta.toFixed(1)}mm.`, 25, finalY); finalY += 8;
             });
         }
 
-        finalY += 5;
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "bold");
-        doc.text(`RESUMO DA ORDEM DE SERVICO:`, 20, finalY);
-        
-        doc.setFont("helvetica", "normal");
-        doc.text(`TEMPO TOTAL DE MAQUINA: ${formatT(totalTempoMin)}`, 20, finalY + 6);
+        finalY += 5; doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text(`RESUMO DA ORDEM DE SERVICO:`, 20, finalY);
+        doc.setFont("helvetica", "normal"); doc.text(`TEMPO TOTAL DE MAQUINA: ${formatT(totalTempoMin)}`, 20, finalY + 6);
         doc.text(`PESO TOTAL COBRADO (CLIENTE): ${totalPesoBase.toFixed(3)} KG`, 20, finalY + 12);
-        
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(111, 66, 193); 
-        doc.text(`PESO P/ SEPARACAO (+20% SOBRA): ${(totalPesoBase * 1.20).toFixed(3)} KG`, 20, finalY + 18);
-        doc.setTextColor(0,0,0);
+        doc.setFont("helvetica", "bold"); doc.setTextColor(111, 66, 193); doc.text(`PESO P/ SEPARACAO (+20% SOBRA): ${(totalPesoBase * 1.20).toFixed(3)} KG`, 20, finalY + 18); doc.setTextColor(0,0,0);
         
     } else {
-        doc.setFontSize(10);
-        doc.text(`ORCAMENTO - OS: ${d.os} | DATA: ${new Date().toLocaleDateString('pt-BR')}`, 20, 35);
-        doc.text(`CLIENTE: ${clean(d.cliente)}`, 20, 40);
-        doc.text(`CNPJ: ${d.cnpj || ""}`, 20, 45);
+        doc.setFontSize(10); doc.text(`ORCAMENTO - OS: ${d.os} | DATA: ${new Date().toLocaleDateString('pt-BR')}`, 20, 35);
+        doc.text(`CLIENTE: ${clean(d.cliente)}`, 20, 40); doc.text(`CNPJ: ${d.cnpj || ""}`, 20, 45); doc.text(`ENDERECO:`, 20, 50);
         
-        doc.text(`ENDERECO:`, 20, 50);
-        
-        const splitEnd = doc.splitTextToSize(clean(d.endereco), 140);
-        doc.text(splitEnd, 45, 50); 
-        
-        let tableY = 60; 
-        if(splitEnd.length > 1) tableY += (splitEnd.length - 1) * 4;
+        const splitEnd = doc.splitTextToSize(clean(d.endereco), 140); doc.text(splitEnd, 45, 50); 
+        let tableY = 60; if(splitEnd.length > 1) tableY += (splitEnd.length - 1) * 4;
 
         doc.autoTable({ 
-            startY: tableY, 
-            head: [['DESCRICAO', 'MATERIAL', 'QTD', 'V. UNIT', 'V. TOTAL']], 
-            body: d.itens.map(i => [
-                clean(i.n), 
-                clean(i.mat), 
-                i.q, 
-                window.fmtMoney(i.v), 
-                window.fmtMoney(i.v * i.q)
-            ]),
-            
-            theme: 'striped',
-            columnStyles: {
-                0: { cellWidth: 'auto' }, 
-                1: { cellWidth: 30 }, 
-                2: { cellWidth: 15, halign: 'center' }, 
-                3: { cellWidth: 30, halign: 'right' },  
-                4: { cellWidth: 30, halign: 'right' }   
-            },
-            styles: { fontSize: 9, cellPadding: 2 }
+            startY: tableY, head: [['DESCRICAO', 'MATERIAL', 'QTD', 'V. UNIT', 'V. TOTAL']], 
+            body: d.itens.map(i => [clean(i.n), clean(i.mat), i.q, window.fmtMoney(i.v), window.fmtMoney(i.v * i.q)]),
+            theme: 'striped', columnStyles: { 0: { cellWidth: 'auto' }, 1: { cellWidth: 30 }, 2: { cellWidth: 15, halign: 'center' }, 3: { cellWidth: 30, halign: 'right' }, 4: { cellWidth: 30, halign: 'right' } }, styles: { fontSize: 9, cellPadding: 2 }
         });
         
         const fY = doc.lastAutoTable.finalY + 10;
-        doc.setFontSize(12);
-        doc.text(`TOTAL GERAL: ${window.fmtMoney(d.total)}`, 190, fY, {align:'right'});
-        
-        doc.setFontSize(8); 
-        doc.text(`FRETE: ${clean(d.frete)} | PRAZO: ${clean(d.prazo)}`, 20, fY + 5);
-        doc.text(`PAGAMENTO: ${clean(d.pagamento)}`, 20, fY + 10);
+        doc.setFontSize(12); doc.text(`TOTAL GERAL: ${window.fmtMoney(d.total)}`, 190, fY, {align:'right'});
+        doc.setFontSize(8); doc.text(`FRETE: ${clean(d.frete)} | PRAZO: ${clean(d.prazo)}`, 20, fY + 5); doc.text(`PAGAMENTO: ${clean(d.pagamento)}`, 20, fY + 10);
     }
     
     let nomeArq = tipo === 'COMPRA' ? `PEDIDO_COMPRA_OS_${d.os}` : `${tipo}_OS_${d.os}`;
@@ -1271,10 +1123,7 @@
 
   function renderSuprimentos() {
     const necessidade = {};
-    (window.marbeDB.pedidos || []).forEach(p => p.itens.forEach(it => {
-        const mat = it.mat || "Nao identificado"; 
-        necessidade[mat] = (necessidade[mat] || 0) + (it.kg_unit * it.q);
-    }));
+    (window.marbeDB.pedidos || []).forEach(p => p.itens.forEach(it => { const mat = it.mat || "Nao identificado"; necessidade[mat] = (necessidade[mat] || 0) + (it.kg_unit * it.q); }));
     let html = `<table><thead><tr><th>Material</th><th>Preciso</th><th>Estoque</th><th>Saldo</th></tr></thead><tbody>`;
     Object.keys(necessidade).forEach(mat => {
         const prec = necessidade[mat], comp = window.marbeDB.estoque[mat] || 0, saldo = comp - prec;
@@ -1288,11 +1137,8 @@
     let hojeStr = new Date().toISOString().split('T')[0];
     
     (window.marbeDB.pedidos || []).forEach(p => {
-        let ent = p.data_entrada ? p.data_entrada.split('-').reverse().join('/') : "N/D";
-        let lim = p.data_limite ? p.data_limite.split('-').reverse().join('/') : "N/D";
-        
-        let status = "Em Produção";
-        let cor = "color:var(--dark)";
+        let ent = p.data_entrada ? p.data_entrada.split('-').reverse().join('/') : "N/D"; let lim = p.data_limite ? p.data_limite.split('-').reverse().join('/') : "N/D";
+        let status = "Em Produção"; let cor = "color:var(--dark)";
         
         if (p.data_limite) {
             if (p.data_limite < hojeStr) { status = "ATRASADO!"; cor = "color:var(--danger); font-weight:bold;"; }
@@ -1302,49 +1148,27 @@
         
         htmlCron += `<tr>
             <td style="font-size:10px"><b>OS ${p.os}</b><br>${p.cliente.substring(0,15)}</td>
-            <td style="text-align:center">${ent}</td>
-            <td style="text-align:center">${lim}</td>
-            <td style="${cor}; text-align:center">${status}</td>
+            <td style="text-align:center">${ent}</td><td style="text-align:center">${lim}</td><td style="${cor}; text-align:center">${status}</td>
         </tr>`;
     });
-    htmlCron += `</tbody></table>`;
-    document.getElementById('dashboardCronograma').innerHTML = (window.marbeDB.pedidos && window.marbeDB.pedidos.length) ? htmlCron : "<p style='color:#888'>Nenhum pedido ativo no momento.</p>";
+    htmlCron += `</tbody></table>`; document.getElementById('dashboardCronograma').innerHTML = (window.marbeDB.pedidos && window.marbeDB.pedidos.length) ? htmlCron : "<p style='color:#888'>Nenhum pedido ativo no momento.</p>";
 
     let htmlTempos = `<table><thead><tr><th>OS - Cliente</th><th>Item</th><th>Qtd</th><th>Tempo Unit.</th><th>Tempo Total</th></tr></thead><tbody>`;
     let totalGeralMinutos = 0;
 
     (window.marbeDB.pedidos || []).forEach(p => {
         p.itens.forEach(it => {
-            let minUnit = it.tempo_min || 0; 
-            let minTotal = minUnit * it.q;
-            totalGeralMinutos += minTotal;
-
-            let formatTempo = (min) => {
-                if (min === 0) return "N/D";
-                let h = Math.floor(min / 60);
-                let m = Math.round(min % 60);
-                return h > 0 ? `${h}h ${m}m` : `${m}m`;
-            };
-
+            let minUnit = it.tempo_min || 0; let minTotal = minUnit * it.q; totalGeralMinutos += minTotal;
+            let formatTempo = (min) => { if (min === 0) return "N/D"; let h = Math.floor(min / 60); let m = Math.round(min % 60); return h > 0 ? `${h}h ${m}m` : `${m}m`; };
             htmlTempos += `<tr>
                 <td style="font-size:10px"><b>OS ${p.os}</b><br>${p.cliente.substring(0,15)}</td>
-                <td style="font-size:10px">${it.n}</td>
-                <td style="text-align:center">${it.q}</td>
-                <td>${formatTempo(minUnit)}</td>
-                <td style="font-weight:bold; color:var(--primary)">${formatTempo(minTotal)}</td>
+                <td style="font-size:10px">${it.n}</td><td style="text-align:center">${it.q}</td><td>${formatTempo(minUnit)}</td><td style="font-weight:bold; color:var(--primary)">${formatTempo(minTotal)}</td>
             </tr>`;
         });
     });
 
-    let hTot = Math.floor(totalGeralMinutos / 60);
-    let mTot = Math.round(totalGeralMinutos % 60);
-    
-    htmlTempos += `</tbody></table>
-    <div style="margin-top:15px; padding:10px; background:#e8f4f8; border-radius:6px; text-align:right;">
-        <strong>TEMPO TOTAL DE PRODUÇÃO (PEDIDOS ATIVOS):</strong> 
-        <span style="font-size:16px; color:var(--primary)">${hTot}h ${mTot}m</span>
-    </div>`;
-
+    let hTot = Math.floor(totalGeralMinutos / 60); let mTot = Math.round(totalGeralMinutos % 60);
+    htmlTempos += `</tbody></table><div style="margin-top:15px; padding:10px; background:#e8f4f8; border-radius:6px; text-align:right;"><strong>TEMPO TOTAL DE PRODUÇÃO (PEDIDOS ATIVOS):</strong> <span style="font-size:16px; color:var(--primary)">${hTot}h ${mTot}m</span></div>`;
     document.getElementById('dashboardProducao').innerHTML = (window.marbeDB.pedidos && window.marbeDB.pedidos.length) ? htmlTempos : "<p style='color:#888'>Nenhum pedido na fila de produção no momento.</p>";
   }
 
@@ -1354,7 +1178,6 @@
           <div style="display:flex; gap:5px; margin-bottom:5px;">
             <input value="${m.n}" readonly style="flex:2; background:#eee">
             <input value="${window.fmtMoney(m.p)}" readonly style="flex:1; background:#eee">
-            
             <button onclick="editarPrecoMaterial(${i})" style="background:var(--warning); color:black; border:none; padding:5px; border-radius:4px; font-weight:bold; font-size:10px; margin-right:2px;">EDIT</button>
             <button onclick="window.marbeDB.custos.mats.splice(${i},1); window.salvarNuvem(); updateUI();" style="background:red; color:white; border:none; padding:5px; border-radius:4px; font-weight:bold">X</button>
           </div>`).join('');
@@ -1362,39 +1185,23 @@
   }
 
   function editarPrecoMaterial(i) {
-      const m = window.marbeDB.custos.mats[i];
-      const novo = prompt(`Novo preço para ${m.n} (Atual: ${m.p}):`, m.p);
-      if(novo) {
-          const pFloat = parseFloat(novo.replace(',','.'));
-          if(!isNaN(pFloat)) {
-              window.marbeDB.custos.mats[i].p = pFloat;
-              window.salvarNuvem();
-              updateUI();
-          }
-      }
+      const m = window.marbeDB.custos.mats[i]; const novo = prompt(`Novo preço para ${m.n} (Atual: ${m.p}):`, m.p);
+      if(novo) { const pFloat = parseFloat(novo.replace(',','.')); if(!isNaN(pFloat)) { window.marbeDB.custos.mats[i].p = pFloat; window.salvarNuvem(); updateUI(); } }
   }
 
   function addMaterial() {
     const n = document.getElementById('matNome').value, p = parseFloat(document.getElementById('matPreco').value);
-    if(n && p) { 
-        if(!window.marbeDB.custos.mats) window.marbeDB.custos.mats = [];
-        window.marbeDB.custos.mats.push({n, p}); window.salvarNuvem(); 
-        document.getElementById('matNome').value=""; document.getElementById('matPreco').value=""; 
-        updateUI();
-    }
+    if(n && p) { if(!window.marbeDB.custos.mats) window.marbeDB.custos.mats = []; window.marbeDB.custos.mats.push({n, p}); window.salvarNuvem(); document.getElementById('matNome').value=""; document.getElementById('matPreco').value=""; updateUI(); }
   }
 
   function editarExistente(origem, index) {
       const base = window.marbeDB[origem][index]; idEdicao = { origem, index, os: base.os };
-      document.getElementById('cnpj').value = base.cnpj || ""; document.getElementById('razao').value = base.cliente;
-      document.getElementById('endereco').value = base.endereco || ""; document.getElementById('osEdicaoLabel').innerText = base.os;
-      document.getElementById('btnCancelaEdit').style.display = 'block'; itensTemp = JSON.parse(JSON.stringify(base.itens));
-      renderTabelaAtual(); tab('orc');
+      document.getElementById('cnpj').value = base.cnpj || ""; document.getElementById('razao').value = base.cliente; document.getElementById('endereco').value = base.endereco || ""; document.getElementById('osEdicaoLabel').innerText = base.os;
+      document.getElementById('btnCancelaEdit').style.display = 'block'; itensTemp = JSON.parse(JSON.stringify(base.itens)); renderTabelaAtual(); tab('orc');
   }
 
   function cancelarEdicao() {
-      idEdicao = null; itensTemp = []; document.getElementById('btnCancelaEdit').style.display = 'none';
-      document.getElementById('osEdicaoLabel').innerText = "Nova"; renderTabelaAtual(); tab('calc');
+      idEdicao = null; itensTemp = []; document.getElementById('btnCancelaEdit').style.display = 'none'; document.getElementById('osEdicaoLabel').innerText = "Nova"; renderTabelaAtual(); tab('calc');
   }
 
   function renderBoletos() {
