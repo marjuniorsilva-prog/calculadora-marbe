@@ -168,7 +168,6 @@
 </div>
 
 <div class="container" id="appContainer">
-  <!-- Abas limpas de inline styles para deixar o CSS brilhar -->
   <div class="tabs">
     <button class="tab-btn active" onclick="tab('calc')">Cálculo</button>
     <button class="tab-btn" onclick="tab('orc')">Orçamento</button>
@@ -455,7 +454,15 @@
   </div>
   
   <div id="producao" class="section">
-    <h3 style="border-bottom:1px solid var(--border); padding-bottom:10px; color:var(--prod);">Cronograma Operacional</h3>
+    <!-- AQUI ESTÃO OS DOIS NOVOS BOTÕES PARA GERAR O PDF DO CRONOGRAMA -->
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:15px;">
+        <h3 style="margin:0; color:var(--prod);">Cronograma Operacional</h3>
+        <div style="display:flex; gap:10px;">
+            <button class="btn" style="background:var(--bg-color); color:var(--dark); border:1px solid var(--border); margin:0; padding:8px 12px; width:auto; font-size:11px;" onclick="gerarPDFCronograma('OPERACIONAL')">🖨️ PDF OPERACIONAL</button>
+            <button class="btn" style="background:var(--primary); color:white; margin:0; padding:8px 12px; width:auto; font-size:11px;" onclick="gerarPDFCronograma('DIRETORIA')">📊 PDF DIRETORIA</button>
+        </div>
+    </div>
+    
     <div id="dashboardCronograma"></div>
 
     <h3 style="margin-top:40px; border-bottom:1px solid var(--border); padding-bottom:10px; color:var(--dark);">Carga de Máquina (Horas Previstas)</h3>
@@ -501,9 +508,6 @@
     </div>
 </div>
 
-<!-- ========================================== -->
-<!-- O JAVASCRIPT ABAIXO FOI MANTIDO 100% INTACTO -->
-<!-- ========================================== -->
 <script>
   let itensTemp = [];
   let idEdicao = null;
@@ -1138,6 +1142,77 @@
     }
     window.marbeDB.pedidos.splice(i, 1); window.salvarNuvem(); tab('financeiro');
   }
+
+  // --- NOVA FUNÇÃO PARA GERAR PDF DO CRONOGRAMA ---
+  function gerarPDFCronograma(tipo) {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      
+      doc.setFontSize(14); 
+      doc.setFont("helvetica", "bold"); 
+      doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 105, 15, {align: "center"});
+      
+      doc.setFontSize(10); 
+      doc.setFont("helvetica", "bold"); 
+      let titulo = tipo === 'DIRETORIA' ? "CRONOGRAMA DE PRODUCAO - VISAO DIRETORIA" : "CRONOGRAMA DE PRODUCAO - VISAO OPERACIONAL";
+      doc.text(titulo, 105, 22, {align: "center"});
+      
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal"); 
+      doc.text(`GERADO EM: ${new Date().toLocaleDateString('pt-BR')} as ${new Date().toLocaleTimeString('pt-BR')}`, 105, 27, {align: "center"});
+      
+      doc.setLineWidth(0.5); 
+      doc.line(15, 30, 195, 30);
+
+      let bodyData = [];
+      let totalDiretoria = 0;
+      let hojeStr = new Date().toISOString().split('T')[0];
+
+      (window.marbeDB.pedidos || []).forEach(p => {
+          let ent = p.data_entrada ? p.data_entrada.split('-').reverse().join('/') : "N/D"; 
+          let lim = p.data_limite ? p.data_limite.split('-').reverse().join('/') : "N/D";
+          let status = "Em Producao";
+          
+          if (p.data_limite) {
+              if (p.data_limite < hojeStr) { status = "ATRASADO"; }
+              else if (p.data_limite === hojeStr) { status = "ENTREGAR HOJE"; }
+              else { status = "No Prazo"; }
+          }
+          
+          let clienteStr = p.cliente ? p.cliente.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().substring(0, 30) : "";
+
+          if (tipo === 'DIRETORIA') {
+              totalDiretoria += (p.total || 0);
+              bodyData.push([`OS ${p.os}`, clienteStr, ent, lim, status, window.fmtMoney(p.total)]);
+          } else {
+              bodyData.push([`OS ${p.os}`, clienteStr, ent, lim, status]);
+          }
+      });
+
+      let headData = tipo === 'DIRETORIA' 
+          ? [['OS', 'CLIENTE', 'ENTRADA', 'PRAZO', 'STATUS', 'VALOR']] 
+          : [['OS', 'CLIENTE', 'ENTRADA', 'PRAZO', 'STATUS']];
+
+      doc.autoTable({
+          startY: 35,
+          head: headData,
+          body: bodyData,
+          theme: 'striped',
+          styles: { fontSize: 8, cellPadding: 3 },
+          headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
+          columnStyles: tipo === 'DIRETORIA' ? { 5: { halign: 'right' } } : {}
+      });
+
+      if (tipo === 'DIRETORIA') {
+          let finalY = doc.lastAutoTable.finalY + 10;
+          doc.setFontSize(12);
+          doc.setFont("helvetica", "bold");
+          doc.text(`TOTAL EM PRODUCAO (CARTEIRA ATIVA): ${window.fmtMoney(totalDiretoria)}`, 195, finalY, {align: 'right'});
+      }
+
+      window.abrirPDFMobile(doc.output('blob'), `CRONOGRAMA_${tipo}_${new Date().getTime()}`);
+  }
+  // ------------------------------------------------
 
   function gerarPDF(tipo, index, base) {
     const { jsPDF } = window.jspdf; const doc = new jsPDF(); const d = window.marbeDB[base][index];
