@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Módulo Financeiro - Projeções</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyATu_V6e1shKRpgBOkX1lw2beyzUEZUCo0",
+      authDomain: "marbeapp-e2db8.firebaseapp.com",
+      projectId: "marbeapp-e2db8",
+      storageBucket: "marbeapp-e2db8.firebasestorage.app",
+      messagingSenderId: "435226749841",
+      appId: "1:435226749841:web:c2b5f5dee676412b228830"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    window.marbeDB = null;
+
+    onValue(ref(db, 'sistema/'), (snapshot) => {
+      const data = snapshot.val();
+      if (data) { 
+          window.marbeDB = data; 
+          renderProjecaoFinanceira();
+          calcularTotais();
+      }
+    });
+
+    window.salvarNuvem = function() { 
+        set(ref(db, 'sistema/'), window.marbeDB)
+            .then(() => { 
+                const btn = document.getElementById('btnSalvarGeral');
+                btn.innerText = "✓ SALVO COM SUCESSO";
+                btn.style.background = "var(--success)";
+                setTimeout(() => {
+                    btn.innerText = "SALVAR ALTERAÇÕES NA NUVEM";
+                    btn.style.background = "var(--primary)";
+                }, 2000);
+            })
+            .catch((error) => { alert("Erro ao salvar: " + error.message); });
+    };
+
+    window.fmtMoney = (v) => {
+        return parseFloat(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+  </script>
+
+  <style>
+    :root { 
+      --primary: #2563eb; 
+      --success: #16a34a; 
+      --warning: #d97706; 
+      --dark: #1e293b; 
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --border: #e2e8f0;
+      --text-main: #334155;
+      --text-muted: #64748b;
+    }
+    
+    body { font-family: 'Inter', sans-serif; background: var(--bg-color); margin: 0; padding: 20px; color: var(--text-main); }
+    
+    .container { max-width: 1000px; margin: auto; }
+    
+    .header { display: flex; justify-content: space-between; align-items: center; background: var(--dark); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .header h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+    
+    .dashboard-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 25px; }
+    .dash-card { background: var(--card-bg); padding: 20px; border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .dash-card h3 { margin: 0 0 10px 0; font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .dash-card .value { font-size: 28px; font-weight: 700; color: var(--dark); }
+    .dash-card.highlight .value { color: var(--primary); }
+    
+    .card-os { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 15px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .card-header { background: #f8fafc; padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .card-body { padding: 20px; }
+    
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; align-items: end; }
+    
+    label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+    input, select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; box-sizing: border-box; font-family: 'Inter', sans-serif; background: #fff; }
+    input:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+    
+    .resumo-fin { margin-top: 15px; padding: 12px; background: #eff6ff; border-radius: 6px; border: 1px dashed var(--primary); font-size: 13px; display: flex; justify-content: space-between; }
+    
+    .btn { padding: 12px 20px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s; text-align: center; display: inline-block; }
+    .btn:hover { filter: brightness(1.1); }
+    .btn-block { display: block; width: 100%; font-size: 16px; padding: 16px; margin-top: 20px; }
+    
+    .badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .badge-alert { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    .badge-ok { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>Módulo de Projeção Financeira (Fábrica)</h1>
+        <a href="index.html" style="color:white; text-decoration:none; font-size:13px; font-weight:600; background:rgba(255,255,255,0.2); padding:8px 15px; border-radius:6px;">Voltar ao ERP</a>
+    </div>
+
+    <div class="dashboard-cards">
+        <div class="dash-card">
+            <h3>Total Produção (OS Ativas)</h3>
+            <div class="value" id="dashTotalGeral">R$ 0,00</div>
+        </div>
+        <div class="dash-card">
+            <h3>Entradas / Sinais Registrados</h3>
+            <div class="value" id="dashTotalEntradas" style="color:var(--success)">R$ 0,00</div>
+        </div>
+        <div class="dash-card highlight">
+            <h3>Saldo Projetado a Receber</h3>
+            <div class="value" id="dashTotalReceber">R$ 0,00</div>
+        </div>
+    </div>
+
+    <div style="margin-bottom: 20px; font-size:14px; color:var(--text-muted);">
+        Abaixo estão todos os pedidos que estão sendo fabricados neste momento. Defina os sinais recebidos e a projeção de faturamento futuro para controle de caixa.
+    </div>
+
+    <div id="listaProjecao">
+        <p style="text-align:center; padding:40px; color:var(--text-muted);">Carregando dados da nuvem...</p>
+    </div>
+
+    <button id="btnSalvarGeral" class="btn btn-block" onclick="window.salvarNuvem()">SALVAR ALTERAÇÕES NA NUVEM</button>
+</div>
+
+<script>
+    function renderProjecaoFinanceira() {
+        if (!window.marbeDB || !window.marbeDB.pedidos) return;
+
+        let html = '';
+        window.marbeDB.pedidos.forEach((p, index) => {
+            // Garante que o objeto de projeção existe na OS
+            if (!p.projecao) {
+                p.projecao = { entrada: 0, condicao: '28dd' };
+            }
+
+            let valorTotal = p.total || 0;
+            let valorEntrada = parseFloat(p.projecao.entrada) || 0;
+            let saldoRestante = valorTotal - valorEntrada;
+
+            let badgeStatus = valorEntrada > 0 ? '<span class="badge badge-ok">Sinal Registrado</span>' : '<span class="badge badge-alert">Pendente de Sinal</span>';
+
+            html += `
+            <div class="card-os">
+                <div class="card-header">
+                    <div>
+                        <strong style="color:var(--dark); font-size:16px;">OS ${p.os} - ${p.cliente.substring(0, 30)}</strong>
+                        <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Valor Total do Pedido: <strong style="color:var(--primary)">${window.fmtMoney(valorTotal)}</strong></div>
+                    </div>
+                    <div>${badgeStatus}</div>
+                </div>
+                <div class="card-body">
+                    <div class="form-grid">
+                        <div>
+                            <label>Valor da Entrada / Sinal (R$)</label>
+                            <input type="number" id="entrada_${index}" value="${valorEntrada}" onchange="atualizarProjecao(${index}, ${valorTotal})">
+                        </div>
+                        <div>
+                            <label>Projeção de Faturamento (Saldo)</label>
+                            <select id="condicao_${index}" onchange="atualizarProjecao(${index}, ${valorTotal})">
+                                <option value="a_vista" ${p.projecao.condicao === 'a_vista' ? 'selected' : ''}>À Vista na Entrega</option>
+                                <option value="7dd" ${p.projecao.condicao === '7dd' ? 'selected' : ''}>Boleto 7 dias</option>
+                                <option value="28dd" ${p.projecao.condicao === '28dd' ? 'selected' : ''}>Boleto 28 dias</option>
+                                <option value="28_56dd" ${p.projecao.condicao === '28_56dd' ? 'selected' : ''}>Boleto 28/56 dias</option>
+                                <option value="30_60_90dd" ${p.projecao.condicao === '30_60_90dd' ? 'selected' : ''}>Boleto 30/60/90 dias</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="resumo-fin">
+                        <span>Saldo a faturar na entrega:</span>
+                        <strong>${window.fmtMoney(saldoRestante)}</strong>
+                    </div>
+                </div>
+            </div>`;
+        });
+
+        document.getElementById('listaProjecao').innerHTML = html || "<p style='text-align:center; color:var(--text-muted);'>Nenhum pedido em produção no momento.</p>";
+    }
+
+    function atualizarProjecao(index, valorTotal) {
+        let novaEntrada = parseFloat(document.getElementById(`entrada_${index}`).value) || 0;
+        let novaCondicao = document.getElementById(`condicao_${index}`).value;
+
+        if (novaEntrada > valorTotal) {
+            alert("O valor da entrada não pode ser maior que o valor total do pedido!");
+            document.getElementById(`entrada_${index}`).value = window.marbeDB.pedidos[index].projecao.entrada;
+            return;
+        }
+
+        window.marbeDB.pedidos[index].projecao.entrada = novaEntrada;
+        window.marbeDB.pedidos[index].projecao.condicao = novaCondicao;
+        
+        renderProjecaoFinanceira();
+        calcularTotais();
+    }
+
+    function calcularTotais() {
+        let tGeral = 0;
+        let tEntradas = 0;
+
+        (window.marbeDB.pedidos || []).forEach(p => {
+            let total = p.total || 0;
+            let entrada = (p.projecao && p.projecao.entrada) ? parseFloat(p.projecao.entrada) : 0;
+            
+            tGeral += total;
+            tEntradas += entrada;
+        });
+
+        let tReceber = tGeral - tEntradas;
+
+        document.getElementById('dashTotalGeral').innerText = window.fmtMoney(tGeral);
+        document.getElementById('dashTotalEntradas').innerText = window.fmtMoney(tEntradas);
+        document.getElementById('dashTotalReceber').innerText = window.fmtMoney(tReceber);
+    }
+</script>
+</body>
+</html>
