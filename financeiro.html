@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Módulo Financeiro Oficial</title>
+  <title>Módulo Financeiro Oficial (Marbe)</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,6 +30,10 @@
       const data = snapshot.val();
       if (data) { 
           window.marbeDB = data; 
+          // Prevenção para garantir que a gaveta de despesas exista
+          if (!window.marbeDB.fin_despesas) window.marbeDB.fin_despesas = [];
+          if (!window.marbeDB.financeiro) window.marbeDB.financeiro = [];
+          if (!window.marbeDB.expedidos) window.marbeDB.expedidos = [];
           updateUI();
       }
     });
@@ -37,15 +41,7 @@
     window.salvarNuvem = function(silencioso = false) { 
         set(ref(db, 'sistema/'), window.marbeDB)
             .then(() => { 
-                if(!silencioso) {
-                    const btn = document.getElementById('btnSalvarGeral');
-                    btn.innerText = "✓ SALVO COM SUCESSO";
-                    btn.style.background = "var(--success)";
-                    setTimeout(() => {
-                        btn.innerText = "SALVAR ALTERAÇÕES NA NUVEM";
-                        btn.style.background = "var(--primary)";
-                    }, 2000);
-                }
+                if(!silencioso) alert("Alterações financeiras salvas na nuvem com sucesso!");
             })
             .catch((error) => { alert("Erro ao salvar: " + error.message); });
     };
@@ -57,26 +53,18 @@
 
   <style>
     :root { 
-      --primary: #2563eb; 
-      --success: #16a34a; 
-      --warning: #d97706; 
-      --dark: #1e293b; 
-      --bg-color: #f1f5f9;
-      --card-bg: #ffffff;
-      --border: #e2e8f0;
-      --text-main: #334155;
-      --text-muted: #64748b;
+      --primary: #2563eb; --success: #16a34a; --warning: #d97706; --danger: #dc2626;
+      --dark: #1e293b; --bg-color: #f1f5f9; --card-bg: #ffffff; --border: #e2e8f0; --text-main: #334155; --text-muted: #64748b;
     }
     
     body { font-family: 'Inter', sans-serif; background: var(--bg-color); margin: 0; padding: 20px; color: var(--text-main); }
-    
     .container { max-width: 1000px; margin: auto; }
     
     .header { display: flex; justify-content: space-between; align-items: center; background: var(--dark); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
     .header h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
     
     .tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; background: #fff; padding: 10px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid var(--border); }
-    .tab-btn { flex: 1; padding: 12px 10px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; font-weight: 600; border-radius: 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s ease; min-width: 120px; }
+    .tab-btn { flex: 1; padding: 12px 10px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; font-weight: 600; border-radius: 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s ease; min-width: 130px; }
     .tab-btn:hover { background: var(--bg-color); color: var(--text-main); }
     .tab-btn.active { background: var(--success) !important; color: white !important; box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.2); }
     
@@ -84,89 +72,133 @@
     .section.active { display: block; animation: fadeIn 0.3s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-    .dashboard-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 25px; }
+    .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
     .dash-card { background: var(--card-bg); padding: 20px; border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     .dash-card h3 { margin: 0 0 10px 0; font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
     .dash-card .value { font-size: 28px; font-weight: 700; color: var(--dark); }
-    .dash-card.highlight .value { color: var(--primary); }
     
-    .card-os { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 15px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    .card-header { background: #f8fafc; padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-    .card-body { padding: 20px; }
-    
-    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; align-items: end; }
+    .card-list { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 15px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-left: 5px solid transparent; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; align-items: end; }
     
     label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
-    input, select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; box-sizing: border-box; font-family: 'Inter', sans-serif; background: #fff; }
+    input, select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; box-sizing: border-box; font-family: 'Inter', sans-serif; background: #fff; transition: all 0.2s; }
     input:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
     
-    .resumo-fin { margin-top: 15px; padding: 12px; background: #eff6ff; border-radius: 6px; border: 1px dashed var(--primary); font-size: 13px; display: flex; justify-content: space-between; }
+    .btn { padding: 12px 20px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s; text-align: center; }
+    .btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
     
-    .btn { padding: 12px 20px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s; text-align: center; display: inline-block; }
-    .btn:hover { filter: brightness(1.1); }
-    .btn-block { display: block; width: 100%; font-size: 16px; padding: 16px; margin-top: 20px; }
-    
-    .badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; display: inline-block; }
     .badge-alert { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
     .badge-ok { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 15px; background: white; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+    table th { background: #f8fafc; border-bottom: 1px solid var(--border); padding: 12px; text-align: left; color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 11px; }
+    table td { padding: 12px; border-bottom: 1px solid var(--border); color: var(--text-main); }
+    table tr:last-child td { border-bottom: none; }
   </style>
 </head>
 <body>
 
 <div class="container">
     <div class="header">
-        <h1>Módulo Financeiro - Caixa Oficial</h1>
+        <h1>Módulo Financeiro - Caixa Oficial e Gestão</h1>
         <a href="index.html" style="color:white; text-decoration:none; font-size:13px; font-weight:600; background:rgba(255,255,255,0.2); padding:8px 15px; border-radius:6px;">Voltar ao ERP Principal</a>
     </div>
 
     <div class="tabs">
-        <button class="tab-btn active" onclick="tab('projecao')">1. Projeção de Caixa</button>
-        <button class="tab-btn" onclick="tab('faturamento')">2. Faturamento (Expedição)</button>
-        <button class="tab-btn" onclick="tab('boletos')">3. Boletos a Receber</button>
+        <button class="tab-btn active" onclick="tab('projecao')">1. Projeção (Fábrica)</button>
+        <button class="tab-btn" onclick="tab('pagar')">2. Contas a Pagar</button>
+        <button class="tab-btn" onclick="tab('faturamento')">3. Expedição (Faturar)</button>
+        <button class="tab-btn" onclick="tab('boletos')">4. A Receber (Boletos)</button>
+        <button class="tab-btn" onclick="tab('relatorios')">5. Relatórios (DRE)</button>
     </div>
 
-    <!-- ABA 1: PROJEÇÃO DE CAIXA -->
+    <!-- 1. PROJEÇÃO (OS NA FÁBRICA) -->
     <div id="projecao" class="section active">
-        <div class="dashboard-cards">
-            <div class="dash-card">
-                <h3>Total em Produção (Fábrica)</h3>
-                <div class="value" id="dashTotalGeral">R$ 0,00</div>
-            </div>
-            <div class="dash-card">
-                <h3>Sinais Registrados</h3>
-                <div class="value" id="dashTotalEntradas" style="color:var(--success)">R$ 0,00</div>
-            </div>
-            <div class="dash-card highlight">
-                <h3>Saldo Projetado a Receber</h3>
-                <div class="value" id="dashTotalReceber">R$ 0,00</div>
-            </div>
-        </div>
-
         <div style="margin-bottom: 20px; font-size:14px; color:var(--text-muted);">
-            Pedidos que ainda estão na fábrica. Defina os sinais recebidos e a projeção de faturamento futuro para prever o caixa.
+            Pedidos que estão em andamento na produção. Configure o Sinal (Entrada) pago antecipadamente.
         </div>
-
-        <div id="listaProjecao">
-            <p style="text-align:center; padding:40px; color:var(--text-muted);">Carregando dados da nuvem...</p>
-        </div>
-
-        <button id="btnSalvarGeral" class="btn btn-block" onclick="window.salvarNuvem()">SALVAR PROJEÇÕES</button>
+        <div id="listaProjecao"></div>
+        <button class="btn" style="width:100%; font-size:16px; margin-top:20px; padding:16px;" onclick="window.salvarNuvem()">SALVAR PROJEÇÕES</button>
     </div>
 
-    <!-- ABA 2: FATURAMENTO E EXPEDIÇÃO -->
+    <!-- 2. CONTAS A PAGAR (CUSTOS, DESPESAS FIXAS, INSUMOS) -->
+    <div id="pagar" class="section">
+        <div class="card-list" style="background:#eff6ff; border-color:var(--info);">
+            <h3 style="margin-top:0; color:var(--info); font-size:16px;">Lançar Nova Despesa (Dívida / Gasto)</h3>
+            <div class="form-grid">
+                <div>
+                    <label>Descrição do Gasto (Ex: Lixa, Aluguel, CPFL)</label>
+                    <input type="text" id="despesaDesc" placeholder="Nome da despesa">
+                </div>
+                <div>
+                    <label>Valor (R$)</label>
+                    <input type="number" id="despesaValor" placeholder="Ex: 150.00">
+                </div>
+                <div>
+                    <label>Vencimento / Data Pagamento</label>
+                    <input type="date" id="despesaData">
+                </div>
+                <div>
+                    <label>Categoria (Plano de Contas)</label>
+                    <select id="despesaCategoria">
+                        <option value="Insumo Produção">Insumo de Produção (Lixas, Discos)</option>
+                        <option value="Despesa Fixa">Despesa Fixa (Aluguel, Prolabore, Internet)</option>
+                        <option value="Despesa Variável">Despesa Variável (Energia, Água, Limpeza, Café)</option>
+                        <option value="Imposto">Impostos</option>
+                    </select>
+                </div>
+            </div>
+            <button class="btn" style="margin-top:15px; width:100%;" onclick="lancarDespesa()">CADASTRAR CONTA A PAGAR</button>
+        </div>
+
+        <h3 style="margin-top:30px; font-size:16px; color:var(--dark);">Contas Abertas / Vencidas</h3>
+        <div id="listaContasPagar"></div>
+    </div>
+
+    <!-- 3. EXPEDIÇÃO E FATURAMENTO -->
     <div id="faturamento" class="section">
         <div style="margin-bottom: 20px; font-size:14px; color:var(--text-muted);">
-            Estas OS já foram concluídas pela produção e estão prontas para emissão de Nota Fiscal e geração de boletos oficiais.
+            Estas OS já foram concluídas pela fábrica. Emita a Nota Fiscal e gere os boletos para que constem no seu caixa futuro.
         </div>
         <div id="listaExpedidos"></div>
     </div>
 
-    <!-- ABA 3: BOLETOS A RECEBER -->
+    <!-- 4. CONTAS A RECEBER (BOLETOS) -->
     <div id="boletos" class="section">
         <div style="margin-bottom: 20px; font-size:14px; color:var(--text-muted);">
-            Títulos faturados que estão aguardando pagamento do cliente.
+            Boletos e promissórias emitidos que estão aguardando o pagamento do cliente.
         </div>
         <div id="listaBoletos"></div>
+    </div>
+
+    <!-- 5. RELATÓRIOS (FLUXO DE CAIXA / DRE) -->
+    <div id="relatorios" class="section">
+        <div class="card-list" style="border-left-color:var(--dark);">
+            <h3 style="margin-top:0; font-size:16px;">Filtro de Relatório Financeiro (Por Período)</h3>
+            <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+                <div><label>Data Início (Pagamento/Recebimento)</label><input type="date" id="relInicio"></div>
+                <div><label>Data Fim</label><input type="date" id="relFim"></div>
+                <div><label>&nbsp;</label><button class="btn" style="width:100%;" onclick="gerarRelatorio()">GERAR EXTRATO</button></div>
+            </div>
+        </div>
+
+        <div class="dash-grid" id="painelRelatorio" style="display:none; margin-top:20px;">
+            <div class="dash-card">
+                <h3>(+) Receitas (Dinheiro que Entrou)</h3>
+                <div class="value" id="relFaturado" style="color:var(--success)">R$ 0,00</div>
+            </div>
+            <div class="dash-card">
+                <h3>(-) Despesas (Dinheiro que Saiu)</h3>
+                <div class="value" id="relGasto" style="color:var(--danger)">R$ 0,00</div>
+            </div>
+            <div class="dash-card" style="border: 2px solid var(--primary);">
+                <h3>(=) Lucro Líquido Real</h3>
+                <div class="value" id="relLiquido" style="color:var(--primary)">R$ 0,00</div>
+            </div>
+        </div>
+        
+        <div id="listaExtratoDetalhados" style="margin-top:20px;"></div>
     </div>
 
 </div>
@@ -176,120 +208,164 @@
         document.querySelectorAll('.section, .tab-btn').forEach(e => e.classList.remove('active'));
         document.getElementById(id).classList.add('active');
         document.querySelectorAll('.tab-btn').forEach(btn => {
-            if(btn.getAttribute('onclick').includes(`('${id}')`)) { btn.classList.add('active'); }
+            if(btn.getAttribute('onclick').includes(`('${id}')`)) btn.classList.add('active');
         });
         updateUI();
     }
 
     function updateUI() {
         if(!window.marbeDB) return;
-        if(document.getElementById('projecao').classList.contains('active')) { renderProjecaoFinanceira(); calcularTotais(); }
-        if(document.getElementById('faturamento').classList.contains('active')) { renderExpedidos(); }
-        if(document.getElementById('boletos').classList.contains('active')) { renderBoletos(); }
+        if(document.getElementById('projecao').classList.contains('active')) renderProjecaoFinanceira();
+        if(document.getElementById('pagar').classList.contains('active')) renderContasPagar();
+        if(document.getElementById('faturamento').classList.contains('active')) renderExpedidos();
+        if(document.getElementById('boletos').classList.contains('active')) renderBoletos();
     }
 
-    /* --- ABA 1: PROJEÇÕES --- */
+    /* --- ABA 1: PROJEÇÃO --- */
     function renderProjecaoFinanceira() {
         let html = '';
         (window.marbeDB.pedidos || []).forEach((p, index) => {
             if (!p.projecao) { p.projecao = { entrada: 0, condicao: '28dd' }; }
-            let valorTotal = p.total || 0;
             let valorEntrada = parseFloat(p.projecao.entrada) || 0;
-            let saldoRestante = valorTotal - valorEntrada;
+            let saldoRestante = (p.total || 0) - valorEntrada;
             let badgeStatus = valorEntrada > 0 ? '<span class="badge badge-ok">Sinal Registrado</span>' : '<span class="badge badge-alert">Pendente de Sinal</span>';
 
             html += `
-            <div class="card-os">
-                <div class="card-header">
-                    <div>
-                        <strong style="color:var(--dark); font-size:16px;">OS ${p.os} - ${p.cliente.substring(0, 30)}</strong>
-                        <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Valor Total do Pedido: <strong style="color:var(--primary)">${window.fmtMoney(valorTotal)}</strong></div>
-                    </div>
-                    <div>${badgeStatus}</div>
+            <div class="card-list" style="border-left-color:var(--warning);">
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <strong style="color:var(--dark); font-size:16px;">OS ${p.os} - ${p.cliente.substring(0, 30)}</strong>
+                    ${badgeStatus}
                 </div>
-                <div class="card-body">
-                    <div class="form-grid">
-                        <div><label>Valor da Entrada / Sinal (R$)</label><input type="number" id="entrada_${index}" value="${valorEntrada}" onchange="atualizarProjecao(${index}, ${valorTotal})"></div>
-                        <div><label>Projeção de Faturamento (Saldo)</label>
-                            <select id="condicao_${index}" onchange="atualizarProjecao(${index}, ${valorTotal})">
-                                <option value="a_vista" ${p.projecao.condicao === 'a_vista' ? 'selected' : ''}>À Vista na Entrega</option>
-                                <option value="7dd" ${p.projecao.condicao === '7dd' ? 'selected' : ''}>Boleto 7 dias</option>
-                                <option value="28dd" ${p.projecao.condicao === '28dd' ? 'selected' : ''}>Boleto 28 dias</option>
-                                <option value="28_56dd" ${p.projecao.condicao === '28_56dd' ? 'selected' : ''}>Boleto 28/56 dias</option>
-                                <option value="30_60_90dd" ${p.projecao.condicao === '30_60_90dd' ? 'selected' : ''}>Boleto 30/60/90 dias</option>
-                            </select>
-                        </div>
+                <div style="font-size:12px; color:var(--text-muted); margin-bottom:15px;">Valor Total do Pedido: <strong style="color:var(--dark); font-size:14px;">${window.fmtMoney(p.total)}</strong></div>
+                <div class="form-grid">
+                    <div>
+                        <label>Sinal / Entrada Antecipada (R$)</label>
+                        <input type="number" id="entrada_${index}" value="${valorEntrada}" onchange="atualizarProjecao(${index}, ${p.total})">
                     </div>
-                    <div class="resumo-fin"><span>Saldo a faturar na entrega:</span><strong>${window.fmtMoney(saldoRestante)}</strong></div>
+                    <div>
+                        <label>Condição de Pagamento do Saldo</label>
+                        <select id="condicao_${index}" onchange="atualizarProjecao(${index}, ${p.total})">
+                            <option value="a_vista" ${p.projecao.condicao === 'a_vista' ? 'selected' : ''}>À Vista na Entrega</option>
+                            <option value="28dd" ${p.projecao.condicao === '28dd' ? 'selected' : ''}>Boleto 28 dias</option>
+                            <option value="28_56dd" ${p.projecao.condicao === '28_56dd' ? 'selected' : ''}>Boleto 28/56 dias</option>
+                        </select>
+                    </div>
                 </div>
             </div>`;
         });
-        document.getElementById('listaProjecao').innerHTML = html || "<p style='text-align:center; color:var(--text-muted);'>Nenhum pedido em produção no momento.</p>";
+        document.getElementById('listaProjecao').innerHTML = html || "<p style='text-align:center; color:var(--text-muted); padding:30px; background:white; border-radius:8px;'>Nenhum pedido em fase de produção na fábrica.</p>";
     }
-
+    
     function atualizarProjecao(index, valorTotal) {
         let novaEntrada = parseFloat(document.getElementById(`entrada_${index}`).value) || 0;
-        let novaCondicao = document.getElementById(`condicao_${index}`).value;
-        if (novaEntrada > valorTotal) {
-            alert("O valor da entrada não pode ser maior que o valor total do pedido!");
-            document.getElementById(`entrada_${index}`).value = window.marbeDB.pedidos[index].projecao.entrada;
-            return;
+        if (novaEntrada > valorTotal) { 
+            alert("Erro: O valor da entrada não pode ser maior que o valor total do pedido!"); 
+            document.getElementById(`entrada_${index}`).value = window.marbeDB.pedidos[index].projecao.entrada; 
+            return; 
         }
         window.marbeDB.pedidos[index].projecao.entrada = novaEntrada;
-        window.marbeDB.pedidos[index].projecao.condicao = novaCondicao;
-        renderProjecaoFinanceira(); calcularTotais();
+        window.marbeDB.pedidos[index].projecao.condicao = document.getElementById(`condicao_${index}`).value;
+        renderProjecaoFinanceira();
     }
 
-    function calcularTotais() {
-        let tGeral = 0; let tEntradas = 0;
-        (window.marbeDB.pedidos || []).forEach(p => {
-            tGeral += (p.total || 0);
-            tEntradas += ((p.projecao && p.projecao.entrada) ? parseFloat(p.projecao.entrada) : 0);
+    /* --- ABA 2: CONTAS A PAGAR --- */
+    function lancarDespesa() {
+        const desc = document.getElementById('despesaDesc').value;
+        const valor = parseFloat(document.getElementById('despesaValor').value);
+        const venc = document.getElementById('despesaData').value;
+        const categoria = document.getElementById('despesaCategoria').value;
+
+        if(!desc || !valor || !venc) return alert("Por favor, preencha todos os campos obrigatórios: Descrição, Valor e Vencimento!");
+        
+        window.marbeDB.fin_despesas.push({ 
+            id: Date.now(), 
+            desc: desc, 
+            valor: valor, 
+            venc: venc, 
+            categoria: categoria, 
+            pago: false 
         });
-        document.getElementById('dashTotalGeral').innerText = window.fmtMoney(tGeral);
-        document.getElementById('dashTotalEntradas').innerText = window.fmtMoney(tEntradas);
-        document.getElementById('dashTotalReceber').innerText = window.fmtMoney(tGeral - tEntradas);
+        
+        window.salvarNuvem(true);
+        document.getElementById('despesaDesc').value = ""; 
+        document.getElementById('despesaValor').value = "";
+        renderContasPagar();
     }
 
-    /* --- ABA 2: FATURAMENTO E EXPEDIÇÃO --- */
+    function renderContasPagar() {
+        let html = ''; let hojeStr = new Date().toISOString().split('T')[0];
+        (window.marbeDB.fin_despesas || []).forEach((d, i) => {
+            if(!d.pago) {
+                let isAtrasado = d.venc < hojeStr;
+                let dataBr = d.venc.split('-').reverse().join('/');
+                html += `
+                <div class="card-list" style="border-left-color:${isAtrasado ? 'var(--danger)' : 'var(--dark)'};">
+                    <div style="display:flex; justify-content:space-between;">
+                        <strong style="color:var(--dark); font-size:15px;">${d.desc}</strong>
+                        <span class="badge ${isAtrasado ? 'badge-alert' : ''}" style="background:#e2e8f0; color:var(--dark)">${d.categoria}</span>
+                    </div>
+                    <div style="font-size:22px; font-weight:700; margin:10px 0; color:var(--danger)">- ${window.fmtMoney(d.valor)}</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px;">
+                        <span style="font-size:13px; color:${isAtrasado ? 'var(--danger)' : 'var(--text-muted)'}">Vencimento: <b>${dataBr}</b> ${isAtrasado ? '<strong style="color:red">(ATRASADO)</strong>' : ''}</span>
+                        <button class="btn" style="background:var(--dark); padding:10px 15px; font-size:12px;" onclick="pagarDespesa(${i})">MARCAR COMO PAGO</button>
+                    </div>
+                </div>`;
+            }
+        });
+        document.getElementById('listaContasPagar').innerHTML = html || "<p style='text-align:center; color:var(--text-muted); padding:30px; background:white; border-radius:8px;'>Todas as contas estão em dia. Nada a pagar!</p>";
+    }
+
+    function pagarDespesa(i) {
+        if(confirm("Confirmar o pagamento desta despesa?\nO valor será contabilizado no seu Relatório de Fluxos como 'Gasto' e sairá desta tela.")) {
+            window.marbeDB.fin_despesas[i].pago = true;
+            window.marbeDB.fin_despesas[i].dataPagamento = new Date().toISOString().split('T')[0];
+            window.salvarNuvem(true); 
+            renderContasPagar();
+        }
+    }
+
+    /* --- ABA 3: EXPEDIÇÃO E FATURAMENTO --- */
     function renderExpedidos() {
         let html = '';
         (window.marbeDB.expedidos || []).forEach((p, i) => {
             let entradaPrevia = (p.projecao && p.projecao.entrada) ? parseFloat(p.projecao.entrada) : 0;
             let saldoFaturar = (p.total || 0) - entradaPrevia;
-
+            
             html += `
-            <div class="card-os" style="border-left: 5px solid var(--success);">
-                <div class="card-header">
+            <div class="card-list" style="border-left-color:var(--primary);">
+                <strong style="color:var(--dark); font-size:16px;">OS ${p.os} - ${p.cliente}</strong><br>
+                <div style="margin-top:8px; font-size:13px; color:var(--text-muted);">
+                    Total do Pedido: ${window.fmtMoney(p.total)} | Sinal Recebido: <strong style="color:var(--success);">${window.fmtMoney(entradaPrevia)}</strong>
+                </div>
+                <div style="font-size:16px; margin-top:8px; color:var(--primary); font-weight:600;">
+                    SALDO A FATURAR: ${window.fmtMoney(saldoFaturar)}
+                </div>
+                
+                <div class="form-grid" style="margin-top:20px; padding-top:20px; border-top:1px dashed var(--border);">
                     <div>
-                        <strong style="color:var(--dark); font-size:16px;">OS ${p.os} - ${p.cliente}</strong>
-                        <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Valor Total do Pedido: <strong>${window.fmtMoney(p.total)}</strong></div>
+                        <label>Nota Fiscal Emitida Nº</label>
+                        <input type="text" id="nf_${i}" placeholder="Ex: 1250 (Deixe em branco se for promissória)">
+                    </div>
+                    <div>
+                        <label>Parcelas (Qtd de Boletos)</label>
+                        <input type="number" id="parc_${i}" value="1">
+                    </div>
+                    <div>
+                        <label>Data 1º Vencimento</label>
+                        <input type="date" id="data_${i}">
                     </div>
                 </div>
-                <div class="card-body">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:15px; padding-bottom:15px; border-bottom:1px solid var(--border);">
-                        <div><span style="color:var(--text-muted); font-size:12px;">Sinal Recebido:</span><br><strong style="color:var(--success);">${window.fmtMoney(entradaPrevia)}</strong></div>
-                        <div style="text-align:right;"><span style="color:var(--text-muted); font-size:12px;">SALDO A FATURAR AGORA:</span><br><strong style="color:var(--primary); font-size:18px;">${window.fmtMoney(saldoFaturar)}</strong></div>
-                    </div>
-                    
-                    <div class="form-grid" style="align-items: center;">
-                        <div><label>Nº da Nota Fiscal Emitida</label><input type="text" id="nf_${i}" placeholder="Ex: 1250"></div>
-                        <div><label>Qtd Parcelas (Boletos)</label><input type="number" id="parc_${i}" value="1"></div>
-                        <div><label>Data 1º Vencimento</label><input type="date" id="data_${i}"></div>
-                    </div>
-                    
-                    <div style="display:flex; gap:10px; margin-top:20px;">
-                        <button class="btn" style="background:#fee2e2; color:var(--danger); width:auto;" onclick="devolverParaProducao(${i})">↩ Devolver p/ Produção</button>
-                        <button class="btn" style="background:var(--success); flex:1;" onclick="faturar(${i}, ${saldoFaturar})">CONCLUIR E GERAR BOLETOS</button>
-                    </div>
+                <div style="display:flex; gap:10px; margin-top:20px;">
+                    <button class="btn" style="background:#fee2e2; color:var(--danger); width:auto;" onclick="devolverParaProducao(${i})">↩ Devolver p/ Fábrica</button>
+                    <button class="btn" style="background:var(--primary); flex:1;" onclick="faturar(${i}, ${saldoFaturar})">CONCLUIR E GERAR BOLETOS A RECEBER</button>
                 </div>
             </div>`;
         });
-        document.getElementById('listaExpedidos').innerHTML = html || "<p style='text-align:center; color:var(--text-muted);'>Nenhuma OS aguardando faturamento.</p>";
+        document.getElementById('listaExpedidos').innerHTML = html || "<p style='text-align:center; color:var(--text-muted); padding:30px; background:white; border-radius:8px;'>Nenhuma OS aguardando faturamento.</p>";
     }
 
     function devolverParaProducao(i) {
-        if(!confirm("A OS apresentou problema ou faltou peça? Devolver para a tela da fábrica?")) return;
+        if(!confirm("A OS apresentou problema ou faltou peça? Ela voltará para a tela da fábrica.")) return;
         let p = window.marbeDB.expedidos.splice(i, 1)[0];
         if(!window.marbeDB.pedidos) window.marbeDB.pedidos = [];
         window.marbeDB.pedidos.push(p);
@@ -298,60 +374,154 @@
     }
 
     function faturar(i, saldoFaturar) {
-        if(saldoFaturar <= 0) {
-            alert("Aviso: Esta OS já foi paga integralmente na entrada. Ela será apenas arquivada.");
-            window.marbeDB.expedidos.splice(i, 1); window.salvarNuvem(true); updateUI(); return;
+        if(saldoFaturar <= 0) { 
+            alert("Esta OS foi paga integralmente de forma antecipada (Sinal = Total do Pedido). Ela será arquivada sem gerar boletos futuros."); 
+            window.marbeDB.expedidos.splice(i, 1); 
+            window.salvarNuvem(true); 
+            updateUI(); 
+            return; 
         }
-
-        const nf = document.getElementById(`nf_${i}`).value;
-        const qtd = parseInt(document.getElementById(`parc_${i}`).value);
+        
+        const nf = document.getElementById(`nf_${i}`).value || "S/N"; 
+        const qtd = parseInt(document.getElementById(`parc_${i}`).value); 
         const dt = document.getElementById(`data_${i}`).value;
-
-        if(!nf || !qtd || !dt) return alert("Preencha NF, Parcelas e a Data do 1º vencimento!");
-
+        
+        if(!qtd || !dt) return alert("Preencha a quantidade de parcelas e a data do vencimento!");
+        
         const p = window.marbeDB.expedidos[i]; 
-        const dataBase = new Date(dt + "T12:00:00");
+        const dataBase = new Date(dt + "T12:00:00"); 
         const valorPorParcela = saldoFaturar / qtd;
-
+        
         if(!window.marbeDB.financeiro) window.marbeDB.financeiro = [];
-
+        
         for(let j=0; j<qtd; j++) {
-            let v = new Date(dataBase); v.setMonth(v.getMonth() + j);
+            let v = new Date(dataBase); 
+            v.setMonth(v.getMonth() + j);
             window.marbeDB.financeiro.push({ 
-                os: p.os, nf: nf, cliente: p.cliente, 
-                valor: valorPorParcela, venc: v.toLocaleDateString('pt-BR'), 
-                parcela: `${j+1}/${qtd}`, pago: false 
+                id_titulo: Date.now() + j, 
+                os: p.os, 
+                nf: nf, 
+                cliente: p.cliente, 
+                valor: valorPorParcela, 
+                venc: v.toISOString().split('T')[0], 
+                parcela: `${j+1}/${qtd}`, 
+                pago: false 
             });
         }
-
+        
         window.marbeDB.expedidos.splice(i, 1); 
         window.salvarNuvem(true); 
         tab('boletos');
     }
 
-    /* --- ABA 3: BOLETOS --- */
+    /* --- ABA 4: BOLETOS A RECEBER --- */
     function renderBoletos() {
-        let html = '';
+        let html = ''; let hojeStr = new Date().toISOString().split('T')[0];
         (window.marbeDB.financeiro || []).forEach((f, i) => {
-            html += `
-            <div class="card-list" style="border-left-color:var(--info);">
-                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                    <strong style="color:var(--dark); font-size:14px;">${f.cliente}</strong>
-                    <span style="font-size:11px; background:var(--bg-color); padding:4px 8px; border-radius:4px; color:var(--text-muted);">OS: ${f.os} | NF: ${f.nf} | Parc: ${f.parcela || '1/1'}</span>
-                </div>
-                <div style="font-size:16px; font-weight:700; color:var(--dark); margin-bottom:5px;">${window.fmtMoney(f.valor)}</div>
-                <div style="font-size:12px; color:var(--text-muted); margin-bottom:15px;">Vencimento: <strong style="color:var(--primary);">${f.venc}</strong></div>
-                <button class="btn" style="background:var(--success); margin:0;" onclick="darBaixaBoleto(${i})">✅ DAR BAIXA NO BOLETO (RECEBIDO)</button>
-            </div>`;
+            if(!f.pago) {
+                let isAtrasado = f.venc < hojeStr; 
+                let dataBr = f.venc.split('-').reverse().join('/');
+                
+                html += `
+                <div class="card-list" style="border-left-color:${isAtrasado ? 'var(--danger)' : 'var(--success)'};">
+                    <div style="display:flex; justify-content:space-between;">
+                        <strong style="color:var(--dark); font-size:15px;">${f.cliente}</strong>
+                        <span style="font-size:11px; background:var(--bg-color); padding:4px 8px; border-radius:4px; color:var(--text-muted);">OS: <b>${f.os}</b> | NF: <b>${f.nf}</b> | Parc: <b>${f.parcela}</b></span>
+                    </div>
+                    <div style="font-size:22px; font-weight:700; color:var(--success); margin:10px 0;">+ ${window.fmtMoney(f.valor)}</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px;">
+                        <span style="font-size:13px; color:${isAtrasado ? 'var(--danger)' : 'var(--text-muted)'}">Vencimento: <b>${dataBr}</b> ${isAtrasado ? '<strong style="color:red">(ATRASADO)</strong>' : ''}</span>
+                        <button class="btn" style="background:var(--success); padding:10px 15px; font-size:12px;" onclick="darBaixaBoleto(${i})">DINHEIRO RECEBIDO ✅</button>
+                    </div>
+                </div>`;
+            }
         });
-        document.getElementById('listaBoletos').innerHTML = html || "<p style='text-align:center; color:var(--text-muted);'>Nenhum boleto em aberto.</p>";
+        document.getElementById('listaBoletos').innerHTML = html || "<p style='text-align:center; color:var(--text-muted); padding:30px; background:white; border-radius:8px;'>Nenhum boleto pendente de recebimento.</p>";
     }
 
     function darBaixaBoleto(i) {
-        if(!confirm("Confirmar que este dinheiro já entrou na conta bancária?")) return;
-        window.marbeDB.financeiro.splice(i, 1);
-        window.salvarNuvem(true);
-        renderBoletos();
+        if(confirm("Confirmar que este dinheiro já entrou na conta bancária da empresa?")) {
+            window.marbeDB.financeiro[i].pago = true;
+            window.marbeDB.financeiro[i].dataRecebimento = new Date().toISOString().split('T')[0];
+            window.salvarNuvem(true); 
+            renderBoletos();
+        }
+    }
+
+    /* --- ABA 5: RELATÓRIOS (DRE / EXTRATO) --- */
+    function gerarRelatorio() {
+        const dataInicio = document.getElementById('relInicio').value;
+        const dataFim = document.getElementById('relFim').value;
+        
+        if(!dataInicio || !dataFim) return alert("Por favor, selecione as datas de Início e Fim para gerar o relatório.");
+
+        let totalRecebido = 0; 
+        let totalGasto = 0; 
+        let htmlExtrato = `
+            <table style="margin-top:20px;">
+                <thead>
+                    <tr>
+                        <th>Data Realizada</th>
+                        <th>Descrição / Cliente</th>
+                        <th>Tipo / Categoria</th>
+                        <th style="text-align:right;">Valor (R$)</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+        // 1. Vasculhar Recebimentos no período
+        (window.marbeDB.financeiro || []).forEach(f => {
+            if (f.pago && f.dataRecebimento >= dataInicio && f.dataRecebimento <= dataFim) {
+                totalRecebido += f.valor;
+                htmlExtrato += `
+                <tr>
+                    <td>${f.dataRecebimento.split('-').reverse().join('/')}</td>
+                    <td><b>${f.cliente}</b><br><span style="font-size:11px; color:var(--text-muted);">OS: ${f.os} - Parcela ${f.parcela}</span></td>
+                    <td style="color:var(--success); font-weight:600; font-size:11px;">RECEITA (BOLETO)</td>
+                    <td style="text-align:right; color:var(--success); font-weight:700;">+ ${window.fmtMoney(f.valor)}</td>
+                </tr>`;
+            }
+        });
+        
+        // Se quisermos computar também os "Sinais/Entradas" pagos antecipadamente (opcional):
+        (window.marbeDB.orçamentos || []).concat(window.marbeDB.pedidos || [], window.marbeDB.expedidos || []).forEach(os => {
+            if (os.projecao && os.projecao.entrada > 0) {
+                 // Simplificação: Sinais não têm data de pagamento salva nativamente nesta versão,
+                 // assumiríamos o dinheiro já em caixa. Para DRE exato, consideramos o boleto,
+                 // mas podemos listar aqui no futuro.
+            }
+        });
+
+        // 2. Vasculhar Despesas Pagas no período
+        (window.marbeDB.fin_despesas || []).forEach(d => {
+            if (d.pago && d.dataPagamento >= dataInicio && d.dataPagamento <= dataFim) {
+                totalGasto += d.valor;
+                htmlExtrato += `
+                <tr>
+                    <td>${d.dataPagamento.split('-').reverse().join('/')}</td>
+                    <td><b>${d.desc}</b></td>
+                    <td style="color:var(--danger); font-weight:600; font-size:11px;">SAÍDA (${d.categoria.toUpperCase()})</td>
+                    <td style="text-align:right; color:var(--danger); font-weight:700;">- ${window.fmtMoney(d.valor)}</td>
+                </tr>`;
+            }
+        });
+
+        if(totalRecebido === 0 && totalGasto === 0) {
+            htmlExtrato += `<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">Nenhuma movimentação encontrada neste período.</td></tr>`;
+        }
+
+        htmlExtrato += `</tbody></table>`;
+        
+        let resultado = totalRecebido - totalGasto;
+
+        // Atualiza Dashboard Superior
+        document.getElementById('relFaturado').innerText = window.fmtMoney(totalRecebido);
+        document.getElementById('relGasto').innerText = window.fmtMoney(totalGasto);
+        document.getElementById('relLiquido').innerText = window.fmtMoney(resultado);
+        document.getElementById('relLiquido').style.color = resultado >= 0 ? "var(--primary)" : "var(--danger)";
+        
+        document.getElementById('painelRelatorio').style.display = 'grid';
+        document.getElementById('listaExtratoDetalhados').innerHTML = htmlExtrato;
     }
 </script>
 </body>
