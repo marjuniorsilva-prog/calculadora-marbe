@@ -35,15 +35,28 @@
           if (!window.marbeDB.fin_despesas) window.marbeDB.fin_despesas = [];
           if (!window.marbeDB.financeiro) window.marbeDB.financeiro = [];
           if (!window.marbeDB.expedidos) window.marbeDB.expedidos = [];
+          if (!window.marbeDB.cfg_pagamentos) {
+              window.marbeDB.cfg_pagamentos = ["À Vista na Retirada", "7 dias", "15 dias", "7/15 dias", "15/30 dias", "10/20 dias", "28 dias", "28/56 dias"];
+          }
           
           if(!window.filtrosFinIniciados) {
               let hoje = new Date();
               let quinzePraFrente = new Date(); quinzePraFrente.setDate(hoje.getDate() + 15);
               let umAnoAtras = new Date(); umAnoAtras.setFullYear(hoje.getFullYear() - 1);
               
+              const strHoje = hoje.toISOString().split('T')[0];
+              const strFrente = quinzePraFrente.toISOString().split('T')[0];
+              const strAtras = umAnoAtras.toISOString().split('T')[0];
+
               if(document.getElementById('filtroBoletoInicio')) {
-                  document.getElementById('filtroBoletoInicio').value = umAnoAtras.toISOString().split('T')[0];
-                  document.getElementById('filtroBoletoFim').value = quinzePraFrente.toISOString().split('T')[0];
+                  document.getElementById('filtroBoletoInicio').value = strAtras;
+                  document.getElementById('filtroBoletoFim').value = strFrente;
+                  
+                  document.getElementById('filtroPagarInicio').value = strAtras;
+                  document.getElementById('filtroPagarFim').value = strFrente;
+                  
+                  document.getElementById('filtroComissaoInicio').value = strAtras;
+                  document.getElementById('filtroComissaoFim').value = strFrente;
               }
               window.filtrosFinIniciados = true;
           }
@@ -65,14 +78,13 @@
     }
   </script>
 
-  <!-- Bibliotecas PDF adicionadas para o Financeiro -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 
   <style>
     :root { 
       --primary: #2563eb; --success: #16a34a; --warning: #d97706; --danger: #dc2626;
-      --dark: #1e293b; --bg-color: #f1f5f9; --card-bg: #ffffff; --border: #e2e8f0; --text-main: #334155; --text-muted: #64748b; --prod: #7c3aed;
+      --dark: #1e293b; --bg-color: #f1f5f9; --card-bg: #ffffff; --border: #e2e8f0; --text-main: #334155; --text-muted: #64748b; --prod: #7c3aed; --comissao: #ea580c;
     }
     
     body { font-family: 'Inter', sans-serif; background: var(--bg-color); margin: 0; padding: 20px; color: var(--text-main); }
@@ -128,17 +140,21 @@
         <button class="tab-btn active" onclick="tab('projecao')">1. Projeção (Fábrica)</button>
         <button class="tab-btn" onclick="tab('pagar')">2. Contas a Pagar</button>
         <button class="tab-btn" onclick="tab('faturamento')">3. Expedição (Faturar)</button>
-        <button class="tab-btn" onclick="tab('boletos')">4. A Receber (Boletos)</button>
+        <button class="tab-btn" onclick="tab('boletos')">4. A Receber</button>
         <button class="tab-btn" onclick="tab('relatorios')">5. Relatórios (DRE)</button>
+        <button class="tab-btn" onclick="tab('comissoes')" style="background:#fff7ed; color:var(--comissao); border:1px solid #fed7aa;">6. Comissões</button>
     </div>
 
     <!-- 1. PROJEÇÃO (OS NA FÁBRICA) -->
     <div id="projecao" class="section active">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
-            <div style="font-size:14px; color:var(--text-muted);">
-                Defina e Confirme as condições de pagamento (Sinal / Condição) das OSs que estão na produção.
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px; flex-wrap:wrap; gap:10px;">
+            <div style="font-size:14px; color:var(--text-muted); flex:1;">
+                Defina e Confirme as condições de pagamento (Sinal / Prazo / Imposto) das OSs que estão na produção.
             </div>
-            <button class="btn" style="background:var(--info); padding:8px 15px; font-size:12px; margin:0;" onclick="gerarPDFProjecao()">📄 IMPRIMIR PREVISÃO (PDF)</button>
+            <div style="display:flex; gap:10px;">
+                <button class="btn" style="background:var(--prod); padding:8px 15px; font-size:12px; margin:0;" onclick="gerarPDFImpostos()">📄 IMPOSTOS PREVISTOS</button>
+                <button class="btn" style="background:var(--info); padding:8px 15px; font-size:12px; margin:0;" onclick="gerarPDFProjecao()">📄 IMPRIMIR PREVISÃO</button>
+            </div>
         </div>
         <div id="listaProjecao"></div>
     </div>
@@ -173,9 +189,14 @@
             <button class="btn" style="margin-top:15px; width:100%;" onclick="lancarDespesa()">CADASTRAR CONTA A PAGAR</button>
         </div>
 
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:30px; margin-bottom:15px;">
-            <h3 style="margin:0; font-size:16px; color:var(--dark);">Contas Abertas / Vencidas</h3>
-            <button class="btn" style="background:var(--info); padding:8px 15px; font-size:12px; margin:0;" onclick="gerarPDFContasPagar()">📄 IMPRIMIR PENDÊNCIAS</button>
+        <div style="background:var(--bg-color); padding:15px; border-radius:8px; border:1px solid var(--border); margin-bottom:20px; margin-top:30px;">
+            <div style="font-weight:600; font-size:12px; margin-bottom:10px; color:var(--primary)">Filtro de Contas a Pagar</div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <input type="date" id="filtroPagarInicio" style="flex:1; min-width:130px;">
+                <input type="date" id="filtroPagarFim" style="flex:1; min-width:130px;">
+                <button class="btn" style="background:var(--dark); margin:0; width:auto; padding:0 25px;" onclick="renderContasPagar()">FILTRAR CONTAS</button>
+                <button class="btn" style="background:var(--info); margin:0; width:auto; padding:0 15px;" onclick="gerarPDFContasPagar()">📄 IMPRIMIR PENDÊNCIAS</button>
+            </div>
         </div>
         
         <div id="listaContasPagar"></div>
@@ -209,10 +230,18 @@
     <div id="relatorios" class="section">
         <div class="card-list" style="border-left-color:var(--dark);">
             <h3 style="margin-top:0; font-size:16px;">Filtro de Relatório Financeiro (Por Período)</h3>
-            <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;">
-                <div><label>Data Início (Pagamento/Recebimento)</label><input type="date" id="relInicio"></div>
+            <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
+                <div><label>Data Início</label><input type="date" id="relInicio"></div>
                 <div><label>Data Fim</label><input type="date" id="relFim"></div>
-                <div><label>&nbsp;</label><button class="btn" style="width:100%;" onclick="gerarRelatorio()">GERAR EXTRATO</button></div>
+                <div>
+                    <label>Tipo de Lançamento</label>
+                    <select id="relTipo">
+                        <option value="todos">Tudo (Entradas e Saídas)</option>
+                        <option value="entradas">Apenas Receitas (Entradas)</option>
+                        <option value="saidas">Apenas Despesas (Saídas)</option>
+                    </select>
+                </div>
+                <div><label>&nbsp;</label><button class="btn" style="width:100%; background:var(--dark);" onclick="gerarRelatorio()">GERAR DRE</button></div>
             </div>
         </div>
 
@@ -232,10 +261,42 @@
         </div>
         
         <div id="botoesDRE" style="display:none; margin-top:15px;">
-            <button class="btn" style="background:var(--prod); width:100%;" onclick="gerarPDFDRE()">🖨️ IMPRIMIR DRE (PDF)</button>
+            <button class="btn" style="background:var(--prod); width:100%;" onclick="gerarPDFDRE()">🖨️ IMPRIMIR RELATÓRIO FILTRADO (PDF)</button>
         </div>
 
         <div id="listaExtratoDetalhados" style="margin-top:20px;"></div>
+    </div>
+
+    <!-- 6. COMISSÕES -->
+    <div id="comissoes" class="section">
+        <div style="margin-bottom: 20px; font-size:14px; color:var(--text-muted);">
+            Gestão de Comissões. As comissões são geradas automaticamente aqui assim que um cliente paga um boleto ou Sinal (Aba Boletos).<br>
+            Regra do Sistema: 12.5% para PU (25% da metade) e 2% para demais materiais. Você pode editar o valor no momento da baixa.
+        </div>
+        
+        <div style="background:#fff7ed; padding:15px; border-radius:8px; border:1px solid #fed7aa; margin-bottom:20px;">
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                <div style="flex:1;">
+                    <label style="color:var(--comissao)">Status da Comissão</label>
+                    <select id="filtroComissaoStatus">
+                        <option value="pendentes">Abertas / Pendentes de Pagamento</option>
+                        <option value="pagas">Já Pagas (Histórico)</option>
+                    </select>
+                </div>
+                <div style="flex:1;">
+                    <label style="color:var(--comissao)">Data Início</label>
+                    <input type="date" id="filtroComissaoInicio">
+                </div>
+                <div style="flex:1;">
+                    <label style="color:var(--comissao)">Data Fim</label>
+                    <input type="date" id="filtroComissaoFim">
+                </div>
+                <button class="btn" style="background:var(--comissao); margin:0; padding:10px 20px;" onclick="renderComissoes()">FILTRAR</button>
+                <button class="btn" style="background:var(--dark); margin:0; padding:10px 15px;" onclick="gerarPDFComissoes()">📄 IMPRIMIR PDF</button>
+            </div>
+        </div>
+        
+        <div id="listaComissoes"></div>
     </div>
 
 </div>
@@ -256,14 +317,67 @@
         if(document.getElementById('pagar').classList.contains('active')) renderContasPagar();
         if(document.getElementById('faturamento').classList.contains('active')) renderExpedidos();
         if(document.getElementById('boletos').classList.contains('active')) renderBoletos();
+        if(document.getElementById('comissoes').classList.contains('active')) renderComissoes();
     }
+
+    // --- FUNÇÃO AUXILIAR DE COMISSÃO (Usada ao confirmar Sinal ou Baixar Boleto) ---
+    function calcularComissaoBase(osNum, valorRecebidoFinal) {
+        let osData = null;
+        ['pedidos', 'orçamentos', 'expedidos'].forEach(base => {
+            if(window.marbeDB[base]) {
+                let found = window.marbeDB[base].find(o => o.os == osNum);
+                if(found) osData = found;
+            }
+        });
+
+        if(!osData || !osData.total || osData.total === 0) return valorRecebidoFinal * 0.02; // Fallback seguro
+        
+        let proporcaoPaga = valorRecebidoFinal / osData.total;
+        let comissaoTotalPrevista = 0;
+
+        (osData.itens || []).forEach(it => {
+            let matUpper = (it.mat || "").toUpperCase();
+            let isPU = (matUpper.includes('PU') || matUpper.includes('POLIURETANO'));
+            let valItemTotal = (it.v * it.q);
+            
+            if(isPU) {
+                comissaoTotalPrevista += valItemTotal * 0.125; // 25% da metade
+            } else {
+                comissaoTotalPrevista += valItemTotal * 0.02; // 2% normal
+            }
+        });
+
+        return comissaoTotalPrevista * proporcaoPaga;
+    }
+
+    function lancarComissao(osNum, valorRecebidoFinal, clienteNome) {
+        let baseCalc = calcularComissaoBase(osNum, valorRecebidoFinal);
+        
+        let comissaoEditada = prompt(`Dinheiro recebido com sucesso!\n\nA comissão gerada para o Marcelo sobre este recebimento (Baseada na regra PU/Normal) é de:\n${window.fmtMoney(baseCalc)}\n\nVocê pode editar este valor abaixo caso tenha havido negociação de margem:`, baseCalc.toFixed(2));
+        
+        if(comissaoEditada !== null && comissaoEditada !== "") {
+            let vFinal = parseFloat(comissaoEditada.replace(',', '.'));
+            window.marbeDB.fin_despesas.push({ 
+                id: Date.now() + Math.random(), 
+                desc: `Comissão OS ${osNum} - ${clienteNome}`, 
+                valor: vFinal, 
+                venc: new Date().toISOString().split('T')[0], 
+                categoria: "Comissão - Marcelo", 
+                pago: false 
+            });
+            alert("Comissão lançada na aba 'Comissões' (como Conta a Pagar) com sucesso!");
+        }
+    }
+
 
     /* --- ABA 1: PROJEÇÃO --- */
     function renderProjecaoFinanceira() {
         let html = '';
+        let comboPagamentos = window.marbeDB.cfg_pagamentos.map(c => `<option value="${c}">${c}</option>`).join('');
+        comboPagamentos += `<option value="NOVA_CONDICAO">➕ Cadastrar Nova Forma...</option>`;
+
         (window.marbeDB.pedidos || []).forEach((p, index) => {
-            // Inicializa estrutura de projeção se for um pedido novo
-            if (!p.projecao) { p.projecao = { entrada: 0, condicao: '28dd', confirmado: false, sinal_lancado: false }; }
+            if (!p.projecao) { p.projecao = { entrada: 0, condicao: '28 dias', imposto: '5.20', confirmado: false, sinal_lancado: false }; }
             
             let valorEntrada = parseFloat(p.projecao.entrada) || 0;
             let isConfirmado = p.projecao.confirmado;
@@ -278,18 +392,27 @@
                     <strong style="color:var(--dark); font-size:16px;">OS ${p.os} - ${p.cliente.substring(0, 30)}</strong>
                     ${badgeStatus}
                 </div>
-                <div style="font-size:12px; color:var(--text-muted); margin-bottom:15px;">Valor Total do Pedido: <strong style="color:var(--dark); font-size:14px;">${window.fmtMoney(p.total)}</strong></div>
-                <div class="form-grid">
+                <div style="font-size:12px; color:var(--text-muted); margin-bottom:15px; display:flex; justify-content:space-between;">
+                    <span>Valor Total do Pedido: <strong style="color:var(--dark); font-size:14px;">${window.fmtMoney(p.total)}</strong></span>
+                    <span>Prazo Fábrica (Entrega): <strong style="color:var(--primary);">${p.data_limite ? p.data_limite.split('-').reverse().join('/') : 'N/D'}</strong></span>
+                </div>
+                
+                <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;">
                     <div>
-                        <label>Sinal / Entrada Antecipada (R$)</label>
+                        <label>Sinal / Entrada (R$)</label>
                         <input type="number" id="entrada_${index}" value="${valorEntrada}" ${isConfirmado ? 'disabled style="background:#f1f5f9;"' : ''}>
                     </div>
                     <div>
-                        <label>Condição de Pagamento do Saldo</label>
-                        <select id="condicao_${index}" ${isConfirmado ? 'disabled style="background:#f1f5f9;"' : ''}>
-                            <option value="a_vista" ${p.projecao.condicao === 'a_vista' ? 'selected' : ''}>À Vista na Entrega</option>
-                            <option value="28dd" ${p.projecao.condicao === '28dd' ? 'selected' : ''}>Boleto 28 dias</option>
-                            <option value="28_56dd" ${p.projecao.condicao === '28_56dd' ? 'selected' : ''}>Boleto 28/56 dias</option>
+                        <label>Condição de Pagto (Saldo)</label>
+                        <select id="condicao_${index}" ${isConfirmado ? 'disabled style="background:#f1f5f9;"' : ''} onchange="verificarNovaCondicao(this)">
+                            ${comboPagamentos.replace(`value="${p.projecao.condicao}"`, `value="${p.projecao.condicao}" selected`)}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Tipo Fiscal (Imposto)</label>
+                        <select id="imposto_${index}" ${isConfirmado ? 'disabled style="background:#f1f5f9;"' : ''}>
+                            <option value="5.20" ${p.projecao.imposto === '5.20' ? 'selected' : ''}>Venda (5.20%)</option>
+                            <option value="7.70" ${p.projecao.imposto === '7.70' ? 'selected' : ''}>Serviço (7.70%)</option>
                         </select>
                     </div>
                 </div>
@@ -304,10 +427,24 @@
         document.getElementById('listaProjecao').innerHTML = html || "<p style='text-align:center; color:var(--text-muted); padding:30px; background:white; border-radius:8px;'>Nenhum pedido em fase de produção na fábrica.</p>";
     }
 
+    function verificarNovaCondicao(selectElement) {
+        if(selectElement.value === 'NOVA_CONDICAO') {
+            let novaForma = prompt("Digite o nome da nova forma de pagamento (Ex: 'Boleto 45 dias' ou 'À Vista'):");
+            if(novaForma) {
+                window.marbeDB.cfg_pagamentos.push(novaForma);
+                window.salvarNuvem(true);
+                renderProjecaoFinanceira(); // Recarrega a tela já com a nova opção disponível
+            } else {
+                renderProjecaoFinanceira(); // Reseta o select
+            }
+        }
+    }
+
     function confirmarProjecao(index, valorTotal) {
         let p = window.marbeDB.pedidos[index];
         let novaEntrada = parseFloat(document.getElementById(`entrada_${index}`).value) || 0;
         let condicao = document.getElementById(`condicao_${index}`).value;
+        let imposto = document.getElementById(`imposto_${index}`).value;
 
         if (novaEntrada > valorTotal) { 
             return alert("Erro: O valor da entrada não pode ser maior que o valor total do pedido!"); 
@@ -315,11 +452,11 @@
 
         p.projecao.entrada = novaEntrada;
         p.projecao.condicao = condicao;
+        p.projecao.imposto = imposto;
         p.projecao.confirmado = true;
 
-        // Automação para laçar o sinal imediatamente na aba Boletos
         if (novaEntrada > 0 && !p.projecao.sinal_lancado) {
-            if(confirm(`O pedido possui um SINAL de ${window.fmtMoney(novaEntrada)}.\nDeseja lançar este valor agora na aba "A Receber (Boletos)"?`)) {
+            if(confirm(`O pedido possui um SINAL de ${window.fmtMoney(novaEntrada)}.\nDeseja lançar este valor agora na aba "A Receber (Boletos)" para dar baixa?`)) {
                 if(!window.marbeDB.financeiro) window.marbeDB.financeiro = [];
                 window.marbeDB.financeiro.push({ 
                     id_titulo: Date.now(), 
@@ -327,7 +464,7 @@
                     nf: "SINAL / ANTECIPADO", 
                     cliente: p.cliente, 
                     valor: novaEntrada, 
-                    venc: new Date().toISOString().split('T')[0], // Sugere recebimento/vencimento pra hoje
+                    venc: new Date().toISOString().split('T')[0], 
                     parcela: "Sinal", 
                     pago: false 
                 });
@@ -346,51 +483,106 @@
         renderProjecaoFinanceira();
     }
 
+    function extrairDiasDaCondicao(condicaoTexto) {
+        let matches = condicaoTexto.match(/\d+/g);
+        if(!matches) return [0]; // Se não tem número, assume entrega (Ex: À vista na retirada)
+        return matches.map(Number);
+    }
+
     function gerarPDFProjecao() {
         if(!window.jspdf) return alert("Aguarde a biblioteca PDF carregar.");
         const { jsPDF } = window.jspdf; const doc = new jsPDF();
         
         doc.setFontSize(14); doc.setFont("helvetica", "bold"); 
-        doc.text("PREVISÃO DE FATURAMENTO - FÁBRICA", 105, 15, {align: "center"});
+        doc.text("PREVISÃO DE FLUXO / FATURAMENTO (FÁBRICA)", 105, 15, {align: "center"});
         doc.setFontSize(10); doc.setFont("helvetica", "normal");
-        doc.text(`GERADO EM: ${new Date().toLocaleDateString('pt-BR')} (Apenas Negociações Confirmadas)`, 105, 22, {align: "center"});
+        doc.text(`Apenas Negociações Confirmadas`, 105, 22, {align: "center"});
         
         let bodyData = []; let totalGeral = 0; let totalSinal = 0; let totalSaldo = 0;
         
         (window.marbeDB.pedidos || []).forEach(p => {
-            // Só imprime o que foi conferido e confirmado pelo financeiro
             if(p.projecao && p.projecao.confirmado) {
                 let sinal = parseFloat(p.projecao.entrada) || 0;
                 let saldo = (p.total || 0) - sinal;
                 totalGeral += (p.total || 0); totalSinal += sinal; totalSaldo += saldo;
                 
+                // Cálculo de Datas Reais Especuladas
+                let dtEntregaBase = p.data_limite ? new Date(p.data_limite + "T12:00:00") : new Date();
+                let diasArray = extrairDiasDaCondicao(p.projecao.condicao);
+                let vencimentosPrevistos = diasArray.map(dias => {
+                    let calcDt = new Date(dtEntregaBase);
+                    calcDt.setDate(calcDt.getDate() + dias);
+                    return calcDt.toLocaleDateString('pt-BR');
+                }).join(' e ');
+
                 bodyData.push([
-                    `OS ${p.os}`, 
-                    p.cliente.substring(0, 25), 
-                    window.fmtMoney(p.total || 0), 
+                    `OS ${p.os}\n${p.cliente.substring(0, 20)}`, 
+                    p.projecao.condicao,
+                    vencimentosPrevistos,
                     window.fmtMoney(sinal), 
                     window.fmtMoney(saldo)
                 ]);
             }
         });
         
-        if(bodyData.length === 0) return alert("Não há pedidos com negociação CONFIRMADA para imprimir. Confirme os lançamentos primeiro.");
+        if(bodyData.length === 0) return alert("Não há pedidos com negociação CONFIRMADA para imprimir.");
         
         doc.autoTable({ 
             startY: 30, 
-            head: [['OS', 'CLIENTE', 'VALOR TOTAL', 'SINAL RECEBIDO', 'SALDO A FATURAR']], 
+            head: [['OS / CLIENTE', 'CONDIÇÃO', 'VENCIMENTOS (CALCULADOS)', 'SINAL (R$)', 'SALDO A FATURAR']], 
             body: bodyData, 
-            theme: 'striped', 
+            theme: 'grid', 
             headStyles: { fillColor: [37, 99, 235] },
-            columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } }
+            columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } }
         });
         
         let finalY = doc.lastAutoTable.finalY + 10;
         doc.setFontSize(11); doc.setFont("helvetica", "bold");
         doc.text(`TOTAL EM PEDIDOS CONFIRMADOS: ${window.fmtMoney(totalGeral)}`, 20, finalY);
-        doc.text(`SINAIS LANÇADOS (ANTECIPADOS): ${window.fmtMoney(totalSinal)}`, 20, finalY + 6);
-        doc.setTextColor(22, 163, 74); // Verde
-        doc.text(`SALDO FUTURO A FATURAR: ${window.fmtMoney(totalSaldo)}`, 20, finalY + 14);
+        doc.text(`SINAIS LANÇADOS/CAIXA REAL: ${window.fmtMoney(totalSinal)}`, 20, finalY + 6);
+        doc.setTextColor(22, 163, 74);
+        doc.text(`PREVISÃO DE BOLETOS FUTUROS: ${window.fmtMoney(totalSaldo)}`, 20, finalY + 14);
+        
+        window.open(URL.createObjectURL(doc.output('blob')), '_blank');
+    }
+
+    function gerarPDFImpostos() {
+        if(!window.jspdf) return alert("Aguarde a biblioteca PDF carregar.");
+        const { jsPDF } = window.jspdf; const doc = new jsPDF();
+        
+        doc.setFontSize(14); doc.setFont("helvetica", "bold"); 
+        doc.text("PREVISÃO TRIBUTÁRIA - MÊS / FÁBRICA", 105, 15, {align: "center"});
+        
+        let bodyData = []; let totalImposto = 0; let baseTotal = 0;
+        
+        (window.marbeDB.pedidos || []).forEach(p => {
+            if(p.projecao && p.projecao.confirmado) {
+                let taxa = parseFloat(p.projecao.imposto) || 0;
+                let valorImposto = (p.total || 0) * (taxa / 100);
+                
+                baseTotal += (p.total || 0); totalImposto += valorImposto;
+                
+                let tipoNome = taxa === 5.20 ? "Venda (5.2%)" : "Serviço (7.7%)";
+                bodyData.push([`OS ${p.os}`, p.cliente.substring(0, 30), window.fmtMoney(p.total), tipoNome, window.fmtMoney(valorImposto)]);
+            }
+        });
+        
+        if(bodyData.length === 0) return alert("Nenhuma OS confirmada para gerar impostos.");
+        
+        doc.autoTable({ 
+            startY: 25, 
+            head: [['OS', 'CLIENTE', 'BASE CÁLCULO', 'TIPO / ALÍQUOTA', 'IMPOSTO (R$)']], 
+            body: bodyData, 
+            theme: 'striped', 
+            headStyles: { fillColor: [124, 58, 237] }, // Roxo
+            columnStyles: { 2: { halign: 'right' }, 4: { halign: 'right' } }
+        });
+        
+        let finalY = doc.lastAutoTable.finalY + 10;
+        doc.setFontSize(12); doc.setFont("helvetica", "bold");
+        doc.text(`BASE DE CÁLCULO TOTAL: ${window.fmtMoney(baseTotal)}`, 20, finalY);
+        doc.setTextColor(220, 38, 38);
+        doc.text(`CARGA TRIBUTÁRIA PREVISTA: ${window.fmtMoney(totalImposto)}`, 20, finalY + 8);
         
         window.open(URL.createObjectURL(doc.output('blob')), '_blank');
     }
@@ -402,7 +594,7 @@
         const venc = document.getElementById('despesaData').value;
         const categoria = document.getElementById('despesaCategoria').value;
 
-        if(!desc || !valor || !venc) return alert("Por favor, preencha todos os campos obrigatórios: Descrição, Valor e Vencimento!");
+        if(!desc || !valor || !venc) return alert("Por favor, preencha todos os campos obrigatórios!");
         
         window.marbeDB.fin_despesas.push({ 
             id: Date.now(), 
@@ -420,33 +612,42 @@
     }
 
     function renderContasPagar() {
+        let dtIni = document.getElementById('filtroPagarInicio').value;
+        let dtFim = document.getElementById('filtroPagarFim').value;
         let html = ''; let hojeStr = new Date().toISOString().split('T')[0];
         
         let despesasOrdenadas = (window.marbeDB.fin_despesas || []).map((d, index) => ({...d, indexOriginal: index}));
         despesasOrdenadas.sort((a,b) => a.venc.localeCompare(b.venc));
 
         despesasOrdenadas.forEach((d) => {
-            if(!d.pago) {
-                let isAtrasado = d.venc < hojeStr;
-                let dataBr = d.venc.split('-').reverse().join('/');
-                html += `
-                <div class="card-list" style="border-left-color:${isAtrasado ? 'var(--danger)' : 'var(--dark)'};">
-                    <div style="display:flex; justify-content:space-between;">
-                        <strong style="color:var(--dark); font-size:15px;">${d.desc}</strong>
-                        <span class="badge ${isAtrasado ? 'badge-alert' : ''}" style="background:#e2e8f0; color:var(--dark)">${d.categoria}</span>
-                    </div>
-                    <div style="font-size:22px; font-weight:700; margin:10px 0; color:var(--danger)">- ${window.fmtMoney(d.valor)}</div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px; flex-wrap:wrap; gap:10px;">
-                        <span style="font-size:13px; color:${isAtrasado ? 'var(--danger)' : 'var(--text-muted)'}">Venc: <b>${dataBr}</b> ${isAtrasado ? '<strong style="color:red">(ATRASADO)</strong>' : ''}</span>
-                        <div style="display:flex; gap:10px;">
-                            <button class="btn" style="background:#e2e8f0; color:var(--dark); padding:8px 12px; font-size:12px; margin:0;" onclick="editarDespesa(${d.indexOriginal})">✏️ EDITAR</button>
-                            <button class="btn" style="background:var(--dark); padding:8px 15px; font-size:12px; margin:0;" onclick="pagarDespesa(${d.indexOriginal})">MARCAR COMO PAGO</button>
+            // Pula comissões aqui, elas têm aba própria
+            if(!d.pago && d.categoria !== "Comissão - Marcelo") {
+                let exibir = false;
+                if (!dtIni || !dtFim) { exibir = true; } 
+                else if (d.venc >= dtIni && d.venc <= dtFim) { exibir = true; }
+
+                if (exibir) {
+                    let isAtrasado = d.venc < hojeStr;
+                    let dataBr = d.venc.split('-').reverse().join('/');
+                    html += `
+                    <div class="card-list" style="border-left-color:${isAtrasado ? 'var(--danger)' : 'var(--dark)'};">
+                        <div style="display:flex; justify-content:space-between;">
+                            <strong style="color:var(--dark); font-size:15px;">${d.desc}</strong>
+                            <span class="badge ${isAtrasado ? 'badge-alert' : ''}" style="background:#e2e8f0; color:var(--dark)">${d.categoria}</span>
                         </div>
-                    </div>
-                </div>`;
+                        <div style="font-size:22px; font-weight:700; margin:10px 0; color:var(--danger)">- ${window.fmtMoney(d.valor)}</div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px; flex-wrap:wrap; gap:10px;">
+                            <span style="font-size:13px; color:${isAtrasado ? 'var(--danger)' : 'var(--text-muted)'}">Venc: <b>${dataBr}</b> ${isAtrasado ? '<strong style="color:red">(ATRASADO)</strong>' : ''}</span>
+                            <div style="display:flex; gap:10px;">
+                                <button class="btn" style="background:#e2e8f0; color:var(--dark); padding:8px 12px; font-size:12px; margin:0;" onclick="editarDespesa(${d.indexOriginal})">✏️ EDITAR</button>
+                                <button class="btn" style="background:var(--dark); padding:8px 15px; font-size:12px; margin:0;" onclick="pagarDespesa(${d.indexOriginal})">MARCAR COMO PAGO</button>
+                            </div>
+                        </div>
+                    </div>`;
+                }
             }
         });
-        document.getElementById('listaContasPagar').innerHTML = html || "<p style='text-align:center; color:var(--text-muted); padding:30px; background:white; border-radius:8px;'>Todas as contas estão em dia. Nada a pagar!</p>";
+        document.getElementById('listaContasPagar').innerHTML = html || "<p style='text-align:center; color:var(--text-muted); padding:30px; background:white; border-radius:8px;'>Nenhuma conta a pagar neste período.</p>";
     }
 
     function editarDespesa(i) {
@@ -458,7 +659,6 @@
         
         window.marbeDB.fin_despesas.splice(i, 1);
         window.scrollTo({ top: 0, behavior: 'smooth' });
-        alert("Modifique os valores no formulário acima e clique em 'CADASTRAR' para salvar a correção.");
     }
 
     function pagarDespesa(i) {
@@ -483,7 +683,7 @@
                     categoria: desp.categoria, 
                     pago: false 
                 });
-                alert("Previsão do próximo mês gerada com sucesso! Você poderá editar o valor na lista quando a nova conta chegar.");
+                alert("Previsão gerada com sucesso!");
             }
         }
         
@@ -492,25 +692,30 @@
     }
 
     function gerarPDFContasPagar() {
+        let dtIni = document.getElementById('filtroPagarInicio').value;
+        let dtFim = document.getElementById('filtroPagarFim').value;
+        
         if(!window.jspdf) return alert("Aguarde a biblioteca PDF carregar completamente.");
         const { jsPDF } = window.jspdf; const doc = new jsPDF();
         
         doc.setFontSize(14); doc.setFont("helvetica", "bold"); 
         doc.text("RELATÓRIO DE PENDÊNCIAS - CONTAS A PAGAR", 105, 15, {align: "center"});
         doc.setFontSize(10); doc.setFont("helvetica", "normal");
-        doc.text(`GERADO EM: ${new Date().toLocaleDateString('pt-BR')}`, 105, 22, {align: "center"});
+        doc.text(`FILTRO: ${dtIni.split('-').reverse().join('/')} até ${dtFim.split('-').reverse().join('/')}`, 105, 22, {align: "center"});
         
         let bodyData = []; let totalPendente = 0;
-        let despesasPDF = (window.marbeDB.fin_despesas || []).filter(d => !d.pago);
+        let despesasPDF = (window.marbeDB.fin_despesas || []).filter(d => !d.pago && d.categoria !== "Comissão - Marcelo");
         despesasPDF.sort((a,b) => a.venc.localeCompare(b.venc));
 
         despesasPDF.forEach(d => {
-            totalPendente += d.valor;
-            let dtBr = d.venc.split('-').reverse().join('/');
-            bodyData.push([d.desc, d.categoria, dtBr, window.fmtMoney(d.valor)]);
+            if (!dtIni || !dtFim || (d.venc >= dtIni && d.venc <= dtFim)) {
+                totalPendente += d.valor;
+                let dtBr = d.venc.split('-').reverse().join('/');
+                bodyData.push([d.desc, d.categoria, dtBr, window.fmtMoney(d.valor)]);
+            }
         });
         
-        if(bodyData.length === 0) return alert("Não há contas pendentes para imprimir.");
+        if(bodyData.length === 0) return alert("Não há contas no filtro atual.");
 
         doc.autoTable({
             startY: 30,
@@ -523,7 +728,7 @@
         
         let finalY = doc.lastAutoTable.finalY + 10;
         doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(220, 38, 38);
-        doc.text(`TOTAL PENDENTE A PAGAR: ${window.fmtMoney(totalPendente)}`, 195, finalY, {align: 'right'});
+        doc.text(`TOTAL PENDENTE NO PERÍODO: ${window.fmtMoney(totalPendente)}`, 195, finalY, {align: 'right'});
         window.open(URL.createObjectURL(doc.output('blob')), '_blank');
     }
 
@@ -560,7 +765,7 @@
                 </div>
                 <div style="display:flex; gap:10px; margin-top:20px;">
                     <button class="btn" style="background:#fee2e2; color:var(--danger); width:auto;" onclick="devolverParaProducao(${i})">↩ Devolver p/ Fábrica</button>
-                    <button class="btn" style="background:var(--primary); flex:1;" onclick="faturar(${i}, ${saldoFaturar})">CONCLUIR E GERAR BOLETOS A RECEBER</button>
+                    <button class="btn" style="background:var(--primary); flex:1;" onclick="faturar(${i}, ${saldoFaturar})">CONCLUIR E GERAR BOLETOS</button>
                 </div>
             </div>`;
         });
@@ -578,7 +783,7 @@
 
     function faturar(i, saldoFaturar) {
         if(saldoFaturar <= 0) { 
-            alert("Esta OS foi paga integralmente de forma antecipada (Sinal = Total do Pedido). Ela será arquivada sem gerar boletos futuros."); 
+            alert("Esta OS foi paga integralmente de forma antecipada. Ela será arquivada."); 
             window.marbeDB.expedidos.splice(i, 1); 
             window.salvarNuvem(true); 
             updateUI(); 
@@ -687,7 +892,6 @@
         let dataDigitada = prompt(`Data em que o dinheiro entrou na conta para ${f.cliente} (OS ${f.os}) [AAAA-MM-DD]:`, hojeStr);
         if(!dataDigitada) return;
 
-        // Permite aplicar juros ou conceder desconto na hora do pagamento
         let ajusteStr = prompt(`O valor original do boleto é ${window.fmtMoney(f.valor)}.\nHouve Juros ou Desconto?\n\n- Digite um valor POSITIVO para Juros (Ex: 15.50)\n- Digite um valor NEGATIVO para Desconto (Ex: -10.00)\n- Deixe 0 se o cliente pagou o valor exato.`, "0");
         if(ajusteStr === null) return;
 
@@ -697,7 +901,11 @@
         if(confirm(`Confirmar o recebimento de ${window.fmtMoney(valorFinal)} na data ${dataDigitada.split('-').reverse().join('/')}?`)) {
             window.marbeDB.financeiro[i].pago = true;
             window.marbeDB.financeiro[i].dataRecebimento = dataDigitada;
-            window.marbeDB.financeiro[i].valor = valorFinal; // Atualiza para o valor real pago pro DRE ficar exato
+            window.marbeDB.financeiro[i].valor = valorFinal; // DRE exato
+            
+            // CHAMA A FUNÇÃO DE COMISSÃO
+            lancarComissao(f.os, valorFinal, f.cliente);
+            
             window.salvarNuvem(true); 
             renderBoletos();
         }
@@ -732,7 +940,6 @@
         
         if(bodyData.length === 0) return alert("Nenhum boleto encontrado no filtro atual para imprimir.");
         
-        // Ordenar por data
         bodyData.sort((a,b) => {
             let dA = a[0].split('/').reverse().join('');
             let dB = b[0].split('/').reverse().join('');
@@ -759,6 +966,7 @@
     function gerarRelatorio() {
         const dataInicio = document.getElementById('relInicio').value;
         const dataFim = document.getElementById('relFim').value;
+        const tipoDRE = document.getElementById('relTipo').value; // 'todos', 'entradas', 'saidas'
         
         if(!dataInicio || !dataFim) return alert("Por favor, selecione as datas de Início e Fim para gerar o relatório.");
 
@@ -776,43 +984,44 @@
                 </thead>
                 <tbody>`;
 
-        // 1. Vasculhar Recebimentos no período
-        (window.marbeDB.financeiro || []).forEach(f => {
-            if (f.pago && f.dataRecebimento >= dataInicio && f.dataRecebimento <= dataFim) {
-                totalRecebido += f.valor;
-                htmlExtrato += `
-                <tr>
-                    <td>${f.dataRecebimento.split('-').reverse().join('/')}</td>
-                    <td><b>${f.cliente}</b><br><span style="font-size:11px; color:var(--text-muted);">OS: ${f.os} - Parcela ${f.parcela}</span></td>
-                    <td style="color:var(--success); font-weight:600; font-size:11px;">RECEITA (BOLETO)</td>
-                    <td style="text-align:right; color:var(--success); font-weight:700;">+ ${window.fmtMoney(f.valor)}</td>
-                </tr>`;
-            }
-        });
+        if (tipoDRE === 'todos' || tipoDRE === 'entradas') {
+            (window.marbeDB.financeiro || []).forEach(f => {
+                if (f.pago && f.dataRecebimento >= dataInicio && f.dataRecebimento <= dataFim) {
+                    totalRecebido += f.valor;
+                    htmlExtrato += `
+                    <tr>
+                        <td>${f.dataRecebimento.split('-').reverse().join('/')}</td>
+                        <td><b>${f.cliente}</b><br><span style="font-size:11px; color:var(--text-muted);">OS: ${f.os} - Parcela ${f.parcela}</span></td>
+                        <td style="color:var(--success); font-weight:600; font-size:11px;">RECEITA (BOLETO)</td>
+                        <td style="text-align:right; color:var(--success); font-weight:700;">+ ${window.fmtMoney(f.valor)}</td>
+                    </tr>`;
+                }
+            });
+        }
         
-        // 2. Vasculhar Despesas Pagas no período
-        (window.marbeDB.fin_despesas || []).forEach(d => {
-            if (d.pago && d.dataPagamento >= dataInicio && d.dataPagamento <= dataFim) {
-                totalGasto += d.valor;
-                htmlExtrato += `
-                <tr>
-                    <td>${d.dataPagamento.split('-').reverse().join('/')}</td>
-                    <td><b>${d.desc}</b></td>
-                    <td style="color:var(--danger); font-weight:600; font-size:11px;">SAÍDA (${d.categoria.toUpperCase()})</td>
-                    <td style="text-align:right; color:var(--danger); font-weight:700;">- ${window.fmtMoney(d.valor)}</td>
-                </tr>`;
-            }
-        });
+        if (tipoDRE === 'todos' || tipoDRE === 'saidas') {
+            (window.marbeDB.fin_despesas || []).forEach(d => {
+                if (d.pago && d.dataPagamento >= dataInicio && d.dataPagamento <= dataFim) {
+                    totalGasto += d.valor;
+                    htmlExtrato += `
+                    <tr>
+                        <td>${d.dataPagamento.split('-').reverse().join('/')}</td>
+                        <td><b>${d.desc}</b></td>
+                        <td style="color:var(--danger); font-weight:600; font-size:11px;">SAÍDA (${d.categoria.toUpperCase()})</td>
+                        <td style="text-align:right; color:var(--danger); font-weight:700;">- ${window.fmtMoney(d.valor)}</td>
+                    </tr>`;
+                }
+            });
+        }
 
         if(totalRecebido === 0 && totalGasto === 0) {
-            htmlExtrato += `<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">Nenhuma movimentação encontrada neste período.</td></tr>`;
+            htmlExtrato += `<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">Nenhuma movimentação encontrada neste período/filtro.</td></tr>`;
         }
 
         htmlExtrato += `</tbody></table>`;
         
         let resultado = totalRecebido - totalGasto;
 
-        // Atualiza Dashboard Superior
         document.getElementById('relFaturado').innerText = window.fmtMoney(totalRecebido);
         document.getElementById('relGasto').innerText = window.fmtMoney(totalGasto);
         document.getElementById('relLiquido').innerText = window.fmtMoney(resultado);
@@ -826,31 +1035,38 @@
     function gerarPDFDRE() {
         const dtIni = document.getElementById('relInicio').value;
         const dtFim = document.getElementById('relFim').value;
-        if(!dtIni || !dtFim) return alert("Gere o relatório na tela primeiro.");
+        const tipoDRE = document.getElementById('relTipo').value;
         
+        if(!dtIni || !dtFim) return alert("Gere o relatório na tela primeiro.");
         if(!window.jspdf) return alert("Aguarde a biblioteca PDF carregar.");
         const { jsPDF } = window.jspdf; const doc = new jsPDF();
         
         doc.setFontSize(14); doc.setFont("helvetica", "bold"); 
         doc.text("DEMONSTRATIVO DE RESULTADOS (DRE) E FLUXO", 105, 15, {align: "center"});
         doc.setFontSize(10); doc.setFont("helvetica", "normal");
-        doc.text(`PERÍODO: ${dtIni.split('-').reverse().join('/')} até ${dtFim.split('-').reverse().join('/')}`, 105, 22, {align: "center"});
+        let lblFiltro = tipoDRE === 'entradas' ? 'Somente Receitas' : (tipoDRE === 'saidas' ? 'Somente Despesas' : 'Geral');
+        doc.text(`PERÍODO: ${dtIni.split('-').reverse().join('/')} até ${dtFim.split('-').reverse().join('/')} | Filtro: ${lblFiltro}`, 105, 22, {align: "center"});
         
         let totalRecebido = 0; let totalGasto = 0; let bodyData = [];
-        
         let extratoArray = [];
-        (window.marbeDB.financeiro || []).forEach(f => {
-            if (f.pago && f.dataRecebimento >= dtIni && f.dataRecebimento <= dtFim) {
-                totalRecebido += f.valor;
-                extratoArray.push({ dataIso: f.dataRecebimento, dataBr: f.dataRecebimento.split('-').reverse().join('/'), desc: `${f.cliente.substring(0,25)} (OS ${f.os})`, tipo: 'RECEITA (+)', valor: f.valor });
-            }
-        });
-        (window.marbeDB.fin_despesas || []).forEach(d => {
-            if (d.pago && d.dataPagamento >= dtIni && d.dataPagamento <= dtFim) {
-                totalGasto += d.valor;
-                extratoArray.push({ dataIso: d.dataPagamento, dataBr: d.dataPagamento.split('-').reverse().join('/'), desc: d.desc, tipo: `DESPESA (-)`, valor: d.valor * -1 });
-            }
-        });
+        
+        if (tipoDRE === 'todos' || tipoDRE === 'entradas') {
+            (window.marbeDB.financeiro || []).forEach(f => {
+                if (f.pago && f.dataRecebimento >= dtIni && f.dataRecebimento <= dtFim) {
+                    totalRecebido += f.valor;
+                    extratoArray.push({ dataIso: f.dataRecebimento, dataBr: f.dataRecebimento.split('-').reverse().join('/'), desc: `${f.cliente.substring(0,25)} (OS ${f.os})`, tipo: 'RECEITA (+)', valor: f.valor });
+                }
+            });
+        }
+        
+        if (tipoDRE === 'todos' || tipoDRE === 'saidas') {
+            (window.marbeDB.fin_despesas || []).forEach(d => {
+                if (d.pago && d.dataPagamento >= dtIni && d.dataPagamento <= dtFim) {
+                    totalGasto += d.valor;
+                    extratoArray.push({ dataIso: d.dataPagamento, dataBr: d.dataPagamento.split('-').reverse().join('/'), desc: d.desc, tipo: `DESPESA (-)`, valor: d.valor * -1 });
+                }
+            });
+        }
         
         extratoArray.sort((a,b) => a.dataIso.localeCompare(b.dataIso));
         extratoArray.forEach(item => {
@@ -879,6 +1095,108 @@
         
         window.open(URL.createObjectURL(doc.output('blob')), '_blank');
     }
+
+    /* --- ABA 6: COMISSÕES --- */
+    function renderComissoes() {
+        let statusFilter = document.getElementById('filtroComissaoStatus').value; // pendentes, pagas
+        let dtIni = document.getElementById('filtroComissaoInicio').value;
+        let dtFim = document.getElementById('filtroComissaoFim').value;
+        let html = '';
+        
+        let arrComissoes = (window.marbeDB.fin_despesas || []).map((d, i) => ({...d, indexOriginal: i})).filter(d => d.categoria === "Comissão - Marcelo");
+        
+        arrComissoes.sort((a,b) => a.venc.localeCompare(b.venc));
+
+        arrComissoes.forEach(c => {
+            let matchesStatus = (statusFilter === 'pagas') ? c.pago : !c.pago;
+            let dateToCompare = c.pago ? c.dataPagamento : c.venc;
+            let matchesDate = (!dtIni || !dtFim) || (dateToCompare >= dtIni && dateToCompare <= dtFim);
+
+            if(matchesStatus && matchesDate) {
+                let color = c.pago ? 'var(--success)' : 'var(--comissao)';
+                let lblData = c.pago ? `Paga em: ${c.dataPagamento.split('-').reverse().join('/')}` : `Gerada em (A Pagar): ${c.venc.split('-').reverse().join('/')}`;
+                
+                html += `
+                <div class="card-list" style="border-left-color:${color};">
+                    <div style="display:flex; justify-content:space-between;">
+                        <strong style="color:var(--dark); font-size:15px;">${c.desc}</strong>
+                        <span class="badge" style="background:#ffedd5; color:var(--comissao); border:1px solid #fed7aa;">Comissão</span>
+                    </div>
+                    <div style="font-size:22px; font-weight:700; margin:10px 0; color:${color}">${window.fmtMoney(c.valor)}</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px; flex-wrap:wrap; gap:10px;">
+                        <span style="font-size:13px; color:var(--text-muted)">${lblData}</span>
+                        <div style="display:flex; gap:10px;">
+                            ${!c.pago ? `<button class="btn" style="background:#e2e8f0; color:var(--dark); padding:8px 12px; font-size:12px; margin:0;" onclick="editarDespesa(${c.indexOriginal})">✏️ EDITAR</button>` : ''}
+                            ${!c.pago ? `<button class="btn" style="background:var(--success); padding:8px 15px; font-size:12px; margin:0;" onclick="pagarComissao(${c.indexOriginal})">MARCAR COMO PAGA</button>` : ''}
+                        </div>
+                    </div>
+                </div>`;
+            }
+        });
+
+        document.getElementById('listaComissoes').innerHTML = html || "<p style='text-align:center; color:var(--text-muted); padding:30px; background:white; border-radius:8px;'>Nenhuma comissão encontrada para este filtro.</p>";
+    }
+
+    function pagarComissao(i) {
+        let hojeStr = new Date().toISOString().split('T')[0];
+        let dataDigitada = prompt("Data em que o Marcelo recebeu a comissão (AAAA-MM-DD):", hojeStr);
+        if(!dataDigitada) return; 
+        
+        window.marbeDB.fin_despesas[i].pago = true;
+        window.marbeDB.fin_despesas[i].dataPagamento = dataDigitada;
+        window.salvarNuvem(true); 
+        renderComissoes();
+    }
+
+    function gerarPDFComissoes() {
+        let statusFilter = document.getElementById('filtroComissaoStatus').value; 
+        let dtIni = document.getElementById('filtroComissaoInicio').value;
+        let dtFim = document.getElementById('filtroComissaoFim').value;
+        
+        if(!window.jspdf) return alert("Aguarde a biblioteca PDF carregar.");
+        const { jsPDF } = window.jspdf; const doc = new jsPDF();
+        
+        let statusStr = statusFilter === 'pagas' ? "COMISSÕES JÁ PAGAS" : "COMISSÕES ABERTAS / PENDENTES";
+        
+        doc.setFontSize(14); doc.setFont("helvetica", "bold"); 
+        doc.text(`RELATÓRIO: ${statusStr}`, 105, 15, {align: "center"});
+        doc.setFontSize(10); doc.setFont("helvetica", "normal");
+        doc.text(`PERÍODO: ${dtIni.split('-').reverse().join('/')} até ${dtFim.split('-').reverse().join('/')}`, 105, 22, {align: "center"});
+        
+        let bodyData = []; let total = 0;
+        let arrComissoes = (window.marbeDB.fin_despesas || []).filter(d => d.categoria === "Comissão - Marcelo");
+        
+        arrComissoes.forEach(c => {
+            let matchesStatus = (statusFilter === 'pagas') ? c.pago : !c.pago;
+            let dateToCompare = c.pago ? c.dataPagamento : c.venc;
+            let matchesDate = (!dtIni || !dtFim) || (dateToCompare >= dtIni && dateToCompare <= dtFim);
+
+            if(matchesStatus && matchesDate) {
+                total += c.valor;
+                let dtBr = dateToCompare.split('-').reverse().join('/');
+                bodyData.push([dtBr, c.desc, window.fmtMoney(c.valor)]);
+            }
+        });
+        
+        if(bodyData.length === 0) return alert("Nenhuma comissão no filtro atual para imprimir.");
+
+        doc.autoTable({
+            startY: 30,
+            head: [['DATA', 'REFERÊNCIA DA COMISSÃO', 'VALOR (R$)']],
+            body: bodyData,
+            theme: 'striped',
+            headStyles: { fillColor: [234, 88, 12] }, // Laranja
+            columnStyles: { 2: { halign: 'right' } }
+        });
+        
+        let finalY = doc.lastAutoTable.finalY + 10;
+        doc.setFontSize(12); doc.setFont("helvetica", "bold"); 
+        doc.setTextColor(234, 88, 12);
+        doc.text(`TOTAL EM COMISSÕES NO PERÍODO: ${window.fmtMoney(total)}`, 195, finalY, {align: 'right'});
+        
+        window.open(URL.createObjectURL(doc.output('blob')), '_blank');
+    }
+
 </script>
 </body>
 </html>
