@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Módulo Financeiro - Projeções</title>
+  <title>Módulo Financeiro Oficial</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,21 +30,22 @@
       const data = snapshot.val();
       if (data) { 
           window.marbeDB = data; 
-          renderProjecaoFinanceira();
-          calcularTotais();
+          updateUI();
       }
     });
 
-    window.salvarNuvem = function() { 
+    window.salvarNuvem = function(silencioso = false) { 
         set(ref(db, 'sistema/'), window.marbeDB)
             .then(() => { 
-                const btn = document.getElementById('btnSalvarGeral');
-                btn.innerText = "✓ SALVO COM SUCESSO";
-                btn.style.background = "var(--success)";
-                setTimeout(() => {
-                    btn.innerText = "SALVAR ALTERAÇÕES NA NUVEM";
-                    btn.style.background = "var(--primary)";
-                }, 2000);
+                if(!silencioso) {
+                    const btn = document.getElementById('btnSalvarGeral');
+                    btn.innerText = "✓ SALVO COM SUCESSO";
+                    btn.style.background = "var(--success)";
+                    setTimeout(() => {
+                        btn.innerText = "SALVAR ALTERAÇÕES NA NUVEM";
+                        btn.style.background = "var(--primary)";
+                    }, 2000);
+                }
             })
             .catch((error) => { alert("Erro ao salvar: " + error.message); });
     };
@@ -74,6 +75,15 @@
     .header { display: flex; justify-content: space-between; align-items: center; background: var(--dark); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
     .header h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
     
+    .tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; background: #fff; padding: 10px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid var(--border); }
+    .tab-btn { flex: 1; padding: 12px 10px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; font-weight: 600; border-radius: 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s ease; min-width: 120px; }
+    .tab-btn:hover { background: var(--bg-color); color: var(--text-main); }
+    .tab-btn.active { background: var(--success) !important; color: white !important; box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.2); }
+    
+    .section { display: none; }
+    .section.active { display: block; animation: fadeIn 0.3s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
     .dashboard-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 25px; }
     .dash-card { background: var(--card-bg); padding: 20px; border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     .dash-card h3 { margin: 0 0 10px 0; font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
@@ -105,51 +115,87 @@
 
 <div class="container">
     <div class="header">
-        <h1>Módulo de Projeção Financeira (Fábrica)</h1>
-        <a href="index.html" style="color:white; text-decoration:none; font-size:13px; font-weight:600; background:rgba(255,255,255,0.2); padding:8px 15px; border-radius:6px;">Voltar ao ERP</a>
+        <h1>Módulo Financeiro - Caixa Oficial</h1>
+        <a href="index.html" style="color:white; text-decoration:none; font-size:13px; font-weight:600; background:rgba(255,255,255,0.2); padding:8px 15px; border-radius:6px;">Voltar ao ERP Principal</a>
     </div>
 
-    <div class="dashboard-cards">
-        <div class="dash-card">
-            <h3>Total Produção (OS Ativas)</h3>
-            <div class="value" id="dashTotalGeral">R$ 0,00</div>
+    <div class="tabs">
+        <button class="tab-btn active" onclick="tab('projecao')">1. Projeção de Caixa</button>
+        <button class="tab-btn" onclick="tab('faturamento')">2. Faturamento (Expedição)</button>
+        <button class="tab-btn" onclick="tab('boletos')">3. Boletos a Receber</button>
+    </div>
+
+    <!-- ABA 1: PROJEÇÃO DE CAIXA -->
+    <div id="projecao" class="section active">
+        <div class="dashboard-cards">
+            <div class="dash-card">
+                <h3>Total em Produção (Fábrica)</h3>
+                <div class="value" id="dashTotalGeral">R$ 0,00</div>
+            </div>
+            <div class="dash-card">
+                <h3>Sinais Registrados</h3>
+                <div class="value" id="dashTotalEntradas" style="color:var(--success)">R$ 0,00</div>
+            </div>
+            <div class="dash-card highlight">
+                <h3>Saldo Projetado a Receber</h3>
+                <div class="value" id="dashTotalReceber">R$ 0,00</div>
+            </div>
         </div>
-        <div class="dash-card">
-            <h3>Entradas / Sinais Registrados</h3>
-            <div class="value" id="dashTotalEntradas" style="color:var(--success)">R$ 0,00</div>
+
+        <div style="margin-bottom: 20px; font-size:14px; color:var(--text-muted);">
+            Pedidos que ainda estão na fábrica. Defina os sinais recebidos e a projeção de faturamento futuro para prever o caixa.
         </div>
-        <div class="dash-card highlight">
-            <h3>Saldo Projetado a Receber</h3>
-            <div class="value" id="dashTotalReceber">R$ 0,00</div>
+
+        <div id="listaProjecao">
+            <p style="text-align:center; padding:40px; color:var(--text-muted);">Carregando dados da nuvem...</p>
         </div>
+
+        <button id="btnSalvarGeral" class="btn btn-block" onclick="window.salvarNuvem()">SALVAR PROJEÇÕES</button>
     </div>
 
-    <div style="margin-bottom: 20px; font-size:14px; color:var(--text-muted);">
-        Abaixo estão todos os pedidos que estão sendo fabricados neste momento. Defina os sinais recebidos e a projeção de faturamento futuro para controle de caixa.
+    <!-- ABA 2: FATURAMENTO E EXPEDIÇÃO -->
+    <div id="faturamento" class="section">
+        <div style="margin-bottom: 20px; font-size:14px; color:var(--text-muted);">
+            Estas OS já foram concluídas pela produção e estão prontas para emissão de Nota Fiscal e geração de boletos oficiais.
+        </div>
+        <div id="listaExpedidos"></div>
     </div>
 
-    <div id="listaProjecao">
-        <p style="text-align:center; padding:40px; color:var(--text-muted);">Carregando dados da nuvem...</p>
+    <!-- ABA 3: BOLETOS A RECEBER -->
+    <div id="boletos" class="section">
+        <div style="margin-bottom: 20px; font-size:14px; color:var(--text-muted);">
+            Títulos faturados que estão aguardando pagamento do cliente.
+        </div>
+        <div id="listaBoletos"></div>
     </div>
 
-    <button id="btnSalvarGeral" class="btn btn-block" onclick="window.salvarNuvem()">SALVAR ALTERAÇÕES NA NUVEM</button>
 </div>
 
 <script>
+    function tab(id) {
+        document.querySelectorAll('.section, .tab-btn').forEach(e => e.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            if(btn.getAttribute('onclick').includes(`('${id}')`)) { btn.classList.add('active'); }
+        });
+        updateUI();
+    }
+
+    function updateUI() {
+        if(!window.marbeDB) return;
+        if(document.getElementById('projecao').classList.contains('active')) { renderProjecaoFinanceira(); calcularTotais(); }
+        if(document.getElementById('faturamento').classList.contains('active')) { renderExpedidos(); }
+        if(document.getElementById('boletos').classList.contains('active')) { renderBoletos(); }
+    }
+
+    /* --- ABA 1: PROJEÇÕES --- */
     function renderProjecaoFinanceira() {
-        if (!window.marbeDB || !window.marbeDB.pedidos) return;
-
         let html = '';
-        window.marbeDB.pedidos.forEach((p, index) => {
-            // Garante que o objeto de projeção existe na OS
-            if (!p.projecao) {
-                p.projecao = { entrada: 0, condicao: '28dd' };
-            }
-
+        (window.marbeDB.pedidos || []).forEach((p, index) => {
+            if (!p.projecao) { p.projecao = { entrada: 0, condicao: '28dd' }; }
             let valorTotal = p.total || 0;
             let valorEntrada = parseFloat(p.projecao.entrada) || 0;
             let saldoRestante = valorTotal - valorEntrada;
-
             let badgeStatus = valorEntrada > 0 ? '<span class="badge badge-ok">Sinal Registrado</span>' : '<span class="badge badge-alert">Pendente de Sinal</span>';
 
             html += `
@@ -163,12 +209,8 @@
                 </div>
                 <div class="card-body">
                     <div class="form-grid">
-                        <div>
-                            <label>Valor da Entrada / Sinal (R$)</label>
-                            <input type="number" id="entrada_${index}" value="${valorEntrada}" onchange="atualizarProjecao(${index}, ${valorTotal})">
-                        </div>
-                        <div>
-                            <label>Projeção de Faturamento (Saldo)</label>
+                        <div><label>Valor da Entrada / Sinal (R$)</label><input type="number" id="entrada_${index}" value="${valorEntrada}" onchange="atualizarProjecao(${index}, ${valorTotal})"></div>
+                        <div><label>Projeção de Faturamento (Saldo)</label>
                             <select id="condicao_${index}" onchange="atualizarProjecao(${index}, ${valorTotal})">
                                 <option value="a_vista" ${p.projecao.condicao === 'a_vista' ? 'selected' : ''}>À Vista na Entrega</option>
                                 <option value="7dd" ${p.projecao.condicao === '7dd' ? 'selected' : ''}>Boleto 7 dias</option>
@@ -178,52 +220,138 @@
                             </select>
                         </div>
                     </div>
-                    
-                    <div class="resumo-fin">
-                        <span>Saldo a faturar na entrega:</span>
-                        <strong>${window.fmtMoney(saldoRestante)}</strong>
-                    </div>
+                    <div class="resumo-fin"><span>Saldo a faturar na entrega:</span><strong>${window.fmtMoney(saldoRestante)}</strong></div>
                 </div>
             </div>`;
         });
-
         document.getElementById('listaProjecao').innerHTML = html || "<p style='text-align:center; color:var(--text-muted);'>Nenhum pedido em produção no momento.</p>";
     }
 
     function atualizarProjecao(index, valorTotal) {
         let novaEntrada = parseFloat(document.getElementById(`entrada_${index}`).value) || 0;
         let novaCondicao = document.getElementById(`condicao_${index}`).value;
-
         if (novaEntrada > valorTotal) {
             alert("O valor da entrada não pode ser maior que o valor total do pedido!");
             document.getElementById(`entrada_${index}`).value = window.marbeDB.pedidos[index].projecao.entrada;
             return;
         }
-
         window.marbeDB.pedidos[index].projecao.entrada = novaEntrada;
         window.marbeDB.pedidos[index].projecao.condicao = novaCondicao;
-        
-        renderProjecaoFinanceira();
-        calcularTotais();
+        renderProjecaoFinanceira(); calcularTotais();
     }
 
     function calcularTotais() {
-        let tGeral = 0;
-        let tEntradas = 0;
-
+        let tGeral = 0; let tEntradas = 0;
         (window.marbeDB.pedidos || []).forEach(p => {
-            let total = p.total || 0;
-            let entrada = (p.projecao && p.projecao.entrada) ? parseFloat(p.projecao.entrada) : 0;
-            
-            tGeral += total;
-            tEntradas += entrada;
+            tGeral += (p.total || 0);
+            tEntradas += ((p.projecao && p.projecao.entrada) ? parseFloat(p.projecao.entrada) : 0);
         });
-
-        let tReceber = tGeral - tEntradas;
-
         document.getElementById('dashTotalGeral').innerText = window.fmtMoney(tGeral);
         document.getElementById('dashTotalEntradas').innerText = window.fmtMoney(tEntradas);
-        document.getElementById('dashTotalReceber').innerText = window.fmtMoney(tReceber);
+        document.getElementById('dashTotalReceber').innerText = window.fmtMoney(tGeral - tEntradas);
+    }
+
+    /* --- ABA 2: FATURAMENTO E EXPEDIÇÃO --- */
+    function renderExpedidos() {
+        let html = '';
+        (window.marbeDB.expedidos || []).forEach((p, i) => {
+            let entradaPrevia = (p.projecao && p.projecao.entrada) ? parseFloat(p.projecao.entrada) : 0;
+            let saldoFaturar = (p.total || 0) - entradaPrevia;
+
+            html += `
+            <div class="card-os" style="border-left: 5px solid var(--success);">
+                <div class="card-header">
+                    <div>
+                        <strong style="color:var(--dark); font-size:16px;">OS ${p.os} - ${p.cliente}</strong>
+                        <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Valor Total do Pedido: <strong>${window.fmtMoney(p.total)}</strong></div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:15px; padding-bottom:15px; border-bottom:1px solid var(--border);">
+                        <div><span style="color:var(--text-muted); font-size:12px;">Sinal Recebido:</span><br><strong style="color:var(--success);">${window.fmtMoney(entradaPrevia)}</strong></div>
+                        <div style="text-align:right;"><span style="color:var(--text-muted); font-size:12px;">SALDO A FATURAR AGORA:</span><br><strong style="color:var(--primary); font-size:18px;">${window.fmtMoney(saldoFaturar)}</strong></div>
+                    </div>
+                    
+                    <div class="form-grid" style="align-items: center;">
+                        <div><label>Nº da Nota Fiscal Emitida</label><input type="text" id="nf_${i}" placeholder="Ex: 1250"></div>
+                        <div><label>Qtd Parcelas (Boletos)</label><input type="number" id="parc_${i}" value="1"></div>
+                        <div><label>Data 1º Vencimento</label><input type="date" id="data_${i}"></div>
+                    </div>
+                    
+                    <div style="display:flex; gap:10px; margin-top:20px;">
+                        <button class="btn" style="background:#fee2e2; color:var(--danger); width:auto;" onclick="devolverParaProducao(${i})">↩ Devolver p/ Produção</button>
+                        <button class="btn" style="background:var(--success); flex:1;" onclick="faturar(${i}, ${saldoFaturar})">CONCLUIR E GERAR BOLETOS</button>
+                    </div>
+                </div>
+            </div>`;
+        });
+        document.getElementById('listaExpedidos').innerHTML = html || "<p style='text-align:center; color:var(--text-muted);'>Nenhuma OS aguardando faturamento.</p>";
+    }
+
+    function devolverParaProducao(i) {
+        if(!confirm("A OS apresentou problema ou faltou peça? Devolver para a tela da fábrica?")) return;
+        let p = window.marbeDB.expedidos.splice(i, 1)[0];
+        if(!window.marbeDB.pedidos) window.marbeDB.pedidos = [];
+        window.marbeDB.pedidos.push(p);
+        window.salvarNuvem(true);
+        updateUI();
+    }
+
+    function faturar(i, saldoFaturar) {
+        if(saldoFaturar <= 0) {
+            alert("Aviso: Esta OS já foi paga integralmente na entrada. Ela será apenas arquivada.");
+            window.marbeDB.expedidos.splice(i, 1); window.salvarNuvem(true); updateUI(); return;
+        }
+
+        const nf = document.getElementById(`nf_${i}`).value;
+        const qtd = parseInt(document.getElementById(`parc_${i}`).value);
+        const dt = document.getElementById(`data_${i}`).value;
+
+        if(!nf || !qtd || !dt) return alert("Preencha NF, Parcelas e a Data do 1º vencimento!");
+
+        const p = window.marbeDB.expedidos[i]; 
+        const dataBase = new Date(dt + "T12:00:00");
+        const valorPorParcela = saldoFaturar / qtd;
+
+        if(!window.marbeDB.financeiro) window.marbeDB.financeiro = [];
+
+        for(let j=0; j<qtd; j++) {
+            let v = new Date(dataBase); v.setMonth(v.getMonth() + j);
+            window.marbeDB.financeiro.push({ 
+                os: p.os, nf: nf, cliente: p.cliente, 
+                valor: valorPorParcela, venc: v.toLocaleDateString('pt-BR'), 
+                parcela: `${j+1}/${qtd}`, pago: false 
+            });
+        }
+
+        window.marbeDB.expedidos.splice(i, 1); 
+        window.salvarNuvem(true); 
+        tab('boletos');
+    }
+
+    /* --- ABA 3: BOLETOS --- */
+    function renderBoletos() {
+        let html = '';
+        (window.marbeDB.financeiro || []).forEach((f, i) => {
+            html += `
+            <div class="card-list" style="border-left-color:var(--info);">
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <strong style="color:var(--dark); font-size:14px;">${f.cliente}</strong>
+                    <span style="font-size:11px; background:var(--bg-color); padding:4px 8px; border-radius:4px; color:var(--text-muted);">OS: ${f.os} | NF: ${f.nf} | Parc: ${f.parcela || '1/1'}</span>
+                </div>
+                <div style="font-size:16px; font-weight:700; color:var(--dark); margin-bottom:5px;">${window.fmtMoney(f.valor)}</div>
+                <div style="font-size:12px; color:var(--text-muted); margin-bottom:15px;">Vencimento: <strong style="color:var(--primary);">${f.venc}</strong></div>
+                <button class="btn" style="background:var(--success); margin:0;" onclick="darBaixaBoleto(${i})">✅ DAR BAIXA NO BOLETO (RECEBIDO)</button>
+            </div>`;
+        });
+        document.getElementById('listaBoletos').innerHTML = html || "<p style='text-align:center; color:var(--text-muted);'>Nenhum boleto em aberto.</p>";
+    }
+
+    function darBaixaBoleto(i) {
+        if(!confirm("Confirmar que este dinheiro já entrou na conta bancária?")) return;
+        window.marbeDB.financeiro.splice(i, 1);
+        window.salvarNuvem(true);
+        renderBoletos();
     }
 </script>
 </body>
