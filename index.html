@@ -25,7 +25,7 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    window.marbeDB = { os: 619, orçamentos: [], pedidos: [], expedidos: [], financeiro: [], custos: {vh: 50, mats: []}, estoque: {}, clientes: [] };
+    window.marbeDB = { os: 619, orçamentos: [], pedidos: [], expedidos: [], financeiro: [], fin_despesas: [], custos: {vh: 50, mats: []}, estoque: {}, clientes: [] };
     window.filtrosIniciados = false;
 
     onValue(ref(db, 'sistema/'), (snapshot) => {
