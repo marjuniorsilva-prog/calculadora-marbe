@@ -35,6 +35,7 @@
           if (!window.marbeDB.fin_despesas) window.marbeDB.fin_despesas = [];
           if (!window.marbeDB.financeiro) window.marbeDB.financeiro = [];
           if (!window.marbeDB.expedidos) window.marbeDB.expedidos = [];
+          if (!window.marbeDB.factoring) window.marbeDB.factoring = [];
           if (!window.marbeDB.cfg_pagamentos) {
               window.marbeDB.cfg_pagamentos = ["À Vista na Retirada", "7 dias", "15 dias", "7/15 dias", "15/30 dias", "10/20 dias", "28 dias", "28/56 dias"];
           }
@@ -84,7 +85,7 @@
   <style>
     :root { 
       --primary: #2563eb; --success: #16a34a; --warning: #d97706; --danger: #dc2626;
-      --dark: #1e293b; --bg-color: #f1f5f9; --card-bg: #ffffff; --border: #e2e8f0; --text-main: #334155; --text-muted: #64748b; --prod: #7c3aed; --comissao: #ea580c;
+      --dark: #1e293b; --bg-color: #f1f5f9; --card-bg: #ffffff; --border: #e2e8f0; --text-main: #334155; --text-muted: #64748b; --prod: #7c3aed; --comissao: #ea580c; --factory: #db2777;
     }
     
     body { font-family: 'Inter', sans-serif; background: var(--bg-color); margin: 0; padding: 20px; color: var(--text-main); }
@@ -94,7 +95,7 @@
     .header h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
     
     .tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; background: #fff; padding: 10px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid var(--border); }
-    .tab-btn { flex: 1; padding: 12px 10px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; font-weight: 600; border-radius: 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s ease; min-width: 130px; }
+    .tab-btn { flex: 1; padding: 12px 10px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; font-weight: 600; border-radius: 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s ease; min-width: 120px; }
     .tab-btn:hover { background: var(--bg-color); color: var(--text-main); }
     .tab-btn.active { background: var(--success) !important; color: white !important; box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.2); }
     
@@ -141,8 +142,9 @@
         <button class="tab-btn" onclick="tab('pagar')">2. Contas a Pagar</button>
         <button class="tab-btn" onclick="tab('faturamento')">3. Expedição (Faturar)</button>
         <button class="tab-btn" onclick="tab('boletos')">4. A Receber</button>
-        <button class="tab-btn" onclick="tab('relatorios')">5. Relatórios (DRE)</button>
+        <button class="tab-btn" onclick="tab('relatorios')">5. DRE</button>
         <button class="tab-btn" onclick="tab('comissoes')" style="background:#fff7ed; color:var(--comissao); border:1px solid #fed7aa;">6. Comissões</button>
+        <button class="tab-btn" onclick="tab('factoring')" style="background:#fdf2f8; color:var(--factory); border:1px solid #fbcfe8;">7. Factoring</button>
     </div>
 
     <!-- 1. PROJEÇÃO (OS NA FÁBRICA) -->
@@ -181,7 +183,7 @@
                     <select id="despesaCategoria">
                         <option value="Insumo Produção">Insumo de Produção (Lixas, Discos)</option>
                         <option value="Despesa Fixa">Despesa Fixa (Aluguel, Prolabore, Internet)</option>
-                        <option value="Despesa Variável">Despesa Variável (Energia, Água, Limpeza, Café)</option>
+                        <option value="Despesa Variável">Despesa Variável (Energia, Água, Limpeza, Café, Taxas)</option>
                         <option value="Imposto">Impostos</option>
                     </select>
                 </div>
@@ -205,8 +207,8 @@
     <!-- 3. EXPEDIÇÃO E FATURAMENTO -->
     <div id="faturamento" class="section">
         <div style="margin-bottom: 20px; font-size:14px; color:var(--text-muted);">
-            Estas OS já foram concluídas pela fábrica. Emita a Nota Fiscal e gere os boletos para que constem no seu caixa futuro.<br>
-            *Dica: Se a negociação tiver valores desiguais (Ex: Entrada + 2 parcelas diferentes), gere as parcelas aqui e depois altere o valor exato na aba "A Receber".
+            Estas OS já foram concluídas pela fábrica. Emita a Nota Fiscal e gere os boletos.
+            <br><b>Dica:</b> Se você vai vender este boleto para uma Factoring, use o botão rosa "VENDER P/ FACTORY".
         </div>
         <div id="listaExpedidos"></div>
     </div>
@@ -270,7 +272,7 @@
     <!-- 6. COMISSÕES -->
     <div id="comissoes" class="section">
         <div style="margin-bottom: 20px; font-size:14px; color:var(--text-muted);">
-            Gestão de Comissões. As comissões são geradas automaticamente aqui assim que um cliente paga um boleto ou Sinal (Aba Boletos).<br>
+            Gestão de Comissões. As comissões são geradas automaticamente aqui assim que um cliente paga um boleto ou Sinal (Aba Boletos) ou via Factory.<br>
             Regra do Sistema: 12.5% para PU (25% da metade) e 2% para demais materiais. Você pode editar o valor no momento da baixa.
         </div>
         
@@ -299,6 +301,14 @@
         <div id="listaComissoes"></div>
     </div>
 
+    <!-- 7. FACTORING -->
+    <div id="factoring" class="section">
+        <div style="margin-bottom: 20px; font-size:14px; color:var(--text-muted);">
+            Acompanhamento de boletos antecipados por Factoring. O dinheiro já entrou no seu caixa geral (DRE), mas esta tela serve exclusivamente para auxiliar na cobrança e monitorar se o cliente pagou a Factory para evitar regresso.
+        </div>
+        <div id="listaFactoring"></div>
+    </div>
+
 </div>
 
 <script>
@@ -318,9 +328,10 @@
         if(document.getElementById('faturamento').classList.contains('active')) renderExpedidos();
         if(document.getElementById('boletos').classList.contains('active')) renderBoletos();
         if(document.getElementById('comissoes').classList.contains('active')) renderComissoes();
+        if(document.getElementById('factoring').classList.contains('active')) renderFactoring();
     }
 
-    // --- FUNÇÃO AUXILIAR DE COMISSÃO (Usada ao confirmar Sinal ou Baixar Boleto) ---
+    // --- FUNÇÃO AUXILIAR DE COMISSÃO (Usada ao confirmar Sinal, Boletos ou Factory) ---
     function calcularComissaoBase(osNum, valorRecebidoFinal) {
         let osData = null;
         ['pedidos', 'orçamentos', 'expedidos'].forEach(base => {
@@ -433,9 +444,9 @@
             if(novaForma) {
                 window.marbeDB.cfg_pagamentos.push(novaForma);
                 window.salvarNuvem(true);
-                renderProjecaoFinanceira(); // Recarrega a tela já com a nova opção disponível
+                renderProjecaoFinanceira(); 
             } else {
-                renderProjecaoFinanceira(); // Reseta o select
+                renderProjecaoFinanceira(); 
             }
         }
     }
@@ -485,7 +496,7 @@
 
     function extrairDiasDaCondicao(condicaoTexto) {
         let matches = condicaoTexto.match(/\d+/g);
-        if(!matches) return [0]; // Se não tem número, assume entrega (Ex: À vista na retirada)
+        if(!matches) return [0]; 
         return matches.map(Number);
     }
 
@@ -506,19 +517,21 @@
                 let saldo = (p.total || 0) - sinal;
                 totalGeral += (p.total || 0); totalSinal += sinal; totalSaldo += saldo;
                 
-                // Cálculo de Datas Reais Especuladas
+                // Cálculo de Datas Reais Especuladas Exatas para o PDF
                 let dtEntregaBase = p.data_limite ? new Date(p.data_limite + "T12:00:00") : new Date();
                 let diasArray = extrairDiasDaCondicao(p.projecao.condicao);
-                let vencimentosPrevistos = diasArray.map(dias => {
+                
+                let vencimentosFormatados = diasArray.map(dias => {
+                    if(dias === 0) return `No ato (${dtEntregaBase.toLocaleDateString('pt-BR')})`;
                     let calcDt = new Date(dtEntregaBase);
                     calcDt.setDate(calcDt.getDate() + dias);
-                    return calcDt.toLocaleDateString('pt-BR');
-                }).join(' e ');
+                    return `${dias}d: ${calcDt.toLocaleDateString('pt-BR')}`;
+                }).join('\n'); // Quebra de linha limpa para quando tiver mais de uma parcela
 
                 bodyData.push([
                     `OS ${p.os}\n${p.cliente.substring(0, 20)}`, 
                     p.projecao.condicao,
-                    vencimentosPrevistos,
+                    vencimentosFormatados,
                     window.fmtMoney(sinal), 
                     window.fmtMoney(saldo)
                 ]);
@@ -574,7 +587,7 @@
             head: [['OS', 'CLIENTE', 'BASE CÁLCULO', 'TIPO / ALÍQUOTA', 'IMPOSTO (R$)']], 
             body: bodyData, 
             theme: 'striped', 
-            headStyles: { fillColor: [124, 58, 237] }, // Roxo
+            headStyles: { fillColor: [124, 58, 237] }, 
             columnStyles: { 2: { halign: 'right' }, 4: { halign: 'right' } }
         });
         
@@ -620,7 +633,6 @@
         despesasOrdenadas.sort((a,b) => a.venc.localeCompare(b.venc));
 
         despesasOrdenadas.forEach((d) => {
-            // Pula comissões aqui, elas têm aba própria
             if(!d.pago && d.categoria !== "Comissão - Marcelo") {
                 let exibir = false;
                 if (!dtIni || !dtFim) { exibir = true; } 
@@ -752,10 +764,10 @@
                 <div class="form-grid" style="margin-top:20px; padding-top:20px; border-top:1px dashed var(--border);">
                     <div>
                         <label>Nota Fiscal Emitida Nº</label>
-                        <input type="text" id="nf_${i}" placeholder="Ex: 1250 (Deixe em branco se for promissória)">
+                        <input type="text" id="nf_${i}" placeholder="Ex: 1250 (Branco se promissória)">
                     </div>
                     <div>
-                        <label>Parcelas (Qtd de Boletos)</label>
+                        <label>Parcelas</label>
                         <input type="number" id="parc_${i}" value="1">
                     </div>
                     <div>
@@ -764,8 +776,9 @@
                     </div>
                 </div>
                 <div style="display:flex; gap:10px; margin-top:20px;">
-                    <button class="btn" style="background:#fee2e2; color:var(--danger); width:auto;" onclick="devolverParaProducao(${i})">↩ Devolver p/ Fábrica</button>
-                    <button class="btn" style="background:var(--primary); flex:1;" onclick="faturar(${i}, ${saldoFaturar})">CONCLUIR E GERAR BOLETOS</button>
+                    <button class="btn" style="background:#fee2e2; color:var(--danger); width:auto;" onclick="devolverParaProducao(${i})">↩ Devolver</button>
+                    <button class="btn" style="background:var(--factory); flex:1;" onclick="faturarFactory(${i}, ${saldoFaturar})">💲 VENDER P/ FACTORY</button>
+                    <button class="btn" style="background:var(--primary); flex:1;" onclick="faturar(${i}, ${saldoFaturar})">GERAR BOLETOS NORMAL</button>
                 </div>
             </div>`;
         });
@@ -781,6 +794,7 @@
         updateUI();
     }
 
+    // Função de Gerar Boleto Normal 
     function faturar(i, saldoFaturar) {
         if(saldoFaturar <= 0) { 
             alert("Esta OS foi paga integralmente de forma antecipada. Ela será arquivada."); 
@@ -820,6 +834,70 @@
         window.marbeDB.expedidos.splice(i, 1); 
         window.salvarNuvem(true); 
         tab('boletos');
+    }
+
+    // Função Nova: Factoring
+    function faturarFactory(i, saldoFaturar) {
+        if(saldoFaturar <= 0) return alert("Esta OS já está paga. Não há o que antecipar.");
+        
+        const nf = document.getElementById(`nf_${i}`).value || "S/N"; 
+        const qtd = parseInt(document.getElementById(`parc_${i}`).value); 
+        const dt = document.getElementById(`data_${i}`).value;
+        
+        if(!qtd || !dt) return alert("Preencha as parcelas e a data do 1º vencimento que o cliente vai pagar para a factory!");
+
+        let liqStr = prompt(`A OS é de ${window.fmtMoney(saldoFaturar)}.\n\nQuanto a FACTORY pagou LÍQUIDO por essa NF (R$)?`, saldoFaturar);
+        if(!liqStr) return;
+        
+        let liquido = parseFloat(liqStr.replace(',','.'));
+        if(isNaN(liquido) || liquido <= 0) return alert("Valor líquido inválido.");
+
+        let hojeStr = new Date().toISOString().split('T')[0];
+        let dtRecebido = prompt("Data em que o dinheiro da Factory caiu na conta (AAAA-MM-DD):", hojeStr);
+        if(!dtRecebido) return;
+
+        const p = window.marbeDB.expedidos[i]; 
+        const taxaFactory = saldoFaturar - liquido;
+
+        // 1. Lança a Receita no DRE
+        if(!window.marbeDB.financeiro) window.marbeDB.financeiro = [];
+        window.marbeDB.financeiro.push({ 
+            id_titulo: Date.now(), os: p.os, nf: nf, cliente: `Factory (${p.cliente})`, 
+            valor: liquido, venc: dtRecebido, parcela: `Antecipação`, 
+            pago: true, dataRecebimento: dtRecebido 
+        });
+
+        // 2. Lança a Taxa no DRE
+        if(taxaFactory > 0) {
+            if(!window.marbeDB.fin_despesas) window.marbeDB.fin_despesas = [];
+            window.marbeDB.fin_despesas.push({
+                id: Date.now() + 1, desc: `Taxa Factoring OS ${p.os} - ${p.cliente}`,
+                valor: taxaFactory, venc: dtRecebido, categoria: "Despesa Variável",
+                pago: true, dataPagamento: dtRecebido
+            });
+        }
+
+        // 3. Cria os boletos de acompanhamento na aba 7
+        if(!window.marbeDB.factoring) window.marbeDB.factoring = [];
+        const dataBase = new Date(dt + "T12:00:00"); 
+        const valorPorParcela = saldoFaturar / qtd;
+
+        for(let j=0; j<qtd; j++) {
+            let v = new Date(dataBase); 
+            v.setMonth(v.getMonth() + j);
+            window.marbeDB.factoring.push({ 
+                id_titulo: Date.now() + 10 + j, os: p.os, nf: nf, cliente: p.cliente, 
+                valor: valorPorParcela, venc: v.toISOString().split('T')[0], 
+                parcela: `${j+1}/${qtd}`, resolvido: false 
+            });
+        }
+
+        // Gera a comissão com base no que você recebeu real na mão
+        lancarComissao(p.os, liquido, p.cliente);
+
+        window.marbeDB.expedidos.splice(i, 1); 
+        window.salvarNuvem(true); 
+        tab('factoring');
     }
 
     /* --- ABA 4: BOLETOS A RECEBER --- */
@@ -901,9 +979,8 @@
         if(confirm(`Confirmar o recebimento de ${window.fmtMoney(valorFinal)} na data ${dataDigitada.split('-').reverse().join('/')}?`)) {
             window.marbeDB.financeiro[i].pago = true;
             window.marbeDB.financeiro[i].dataRecebimento = dataDigitada;
-            window.marbeDB.financeiro[i].valor = valorFinal; // DRE exato
+            window.marbeDB.financeiro[i].valor = valorFinal; 
             
-            // CHAMA A FUNÇÃO DE COMISSÃO
             lancarComissao(f.os, valorFinal, f.cliente);
             
             window.salvarNuvem(true); 
@@ -966,7 +1043,7 @@
     function gerarRelatorio() {
         const dataInicio = document.getElementById('relInicio').value;
         const dataFim = document.getElementById('relFim').value;
-        const tipoDRE = document.getElementById('relTipo').value; // 'todos', 'entradas', 'saidas'
+        const tipoDRE = document.getElementById('relTipo').value; 
         
         if(!dataInicio || !dataFim) return alert("Por favor, selecione as datas de Início e Fim para gerar o relatório.");
 
@@ -992,7 +1069,7 @@
                     <tr>
                         <td>${f.dataRecebimento.split('-').reverse().join('/')}</td>
                         <td><b>${f.cliente}</b><br><span style="font-size:11px; color:var(--text-muted);">OS: ${f.os} - Parcela ${f.parcela}</span></td>
-                        <td style="color:var(--success); font-weight:600; font-size:11px;">RECEITA (BOLETO)</td>
+                        <td style="color:var(--success); font-weight:600; font-size:11px;">RECEITA</td>
                         <td style="text-align:right; color:var(--success); font-weight:700;">+ ${window.fmtMoney(f.valor)}</td>
                     </tr>`;
                 }
@@ -1098,7 +1175,7 @@
 
     /* --- ABA 6: COMISSÕES --- */
     function renderComissoes() {
-        let statusFilter = document.getElementById('filtroComissaoStatus').value; // pendentes, pagas
+        let statusFilter = document.getElementById('filtroComissaoStatus').value;
         let dtIni = document.getElementById('filtroComissaoInicio').value;
         let dtFim = document.getElementById('filtroComissaoFim').value;
         let html = '';
@@ -1185,7 +1262,7 @@
             head: [['DATA', 'REFERÊNCIA DA COMISSÃO', 'VALOR (R$)']],
             body: bodyData,
             theme: 'striped',
-            headStyles: { fillColor: [234, 88, 12] }, // Laranja
+            headStyles: { fillColor: [234, 88, 12] }, 
             columnStyles: { 2: { halign: 'right' } }
         });
         
@@ -1195,6 +1272,43 @@
         doc.text(`TOTAL EM COMISSÕES NO PERÍODO: ${window.fmtMoney(total)}`, 195, finalY, {align: 'right'});
         
         window.open(URL.createObjectURL(doc.output('blob')), '_blank');
+    }
+
+    /* --- ABA 7: FACTORING --- */
+    function renderFactoring() {
+        let html = ''; 
+        let hojeStr = new Date().toISOString().split('T')[0];
+        
+        (window.marbeDB.factoring || []).forEach((f, i) => {
+            if(!f.resolvido) {
+                let isAtrasado = f.venc < hojeStr; 
+                let dataBr = f.venc.split('-').reverse().join('/');
+                
+                html += `
+                <div class="card-list" style="border-left-color:${isAtrasado ? 'var(--danger)' : 'var(--factory)'}; background:#fdf2f8;">
+                    <div style="display:flex; justify-content:space-between;">
+                        <strong style="color:var(--dark); font-size:15px;">${f.cliente}</strong>
+                        <span style="font-size:11px; background:#fce7f3; padding:4px 8px; border-radius:4px; color:var(--factory); border:1px solid #fbcfe8;">OS: <b>${f.os}</b> | NF: <b>${f.nf}</b> | Parc: <b>${f.parcela}</b></span>
+                    </div>
+                    <div style="font-size:22px; font-weight:700; color:var(--factory); margin:10px 0;">${window.fmtMoney(f.valor)}</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px;">
+                        <span style="font-size:13px; color:${isAtrasado ? 'var(--danger)' : 'var(--text-muted)'}">Vencimento Factory: <b>${dataBr}</b> ${isAtrasado ? '<strong style="color:red">(COBRAR CLIENTE)</strong>' : ''}</span>
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn" style="background:var(--success); padding:10px 15px; font-size:12px; margin:0;" onclick="resolverFactoring(${i})">OK - CLIENTE PAGOU A FACTORY ✅</button>
+                        </div>
+                    </div>
+                </div>`;
+            }
+        });
+        document.getElementById('listaFactoring').innerHTML = html || "<p style='text-align:center; color:var(--text-muted); padding:30px; background:white; border-radius:8px;'>Nenhum boleto de Factory pendente de monitoramento.</p>";
+    }
+
+    function resolverFactoring(i) {
+        if(confirm("Confirmar que o cliente pagou a Factoring e você está livre dessa responsabilidade?\n\n(Isso apenas remove o aviso da tela, não altera o caixa pois o dinheiro da Factory já foi lançado.)")) {
+            window.marbeDB.factoring[i].resolvido = true;
+            window.salvarNuvem(true); 
+            renderFactoring();
+        }
     }
 
 </script>
