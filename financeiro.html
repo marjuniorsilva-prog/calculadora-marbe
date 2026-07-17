@@ -25,15 +25,30 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
     window.marbeDB = null;
+    window.filtrosFinIniciados = false;
 
     onValue(ref(db, 'sistema/'), (snapshot) => {
       const data = snapshot.val();
       if (data) { 
           window.marbeDB = data; 
-          // Prevenção para garantir que a gaveta de despesas exista
+          
           if (!window.marbeDB.fin_despesas) window.marbeDB.fin_despesas = [];
           if (!window.marbeDB.financeiro) window.marbeDB.financeiro = [];
           if (!window.marbeDB.expedidos) window.marbeDB.expedidos = [];
+          
+          if(!window.filtrosFinIniciados) {
+              let hoje = new Date();
+              let quinzePraFrente = new Date(); quinzePraFrente.setDate(hoje.getDate() + 15);
+              
+              let umAnoAtras = new Date(); umAnoAtras.setFullYear(hoje.getFullYear() - 1);
+              
+              if(document.getElementById('filtroBoletoInicio')) {
+                  document.getElementById('filtroBoletoInicio').value = umAnoAtras.toISOString().split('T')[0];
+                  document.getElementById('filtroBoletoFim').value = quinzePraFrente.toISOString().split('T')[0];
+              }
+              window.filtrosFinIniciados = true;
+          }
+
           updateUI();
       }
     });
@@ -167,21 +182,11 @@
     <!-- 4. CONTAS A RECEBER (BOLETOS) -->
     <div id="boletos" class="section">
         <div style="background:var(--bg-color); padding:15px; border-radius:8px; border:1px solid var(--border); margin-bottom:20px;">
-            <label style="margin-top:0; color:var(--dark);">Filtro Rápido de Boletos (Otimizado para não travar)</label>
-            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
-                <div style="flex:1; min-width:200px;">
-                    <select id="filtroBoletosTipo" onchange="mudarFiltroBoletos()">
-                        <option value="30d">Vencidos + Próximos 30 Dias (Padrão)</option>
-                        <option value="vencidos">Apenas Vencidos</option>
-                        <option value="data">Pesquisa por Período (Data específica)</option>
-                        <option value="todos">Mostrar TODOS (Pode ficar lento)</option>
-                    </select>
-                </div>
-                <div id="boxFiltroDataBoleto" style="display:none; flex:2; gap:10px;">
-                     <input type="date" id="filtroBoletoInicio" style="flex:1">
-                     <input type="date" id="filtroBoletoFim" style="flex:1">
-                </div>
-                <button class="btn" style="background:var(--dark); margin:0; padding:10px 20px;" onclick="renderBoletos()">BUSCAR</button>
+            <div style="font-weight:600; font-size:12px; margin-bottom:10px; color:var(--primary)">Filtro de Boletos (Padrão: Vencidos + 15 Dias a Vencer)</div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <input type="date" id="filtroBoletoInicio" style="flex:1; min-width:130px;">
+                <input type="date" id="filtroBoletoFim" style="flex:1; min-width:130px;">
+                <button class="btn" style="background:var(--dark); margin:0; width:auto; padding:0 25px;" onclick="renderBoletos()">FILTRAR BOLETOS</button>
             </div>
         </div>
         
@@ -430,49 +435,23 @@
         tab('boletos');
     }
 
-    /* --- ABA 4: BOLETOS A RECEBER (COM FILTRO OTIMIZADO) --- */
-    function mudarFiltroBoletos() {
-        const v = document.getElementById('filtroBoletosTipo').value;
-        document.getElementById('boxFiltroDataBoleto').style.display = (v === 'data') ? 'flex' : 'none';
-        renderBoletos();
-    }
-
+    /* --- ABA 4: BOLETOS A RECEBER (COM FILTRO LIVRE) --- */
     function renderBoletos() {
+        let dataInicioStr = document.getElementById('filtroBoletoInicio').value;
+        let dataFimStr = document.getElementById('filtroBoletoFim').value;
         let html = ''; 
-        let hoje = new Date();
-        let hojeStr = hoje.toISOString().split('T')[0];
+        let hojeStr = new Date().toISOString().split('T')[0];
         
-        // Calcula a data de 30 dias pra frente
-        let trintaDias = new Date();
-        trintaDias.setDate(hoje.getDate() + 30);
-        let trintaDiasStr = trintaDias.toISOString().split('T')[0];
-
-        // Pega os filtros do painel superior
-        let tipoFiltro = document.getElementById('filtroBoletosTipo') ? document.getElementById('filtroBoletosTipo').value : '30d';
-        let dtIni = document.getElementById('filtroBoletoInicio') ? document.getElementById('filtroBoletoInicio').value : '';
-        let dtFim = document.getElementById('filtroBoletoFim') ? document.getElementById('filtroBoletoFim').value : '';
-
-        // O segredo para não travar: só injetamos no HTML (DOM) as parcelas que passaram pelo filtro!
         (window.marbeDB.financeiro || []).forEach((f, i) => {
             if(!f.pago) {
                 let exibir = false;
                 
-                if (tipoFiltro === '30d') {
-                    // Puxa atrasados e os que vencem nos próximos 30 dias (para garantir o fluxo de caixa visível)
-                    if (f.venc <= trintaDiasStr) exibir = true;
-                } else if (tipoFiltro === 'vencidos') {
-                    if (f.venc < hojeStr) exibir = true;
-                } else if (tipoFiltro === 'todos') {
-                    exibir = true;
-                } else if (tipoFiltro === 'data') {
-                    if (dtIni && dtFim) {
-                        if (f.venc >= dtIni && f.venc <= dtFim) exibir = true;
-                    } else {
-                        exibir = true; // Mostra tudo se não colocar data
-                    }
-                }
+                // Validação de filtro com os campos Início e Fim
+                let passaInicio = !dataInicioStr || f.venc >= dataInicioStr;
+                let passaFim = !dataFimStr || f.venc <= dataFimStr;
 
-                // Renderiza o card apenas se passou na validação do filtro
+                if (passaInicio && passaFim) exibir = true;
+
                 if (exibir) {
                     let isAtrasado = f.venc < hojeStr; 
                     let dataBr = f.venc.split('-').reverse().join('/');
@@ -492,7 +471,7 @@
                 }
             }
         });
-        document.getElementById('listaBoletos').innerHTML = html || "<p style='text-align:center; color:var(--text-muted); padding:30px; background:white; border-radius:8px;'>Nenhum boleto encontrado para este filtro.</p>";
+        document.getElementById('listaBoletos').innerHTML = html || "<p style='text-align:center; color:var(--text-muted); padding:30px; background:white; border-radius:8px;'>Nenhum boleto pendente neste período.</p>";
     }
 
     function darBaixaBoleto(i) {
