@@ -291,6 +291,7 @@
         <select id="tipoServicoCalc" style="border-color:var(--prod); font-weight:600; color:var(--prod);">
             <option value="4.5">PEÇA NOVA (4.5%)</option>
             <option value="6.5">REFORMA (6.5%)</option>
+            <option value="0" style="color:var(--danger)">GARANTIA / RETRABALHO (0%)</option>
         </select>
 
         <details>
@@ -320,7 +321,7 @@
         <div class="res-line"><span style="color:var(--text-muted)">Custo Matéria:</span> <span id="resCustoMat" style="font-weight:600;">R$ 0,00</span></div>
         <div class="res-line" id="linhaCola"><span style="color:var(--text-muted)">Custo Cola (10%):</span> <span id="resCustoCola" style="font-weight:600;">R$ 0,00</span></div>
         <div class="res-line"><span style="color:var(--text-muted)">Custo Mão de Obra:</span> <span id="resCustoMO" style="font-weight:600;">R$ 0,00</span></div>
-        <div class="res-line" style="font-weight:700; color:#fff;"><span>Custo de Produção:</span> <span id="resCustoTot">R$ 0,00</span></div>
+        <div class="res-line" style="font-weight:700; color:#fff;"><span id="lblCustoTot">Custo de Produção:</span> <span id="resCustoTot">R$ 0,00</span></div>
         
         <div style="height:1px; background:rgba(255,255,255,0.1); margin:15px 0;"></div>
         
@@ -454,7 +455,6 @@
   </div>
   
   <div id="producao" class="section">
-    <!-- AQUI ESTÃO OS DOIS NOVOS BOTÕES PARA GERAR O PDF DO CRONOGRAMA -->
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:15px;">
         <h3 style="margin:0; color:var(--prod);">Cronograma Operacional</h3>
         <div style="display:flex; gap:10px;">
@@ -553,7 +553,6 @@
     document.querySelectorAll('.section, .tab-btn').forEach(e => e.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     
-    // Procura o botão correspondente e adiciona active
     document.querySelectorAll('.tab-btn').forEach(btn => {
         if(btn.getAttribute('onclick').includes(`('${id}')`)) {
             btn.classList.add('active');
@@ -824,8 +823,10 @@
       const nomeMat = selMat.options[selMat.selectedIndex].text;
       
       const valorHora = parseFloat(document.getElementById('tipoTorno').value);
-      const taxaImposto = parseFloat(document.getElementById('tipoServicoCalc').value);
-      const nomeServico = document.getElementById('tipoServicoCalc').options[document.getElementById('tipoServicoCalc').selectedIndex].text;
+      const selServico = document.getElementById('tipoServicoCalc');
+      const taxaImposto = parseFloat(selServico.value);
+      const nomeServico = selServico.options[selServico.selectedIndex].text;
+      const isGarantia = nomeServico.includes('GARANTIA');
 
       let volumeCm3 = 0; let pesoDiretoG = 0; let descMedidas = ""; let metaRevest = null; 
 
@@ -915,6 +916,12 @@
       let valorImposto = precoBase * (taxaImposto / 100);
       let precoFinal = precoBase + valorImposto;
 
+      if(isGarantia) {
+          precoBase = 0;
+          valorImposto = 0;
+          precoFinal = 0;
+      }
+
       let minPorPeca = 0;
       if (tipo === 'revestimento') {
           const hGastas = parseFloat(document.getElementById('horasGastas').value) || 0;
@@ -927,6 +934,10 @@
       let nomeFinalItem = (tipo === 'revestimento') 
           ? descMedidas 
           : `${document.getElementById('tipoPeca').options[document.getElementById('tipoPeca').selectedIndex].text} - ${nomeServico} ${descMedidas}`;
+
+      if(isGarantia && !nomeFinalItem.includes('[GARANTIA]')) {
+          nomeFinalItem = `[GARANTIA] ${nomeFinalItem}`;
+      }
 
       ultimoCalculo = {
           n: nomeFinalItem, mat: nomeMat, med: descMedidas, q: 1, v: precoFinal, kg_unit: pesoBrutoKg, tempo_min: minPorPeca, meta: metaRevest 
@@ -959,8 +970,18 @@
       document.getElementById('resPesoBruto').innerText = pesoBrutoG.toFixed(1) + ' g';
       document.getElementById('resCustoMat').innerText = window.fmtMoney(custoMateria);
       document.getElementById('resCustoMO').innerText = window.fmtMoney(custoMO);
+      
       document.getElementById('resCustoTot').innerText = window.fmtMoney(custoProd);
-      document.getElementById('resMarkup').innerText = markup + "x (" + window.fmtMoney(precoBase) + ")";
+      if(isGarantia) {
+          document.getElementById('lblCustoTot').innerText = "Custo (Prejuízo Interno):";
+          document.getElementById('resCustoTot').style.color = "#fca5a5";
+          document.getElementById('resMarkup').innerText = "Garantia (Sem Receita)";
+      } else {
+          document.getElementById('lblCustoTot').innerText = "Custo de Produção:";
+          document.getElementById('resCustoTot').style.color = "#fff";
+          document.getElementById('resMarkup').innerText = markup + "x (" + window.fmtMoney(precoBase) + ")";
+      }
+      
       document.getElementById('resTaxa').innerText = taxaImposto;
       document.getElementById('resValorImposto').innerText = window.fmtMoney(valorImposto);
       document.getElementById('resPrecoVenda').innerText = window.fmtMoney(precoFinal);
@@ -1143,7 +1164,6 @@
     window.marbeDB.pedidos.splice(i, 1); window.salvarNuvem(); tab('financeiro');
   }
 
-  // --- NOVA FUNÇÃO PARA GERAR PDF DO CRONOGRAMA ---
   function gerarPDFCronograma(tipo) {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
@@ -1212,7 +1232,6 @@
 
       window.abrirPDFMobile(doc.output('blob'), `CRONOGRAMA_${tipo}_${new Date().getTime()}`);
   }
-  // ------------------------------------------------
 
   function gerarPDF(tipo, index, base) {
     const { jsPDF } = window.jspdf; const doc = new jsPDF(); const d = window.marbeDB[base][index];
