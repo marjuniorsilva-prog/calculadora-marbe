@@ -166,9 +166,25 @@
 
     <!-- 4. CONTAS A RECEBER (BOLETOS) -->
     <div id="boletos" class="section">
-        <div style="margin-bottom: 20px; font-size:14px; color:var(--text-muted);">
-            Boletos e promissórias emitidos que estão aguardando o pagamento do cliente.
+        <div style="background:var(--bg-color); padding:15px; border-radius:8px; border:1px solid var(--border); margin-bottom:20px;">
+            <label style="margin-top:0; color:var(--dark);">Filtro Rápido de Boletos (Otimizado para não travar)</label>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                <div style="flex:1; min-width:200px;">
+                    <select id="filtroBoletosTipo" onchange="mudarFiltroBoletos()">
+                        <option value="30d">Vencidos + Próximos 30 Dias (Padrão)</option>
+                        <option value="vencidos">Apenas Vencidos</option>
+                        <option value="data">Pesquisa por Período (Data específica)</option>
+                        <option value="todos">Mostrar TODOS (Pode ficar lento)</option>
+                    </select>
+                </div>
+                <div id="boxFiltroDataBoleto" style="display:none; flex:2; gap:10px;">
+                     <input type="date" id="filtroBoletoInicio" style="flex:1">
+                     <input type="date" id="filtroBoletoFim" style="flex:1">
+                </div>
+                <button class="btn" style="background:var(--dark); margin:0; padding:10px 20px;" onclick="renderBoletos()">BUSCAR</button>
+            </div>
         </div>
+        
         <div id="listaBoletos"></div>
     </div>
 
@@ -414,29 +430,69 @@
         tab('boletos');
     }
 
-    /* --- ABA 4: BOLETOS A RECEBER --- */
+    /* --- ABA 4: BOLETOS A RECEBER (COM FILTRO OTIMIZADO) --- */
+    function mudarFiltroBoletos() {
+        const v = document.getElementById('filtroBoletosTipo').value;
+        document.getElementById('boxFiltroDataBoleto').style.display = (v === 'data') ? 'flex' : 'none';
+        renderBoletos();
+    }
+
     function renderBoletos() {
-        let html = ''; let hojeStr = new Date().toISOString().split('T')[0];
+        let html = ''; 
+        let hoje = new Date();
+        let hojeStr = hoje.toISOString().split('T')[0];
+        
+        // Calcula a data de 30 dias pra frente
+        let trintaDias = new Date();
+        trintaDias.setDate(hoje.getDate() + 30);
+        let trintaDiasStr = trintaDias.toISOString().split('T')[0];
+
+        // Pega os filtros do painel superior
+        let tipoFiltro = document.getElementById('filtroBoletosTipo') ? document.getElementById('filtroBoletosTipo').value : '30d';
+        let dtIni = document.getElementById('filtroBoletoInicio') ? document.getElementById('filtroBoletoInicio').value : '';
+        let dtFim = document.getElementById('filtroBoletoFim') ? document.getElementById('filtroBoletoFim').value : '';
+
+        // O segredo para não travar: só injetamos no HTML (DOM) as parcelas que passaram pelo filtro!
         (window.marbeDB.financeiro || []).forEach((f, i) => {
             if(!f.pago) {
-                let isAtrasado = f.venc < hojeStr; 
-                let dataBr = f.venc.split('-').reverse().join('/');
+                let exibir = false;
                 
-                html += `
-                <div class="card-list" style="border-left-color:${isAtrasado ? 'var(--danger)' : 'var(--success)'};">
-                    <div style="display:flex; justify-content:space-between;">
-                        <strong style="color:var(--dark); font-size:15px;">${f.cliente}</strong>
-                        <span style="font-size:11px; background:var(--bg-color); padding:4px 8px; border-radius:4px; color:var(--text-muted);">OS: <b>${f.os}</b> | NF: <b>${f.nf}</b> | Parc: <b>${f.parcela}</b></span>
-                    </div>
-                    <div style="font-size:22px; font-weight:700; color:var(--success); margin:10px 0;">+ ${window.fmtMoney(f.valor)}</div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px;">
-                        <span style="font-size:13px; color:${isAtrasado ? 'var(--danger)' : 'var(--text-muted)'}">Vencimento: <b>${dataBr}</b> ${isAtrasado ? '<strong style="color:red">(ATRASADO)</strong>' : ''}</span>
-                        <button class="btn" style="background:var(--success); padding:10px 15px; font-size:12px;" onclick="darBaixaBoleto(${i})">DINHEIRO RECEBIDO ✅</button>
-                    </div>
-                </div>`;
+                if (tipoFiltro === '30d') {
+                    // Puxa atrasados e os que vencem nos próximos 30 dias (para garantir o fluxo de caixa visível)
+                    if (f.venc <= trintaDiasStr) exibir = true;
+                } else if (tipoFiltro === 'vencidos') {
+                    if (f.venc < hojeStr) exibir = true;
+                } else if (tipoFiltro === 'todos') {
+                    exibir = true;
+                } else if (tipoFiltro === 'data') {
+                    if (dtIni && dtFim) {
+                        if (f.venc >= dtIni && f.venc <= dtFim) exibir = true;
+                    } else {
+                        exibir = true; // Mostra tudo se não colocar data
+                    }
+                }
+
+                // Renderiza o card apenas se passou na validação do filtro
+                if (exibir) {
+                    let isAtrasado = f.venc < hojeStr; 
+                    let dataBr = f.venc.split('-').reverse().join('/');
+                    
+                    html += `
+                    <div class="card-list" style="border-left-color:${isAtrasado ? 'var(--danger)' : 'var(--success)'};">
+                        <div style="display:flex; justify-content:space-between;">
+                            <strong style="color:var(--dark); font-size:15px;">${f.cliente}</strong>
+                            <span style="font-size:11px; background:var(--bg-color); padding:4px 8px; border-radius:4px; color:var(--text-muted);">OS: <b>${f.os}</b> | NF: <b>${f.nf}</b> | Parc: <b>${f.parcela}</b></span>
+                        </div>
+                        <div style="font-size:22px; font-weight:700; color:var(--success); margin:10px 0;">+ ${window.fmtMoney(f.valor)}</div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px;">
+                            <span style="font-size:13px; color:${isAtrasado ? 'var(--danger)' : 'var(--text-muted)'}">Vencimento: <b>${dataBr}</b> ${isAtrasado ? '<strong style="color:red">(ATRASADO)</strong>' : ''}</span>
+                            <button class="btn" style="background:var(--success); padding:10px 15px; font-size:12px;" onclick="darBaixaBoleto(${i})">DINHEIRO RECEBIDO ✅</button>
+                        </div>
+                    </div>`;
+                }
             }
         });
-        document.getElementById('listaBoletos').innerHTML = html || "<p style='text-align:center; color:var(--text-muted); padding:30px; background:white; border-radius:8px;'>Nenhum boleto pendente de recebimento.</p>";
+        document.getElementById('listaBoletos').innerHTML = html || "<p style='text-align:center; color:var(--text-muted); padding:30px; background:white; border-radius:8px;'>Nenhum boleto encontrado para este filtro.</p>";
     }
 
     function darBaixaBoleto(i) {
@@ -483,15 +539,6 @@
             }
         });
         
-        // Se quisermos computar também os "Sinais/Entradas" pagos antecipadamente (opcional):
-        (window.marbeDB.orçamentos || []).concat(window.marbeDB.pedidos || [], window.marbeDB.expedidos || []).forEach(os => {
-            if (os.projecao && os.projecao.entrada > 0) {
-                 // Simplificação: Sinais não têm data de pagamento salva nativamente nesta versão,
-                 // assumiríamos o dinheiro já em caixa. Para DRE exato, consideramos o boleto,
-                 // mas podemos listar aqui no futuro.
-            }
-        });
-
         // 2. Vasculhar Despesas Pagas no período
         (window.marbeDB.fin_despesas || []).forEach(d => {
             if (d.pago && d.dataPagamento >= dataInicio && d.dataPagamento <= dataFim) {
