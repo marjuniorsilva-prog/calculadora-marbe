@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema B2B v34.12 (Marbe)</title>
+  <title>Sistema B2B v34.13 (Marbe)</title>
   
-  <!-- Fonte Premium para o Sistema -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -26,7 +25,7 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    window.marbeDB = { os: 619, orçamentos: [], pedidos: [], financeiro: [], custos: {vh: 50, mats: []}, estoque: {}, clientes: [] };
+    window.marbeDB = { os: 619, orçamentos: [], pedidos: [], expedidos: [], financeiro: [], custos: {vh: 50, mats: []}, estoque: {}, clientes: [] };
     window.filtrosIniciados = false;
 
     onValue(ref(db, 'sistema/'), (snapshot) => {
@@ -67,7 +66,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
   
   <style>
-    /* CSS TOTALMENTE REFORMULADO PARA VISUAL PROFISSIONAL */
     :root { 
       --primary: #2563eb; 
       --primary-hover: #1d4ed8;
@@ -78,7 +76,6 @@
       --prod: #7c3aed; 
       --warning: #d97706; 
       --compra: #ea580c; 
-      
       --bg-color: #f1f5f9;
       --card-bg: #ffffff;
       --border: #e2e8f0;
@@ -88,7 +85,6 @@
     
     body { font-family: 'Inter', sans-serif; background: var(--bg-color); margin: 0; padding: 15px; color: var(--text-main); }
     
-    /* Login */
     #loginScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-color); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
     .login-box { width: 100%; max-width: 380px; text-align: center; background: #fff; padding: 40px 30px; border-radius: 16px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); border: 1px solid var(--border); }
     .login-logo { max-width: 80%; height: auto; margin-bottom: 30px; }
@@ -97,44 +93,36 @@
     .login-btn { width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
     .login-btn:hover { background: var(--primary-hover); }
 
-    /* Layout Principal */
     .container { max-width: 1100px; margin: auto; display: none; }
     
-    /* Menu / Abas */
     .tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; background: #fff; padding: 10px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid var(--border); }
     .tab-btn { flex: 1; padding: 12px 10px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; font-weight: 600; border-radius: 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s ease; min-width: 90px; }
     .tab-btn:hover { background: var(--bg-color); color: var(--text-main); }
     .tab-btn.active { background: var(--primary) !important; color: white !important; box-shadow: 0 4px 6px -1px rgba(37,99,235,0.2); }
     
-    /* Painéis de Conteúdo */
     .section { display: none; background: var(--card-bg); padding: 25px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid var(--border); animation: fadeIn 0.3s ease-out; }
     .section.active { display: block; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
     
-    /* Tipografia e Formulários */
     h3 { color: var(--dark); margin-top: 0; font-weight: 700; letter-spacing: -0.5px; }
     label { display: block; margin-top: 15px; font-weight: 600; font-size: 12px; color: var(--text-main); margin-bottom: 6px; }
     input, select, textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; box-sizing: border-box; color: var(--text-main); font-family: 'Inter', sans-serif; transition: all 0.2s; background: #fff; }
     input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
     select { cursor: pointer; }
     
-    /* Botões Padrão */
     .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 15px; color: white; text-align: center; display: block; font-size: 13px; letter-spacing: 0.5px; transition: transform 0.1s, filter 0.2s, box-shadow 0.2s; }
     .btn:hover { filter: brightness(1.05); transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
     .btn:active { transform: translateY(0); box-shadow: none; }
     
-    /* Tabelas Premium */
     table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; margin-top: 15px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
     table th { background: #f8fafc; border-bottom: 1px solid var(--border); padding: 14px 12px; text-align: left; font-weight: 600; color: var(--text-muted); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
     table td { border-bottom: 1px solid var(--border); padding: 14px 12px; color: var(--text-main); vertical-align: middle; }
     table tr:last-child td { border-bottom: none; }
     table tr:hover td { background-color: #f8fafc; }
     
-    /* Cartões de Listagem (OS e Clientes) */
     .card-list { background: #fff; border: 1px solid var(--border); padding: 18px; border-radius: 10px; margin-bottom: 15px; border-left: 5px solid var(--primary); box-shadow: 0 1px 2px rgba(0,0,0,0.02); transition: transform 0.2s ease, box-shadow 0.2s ease; }
     .card-list:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); border-color: #cbd5e1; }
     
-    /* Utilitários */
     .editable-input { border: 1px solid #fcd34d !important; background: #fffbeb !important; padding: 8px !important; text-align: center; font-weight: 500; }
     .negativo { color: var(--danger); font-weight: bold; }
     .positivo { color: var(--success); font-weight: bold; }
@@ -142,13 +130,11 @@
     .row { display: flex; gap: 15px; }
     .col { flex: 1; }
     
-    /* Dashboard Financeiro/Resultado */
     .resultado-box { background: var(--dark); color: #f8fafc; padding: 25px; border-radius: 12px; margin-top: 25px; font-size: 14px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
     .res-line { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); padding: 10px 0; }
     .res-line:last-of-type { border-bottom: none; }
     .res-destaque { font-size: 24px; font-weight: 700; color: #10b981; text-align: center; margin-top: 20px; padding-top: 20px; border-top: 1px dashed rgba(255,255,255,0.2); }
     
-    /* Sanfona (Details) */
     details { background: #f8fafc; padding: 15px 20px; border-radius: 8px; border: 1px solid var(--border); margin-top: 20px; transition: all 0.3s ease; }
     summary { font-weight: 600; cursor: pointer; font-size: 13px; color: var(--primary); user-select: none; outline: none; }
     summary:hover { color: var(--primary-hover); }
@@ -163,7 +149,7 @@
         <input type="text" id="loginUser" class="login-input" placeholder="Usuário">
         <input type="password" id="loginPass" class="login-input" placeholder="Senha">
         <button class="login-btn" onclick="fazerLogin()">ENTRAR</button>
-        <p style="font-size:12px; color:var(--text-muted); margin-top:20px; font-weight:500;">Versão Corporativa 34.12</p>
+        <p style="font-size:12px; color:var(--text-muted); margin-top:20px; font-weight:500;">Versão Corporativa 34.13</p>
     </div>
 </div>
 
@@ -174,15 +160,13 @@
     <button class="tab-btn" onclick="tab('historico')">Histórico</button>
     <button class="tab-btn" onclick="tab('clientesTab')">Clientes</button>
     <button class="tab-btn" onclick="tab('suprimentos')">Suprimentos</button>
-    <button class="tab-btn" onclick="tab('pedidos')">Pedidos / NF</button>
-    <button class="tab-btn" onclick="tab('financeiro')">Boletos</button>
     <button class="tab-btn" onclick="tab('cfg')">Custos</button>
     <button class="tab-btn" onclick="tab('producao')">Produção</button>
+    <button class="tab-btn" onclick="window.open('financeiro.html', '_blank')" style="color: var(--success); font-weight: bold;">Financeiro ↗</button>
     <button class="tab-btn" onclick="fazerLogout()" style="color: var(--danger);">Sair</button>
   </div>
 
   <div id="calc" class="section active">
-    
     <label>Geometria da Peça</label>
     <select id="tipoPeca" onchange="mudarInputsCalculo()">
         <option value="retangular">Retangular / Placa (C x L x E)</option>
@@ -308,7 +292,6 @@
 
     <button class="btn" style="background:var(--info); font-size:14px; margin-top:25px;" onclick="simularCalculo()">SIMULAR CUSTO</button>
 
-    <!-- CAIXA DO ASSISTENTE DE HISTÓRICO -->
     <div id="alertaMemoria" style="display:none; padding:15px; border-radius:8px; margin-top:20px; font-size:13px; line-height: 1.5;"></div>
 
     <div id="boxResultado" class="resultado-box hidden">
@@ -332,10 +315,8 @@
         
         <button class="btn" style="background:var(--success); margin-top:20px; border:1px solid rgba(255,255,255,0.2); font-size:14px;" onclick="adicionarAoOrcamento()">ADICIONAR AO ORÇAMENTO</button>
     </div>
-
   </div>
 
-  <!-- Orçamento -->
   <div id="orc" class="section">
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:15px; margin-bottom:15px;">
         <h3 style="margin:0;">Edição de OS</h3>
@@ -406,35 +387,18 @@
                   <input type="text" id="cadCliCnpj" onblur="buscaCNPJCadastro(this.value)" placeholder="Somente números">
               </div>
           </div>
-          
           <label>Endereço Completo</label>
           <input type="text" id="cadCliEndereco" placeholder="Rua, Número, Bairro, Cidade - UF">
-          
           <div class="row">
-              <div class="col">
-                  <label>Nome do Contato</label>
-                  <input type="text" id="cadCliContato" placeholder="Ex: João (Engenharia)">
-              </div>
-              <div class="col">
-                  <label>WhatsApp</label>
-                  <input type="text" id="cadCliWhatsapp" placeholder="(16) 99999-9999">
-              </div>
+              <div class="col"><label>Nome do Contato</label><input type="text" id="cadCliContato" placeholder="Ex: João (Engenharia)"></div>
+              <div class="col"><label>WhatsApp</label><input type="text" id="cadCliWhatsapp" placeholder="(16) 99999-9999"></div>
           </div>
-          <label>E-mail</label>
-          <input type="text" id="cadCliEmail" placeholder="compras@exemplo.com.br">
-          
-          <label>Observações / Requisitos Técnicos</label>
-          <textarea id="cadCliObs" rows="2" placeholder="Ex: Exige certificado de dureza (Shore A) na entrega..."></textarea>
-          
+          <label>E-mail</label><input type="text" id="cadCliEmail" placeholder="compras@exemplo.com.br">
+          <label>Observações / Requisitos Técnicos</label><textarea id="cadCliObs" rows="2" placeholder="Ex: Exige certificado de dureza (Shore A) na entrega..."></textarea>
           <input type="hidden" id="cadCliIndex" value="-1">
-          
           <div class="row" style="margin-top:20px;">
-              <div class="col">
-                  <button class="btn" style="background:#cbd5e1; color:var(--dark);" onclick="limparFormCliente()">LIMPAR CAMPOS</button>
-              </div>
-              <div class="col" style="flex:2">
-                  <button class="btn" style="background:var(--primary);" onclick="salvarClienteCRM()">SALVAR CLIENTE</button>
-              </div>
+              <div class="col"><button class="btn" style="background:#cbd5e1; color:var(--dark);" onclick="limparFormCliente()">LIMPAR CAMPOS</button></div>
+              <div class="col" style="flex:2"><button class="btn" style="background:var(--primary);" onclick="salvarClienteCRM()">SALVAR CLIENTE</button></div>
           </div>
       </div>
 
@@ -442,12 +406,8 @@
           <h4 style="margin:0; color:var(--dark);">Diretório de Clientes</h4>
           <input type="text" id="buscaCliente" placeholder="Buscar por nome ou CNPJ..." style="width:100%; max-width:300px; margin:0;" onkeyup="renderListaClientes()">
       </div>
-      
       <div id="dashboardClientes"></div>
   </div>
-  
-  <div id="pedidos" class="section"><div id="listaPedidos"></div></div>
-  <div id="financeiro" class="section"><div id="listaBoletos"></div></div>
   
   <div id="suprimentos" class="section">
       <h3 style="border-bottom:1px solid var(--border); padding-bottom:10px;">Análise de Necessidade de Estoque</h3>
@@ -463,7 +423,9 @@
         </div>
     </div>
     
-    <div id="dashboardCronograma"></div>
+    <div style="overflow-x:auto;">
+        <div id="dashboardCronograma"></div>
+    </div>
 
     <h3 style="margin-top:40px; border-bottom:1px solid var(--border); padding-bottom:10px; color:var(--dark);">Carga de Máquina (Horas Previstas)</h3>
     <div id="dashboardProducao"></div>
@@ -509,56 +471,22 @@
 </div>
 
 <script>
-  let itensTemp = [];
-  let idEdicao = null;
-  let ultimoCalculo = null; 
-  let idxFechar = null;
+  let itensTemp = []; let idEdicao = null; let ultimoCalculo = null; let idxFechar = null;
 
-  function addHistoryState() {
-      try { history.pushState({ appLogado: true }, null, window.location.href); } catch(e) {}
-  }
-
-  function iniciarSessao() {
-      document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('appContainer').style.display = 'block';
-      addHistoryState();
-  }
-
+  function addHistoryState() { try { history.pushState({ appLogado: true }, null, window.location.href); } catch(e) {} }
+  function iniciarSessao() { document.getElementById('loginScreen').style.display = 'none'; document.getElementById('appContainer').style.display = 'block'; addHistoryState(); }
   function fazerLogin() {
-      const u = document.getElementById('loginUser').value;
-      const p = document.getElementById('loginPass').value;
-      if (u === 'Abel' && p === '201000') {
-          localStorage.setItem('marbe_logado', 'true');
-          iniciarSessao();
-      } else {
-          alert("Usuário ou senha incorretos!");
-      }
+      const u = document.getElementById('loginUser').value; const p = document.getElementById('loginPass').value;
+      if (u === 'Abel' && p === '201000') { localStorage.setItem('marbe_logado', 'true'); iniciarSessao(); } else { alert("Usuário ou senha incorretos!"); }
   }
-
-  function fazerLogout() {
-      localStorage.removeItem('marbe_logado');
-      document.getElementById('loginScreen').style.display = 'flex';
-      document.getElementById('appContainer').style.display = 'none';
-      document.getElementById('loginUser').value = '';
-      document.getElementById('loginPass').value = '';
-  }
-
+  function fazerLogout() { localStorage.removeItem('marbe_logado'); document.getElementById('loginScreen').style.display = 'flex'; document.getElementById('appContainer').style.display = 'none'; document.getElementById('loginUser').value = ''; document.getElementById('loginPass').value = ''; }
   if (localStorage.getItem('marbe_logado') === 'true') { iniciarSessao(); }
-
-  window.addEventListener('popstate', function(event) {
-      if (localStorage.getItem('marbe_logado') === 'true') { addHistoryState(); }
-  });
+  window.addEventListener('popstate', function(event) { if (localStorage.getItem('marbe_logado') === 'true') { addHistoryState(); } });
 
   function tab(id) {
     document.querySelectorAll('.section, .tab-btn').forEach(e => e.classList.remove('active'));
     document.getElementById(id).classList.add('active');
-    
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        if(btn.getAttribute('onclick').includes(`('${id}')`)) {
-            btn.classList.add('active');
-        }
-    });
-
+    document.querySelectorAll('.tab-btn').forEach(btn => { if(btn.getAttribute('onclick').includes(`('${id}')`)) { btn.classList.add('active'); } });
     if(id === 'suprimentos') renderSuprimentos();
     if(id === 'producao') renderProducao();
     if(id === 'clientesTab') renderListaClientes();
@@ -575,7 +503,7 @@
         document.getElementById('valorHoraGlobal').value = window.marbeDB.custos.vh || 50;
         document.getElementById('custoHoraInput').value = window.marbeDB.custos.vh || 50;
     }
-    renderOrcamentos(); renderPedidos(); renderBoletos(); renderCustos(); 
+    renderOrcamentos(); renderCustos(); 
     if(typeof renderProducao === 'function') renderProducao();
     atualizarListaClientes();
     if(document.getElementById('clientesTab').classList.contains('active')) renderListaClientes();
@@ -584,79 +512,44 @@
   function verificarSimilaridadeNoHistorico(pesoKgAtual, tempoMinAtual, tipoAtual, metaAtual) {
       let historicoEncontrado = [];
       const bases = [...(window.marbeDB.pedidos || []), ...(window.marbeDB.orçamentos || [])];
-      
       bases.forEach(os => {
           if(os.itens) {
               os.itens.forEach(it => {
                   let tipoIt = (it.meta && it.meta.tipo === 'revestimento') ? 'revestimento' : 'geral';
                   let tipoReq = (tipoAtual === 'revestimento') ? 'revestimento' : 'geral';
-                  
                   if (tipoIt === tipoReq) {
                       let similar = false;
-
                       if (tipoReq === 'revestimento' && metaAtual && it.meta) {
                           let fMin = metaAtual.dFerro * 0.85, fMax = metaAtual.dFerro * 1.15;
                           let aMin = metaAtual.dAcabado * 0.85, aMax = metaAtual.dAcabado * 1.15;
                           let cMin = metaAtual.lRolo * 0.85, cMax = metaAtual.lRolo * 1.15;
-
-                          if (
-                              it.meta.dFerro >= fMin && it.meta.dFerro <= fMax &&
-                              it.meta.dAcabado >= aMin && it.meta.dAcabado <= aMax &&
-                              it.meta.lRolo >= cMin && it.meta.lRolo <= cMax &&
-                              it.tempo_min > 0
-                          ) {
-                              similar = true;
-                          }
-                      } 
-                      else {
-                          let minKg = pesoKgAtual * 0.80;
-                          let maxKg = pesoKgAtual * 1.20;
-                          if (it.kg_unit >= minKg && it.kg_unit <= maxKg && it.tempo_min > 0) {
-                              similar = true;
-                          }
+                          if (it.meta.dFerro >= fMin && it.meta.dFerro <= fMax && it.meta.dAcabado >= aMin && it.meta.dAcabado <= aMax && it.meta.lRolo >= cMin && it.meta.lRolo <= cMax && it.tempo_min > 0) { similar = true; }
+                      } else {
+                          let minKg = pesoKgAtual * 0.80; let maxKg = pesoKgAtual * 1.20;
+                          if (it.kg_unit >= minKg && it.kg_unit <= maxKg && it.tempo_min > 0) { similar = true; }
                       }
-
                       if (similar) {
                           let jaExiste = historicoEncontrado.find(h => h.os === os.os && h.med === it.med);
-                          if(!jaExiste) {
-                              historicoEncontrado.push({ os: os.os, cliente: os.cliente, med: it.med, tempo_min: it.tempo_min });
-                          }
+                          if(!jaExiste) { historicoEncontrado.push({ os: os.os, cliente: os.cliente, med: it.med, tempo_min: it.tempo_min }); }
                       }
                   }
               });
           }
       });
-
       if (historicoEncontrado.length > 0) {
           let mediaTempoMin = historicoEncontrado.reduce((acc, curr) => acc + curr.tempo_min, 0) / historicoEncontrado.length;
           let difPerc = Math.abs(tempoMinAtual - mediaTempoMin) / mediaTempoMin;
-          
           let formatT = (m) => { let hh = Math.floor(m / 60); let mm = Math.round(m % 60); return hh > 0 ? `${hh}h ${mm}m` : `${mm}m`; };
-          
-          let htmlMsg = `<strong style="font-size:14px; color:var(--primary);">🧠 Assistente de Orçamento:</strong><br>
-                         <span style="color:var(--text-main);">Encontrei <b>${historicoEncontrado.length}</b> peça(s) com medidas semelhantes no seu histórico.</span><br>
-                         <ul style="margin: 12px 0; padding-left: 20px; font-size: 12px; color:var(--text-muted);">`;
-
+          let htmlMsg = `<strong style="font-size:14px; color:var(--primary);">🧠 Assistente de Orçamento:</strong><br><span style="color:var(--text-main);">Encontrei <b>${historicoEncontrado.length}</b> peça(s) com medidas semelhantes no seu histórico.</span><br><ul style="margin: 12px 0; padding-left: 20px; font-size: 12px; color:var(--text-muted);">`;
           let limite = Math.min(historicoEncontrado.length, 10);
           for(let i=0; i<limite; i++) {
               let ex = historicoEncontrado[i];
               htmlMsg += `<li style="margin-bottom:5px;"><b style="color:var(--dark)">OS ${ex.os}</b> (${ex.cliente.substring(0,15)}...) | Medida: ${ex.med} ➔ <b style="color:var(--primary)">Tempo Gasto: ${formatT(ex.tempo_min)}</b></li>`;
           }
           if(historicoEncontrado.length > 10) htmlMsg += `<li><i>... e mais ${historicoEncontrado.length - 10} registros compatíveis.</i></li>`;
-
           htmlMsg += `</ul>`;
-
-          if (difPerc > 0.20) {
-              return { 
-                  alerta: true, 
-                  html: htmlMsg + `<div style="background:#fef2f2; border:1px solid #f87171; color:#b91c1c; padding:10px; border-radius:6px; margin-top:10px;">⚠️ <b>Atenção:</b> Você orçou ${formatT(tempoMinAtual)} agora. Isso difere bastante da sua média histórica!</div>` 
-              };
-          } else {
-              return { 
-                  alerta: false, 
-                  html: htmlMsg + `<div style="background:#f0fdf4; border:1px solid #4ade80; color:#15803d; padding:10px; border-radius:6px; margin-top:10px;">✅ <b>Perfeito!</b> O tempo de ${formatT(tempoMinAtual)} está coerente com o seu histórico.</div>` 
-              };
-          }
+          if (difPerc > 0.20) { return { alerta: true, html: htmlMsg + `<div style="background:#fef2f2; border:1px solid #f87171; color:#b91c1c; padding:10px; border-radius:6px; margin-top:10px;">⚠️ <b>Atenção:</b> Você orçou ${formatT(tempoMinAtual)} agora. Isso difere bastante da sua média histórica!</div>` }; } 
+          else { return { alerta: false, html: htmlMsg + `<div style="background:#f0fdf4; border:1px solid #4ade80; color:#15803d; padding:10px; border-radius:6px; margin-top:10px;">✅ <b>Perfeito!</b> O tempo de ${formatT(tempoMinAtual)} está coerente com o seu histórico.</div>` }; }
       }
       return null;
   }
@@ -664,117 +557,59 @@
   async function buscaCNPJCadastro(v) {
     const cnpj = v.replace(/\D/g, ''); if (cnpj.length !== 14) return;
     try {
-      const r = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
-      const d = await r.json();
+      const r = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`); const d = await r.json();
       if(!document.getElementById('cadCliRazao').value) document.getElementById('cadCliRazao').value = d.razao_social || "";
       if(!document.getElementById('cadCliEndereco').value) document.getElementById('cadCliEndereco').value = d.logradouro ? `${d.logradouro}, ${d.numero} - ${d.bairro}, ${d.municipio} - ${d.uf}` : "";
     } catch (e) {}
   }
 
   function limparFormCliente() {
-      document.getElementById('cadCliRazao').value = '';
-      document.getElementById('cadCliCnpj').value = '';
-      document.getElementById('cadCliEndereco').value = '';
-      document.getElementById('cadCliContato').value = '';
-      document.getElementById('cadCliWhatsapp').value = '';
-      document.getElementById('cadCliEmail').value = '';
-      document.getElementById('cadCliObs').value = '';
+      ['cadCliRazao','cadCliCnpj','cadCliEndereco','cadCliContato','cadCliWhatsapp','cadCliEmail','cadCliObs'].forEach(id => document.getElementById(id).value = '');
       document.getElementById('cadCliIndex').value = '-1';
   }
 
   function salvarClienteCRM() {
-      const razao = document.getElementById('cadCliRazao').value;
-      if (!razao) return alert("Razão Social é obrigatória!");
-
-      const cnpj = document.getElementById('cadCliCnpj').value;
-      const index = parseInt(document.getElementById('cadCliIndex').value);
-      
-      const dadosCliente = {
-          razao: razao, cnpj: cnpj,
-          endereco: document.getElementById('cadCliEndereco').value,
-          contato: document.getElementById('cadCliContato').value,
-          whatsapp: document.getElementById('cadCliWhatsapp').value,
-          email: document.getElementById('cadCliEmail').value,
-          obs: document.getElementById('cadCliObs').value
-      };
-
+      const razao = document.getElementById('cadCliRazao').value; if (!razao) return alert("Razão Social é obrigatória!");
+      const cnpj = document.getElementById('cadCliCnpj').value; const index = parseInt(document.getElementById('cadCliIndex').value);
+      const dadosCliente = { razao: razao, cnpj: cnpj, endereco: document.getElementById('cadCliEndereco').value, contato: document.getElementById('cadCliContato').value, whatsapp: document.getElementById('cadCliWhatsapp').value, email: document.getElementById('cadCliEmail').value, obs: document.getElementById('cadCliObs').value };
       if(!window.marbeDB.clientes) window.marbeDB.clientes = [];
-
-      if (index >= 0) {
-          window.marbeDB.clientes[index] = dadosCliente;
-      } else {
+      if (index >= 0) { window.marbeDB.clientes[index] = dadosCliente; } 
+      else {
           const existe = window.marbeDB.clientes.find(c => (cnpj && c.cnpj === cnpj) || c.razao === razao);
           if (existe) { if(!confirm("Já existe um cliente cadastrado com este Nome ou CNPJ. Deseja cadastrar mesmo assim?")) return; }
           window.marbeDB.clientes.push(dadosCliente);
       }
-
-      window.salvarNuvem(); atualizarListaClientes(); renderListaClientes(); limparFormCliente();
-      alert("Cliente salvo com sucesso!");
+      window.salvarNuvem(); atualizarListaClientes(); renderListaClientes(); limparFormCliente(); alert("Cliente salvo com sucesso!");
   }
 
   function editarCliente(index) {
       const c = window.marbeDB.clientes[index];
-      document.getElementById('cadCliRazao').value = c.razao || '';
-      document.getElementById('cadCliCnpj').value = c.cnpj || '';
-      document.getElementById('cadCliEndereco').value = c.endereco || '';
-      document.getElementById('cadCliContato').value = c.contato || '';
-      document.getElementById('cadCliWhatsapp').value = c.whatsapp || '';
-      document.getElementById('cadCliEmail').value = c.email || '';
-      document.getElementById('cadCliObs').value = c.obs || '';
-      document.getElementById('cadCliIndex').value = index;
-      window.scrollTo(0,0);
+      document.getElementById('cadCliRazao').value = c.razao || ''; document.getElementById('cadCliCnpj').value = c.cnpj || ''; document.getElementById('cadCliEndereco').value = c.endereco || ''; document.getElementById('cadCliContato').value = c.contato || ''; document.getElementById('cadCliWhatsapp').value = c.whatsapp || ''; document.getElementById('cadCliEmail').value = c.email || ''; document.getElementById('cadCliObs').value = c.obs || ''; document.getElementById('cadCliIndex').value = index; window.scrollTo(0,0);
   }
 
   function excluirCliente(index) {
       if(confirm(`Tem certeza que deseja excluir o cliente ${window.marbeDB.clientes[index].razao}? (Isso não afeta OS antigas)`)) {
-          window.marbeDB.clientes.splice(index, 1);
-          window.salvarNuvem(); atualizarListaClientes(); renderListaClientes();
+          window.marbeDB.clientes.splice(index, 1); window.salvarNuvem(); atualizarListaClientes(); renderListaClientes();
       }
   }
 
   function renderListaClientes() {
-      if(!window.marbeDB.clientes || window.marbeDB.clientes.length === 0) {
-          document.getElementById('dashboardClientes').innerHTML = "<p style='text-align:center; padding:30px; color:var(--text-muted); background:var(--bg-color); border-radius:8px;'>Nenhum cliente cadastrado ainda.</p>";
-          return;
-      }
-      const termo = document.getElementById('buscaCliente').value.toLowerCase();
-      let html = '';
-
+      if(!window.marbeDB.clientes || window.marbeDB.clientes.length === 0) { document.getElementById('dashboardClientes').innerHTML = "<p style='text-align:center; padding:30px; color:var(--text-muted); background:var(--bg-color); border-radius:8px;'>Nenhum cliente cadastrado ainda.</p>"; return; }
+      const termo = document.getElementById('buscaCliente').value.toLowerCase(); let html = '';
       window.marbeDB.clientes.forEach((c, i) => {
           if (termo && !c.razao.toLowerCase().includes(termo) && !(c.cnpj && c.cnpj.includes(termo))) return;
-          let infoExtra = '';
-          if(c.contato) infoExtra += `Contato: ${c.contato} `;
-          if(c.whatsapp) infoExtra += `| Whats: ${c.whatsapp}`;
-
-          html += `
-          <div class="card-list">
-              <div style="display:flex; justify-content:space-between; align-items:center;">
-                  <strong style="font-size:14px; color:var(--dark);">${c.razao}</strong>
-                  <span style="font-size:11px; background:var(--bg-color); padding:4px 8px; border-radius:4px; color:var(--text-muted);">${c.cnpj || "Sem CNPJ"}</span>
-              </div>
-              <div style="font-size:12px; color:var(--text-muted); margin-top:8px;">${infoExtra}</div>
-              ${c.obs ? `<div style="font-size:11px; color:#92400e; background:#fef3c7; padding:8px; margin-top:8px; border-radius:4px; border-left:3px solid #f59e0b;">${c.obs}</div>` : ''}
-              <div style="display:flex; gap:10px; margin-top:12px;">
-                  <button class="btn" style="background:var(--bg-color); color:var(--text-main); padding:8px; margin:0; font-size:11px;" onclick="editarCliente(${i})">EDITAR</button>
-                  <button class="btn" style="background:#fee2e2; color:var(--danger); padding:8px; margin:0; font-size:11px;" onclick="excluirCliente(${i})">EXCLUIR</button>
-              </div>
-          </div>`;
+          let infoExtra = ''; if(c.contato) infoExtra += `Contato: ${c.contato} `; if(c.whatsapp) infoExtra += `| Whats: ${c.whatsapp}`;
+          html += `<div class="card-list"><div style="display:flex; justify-content:space-between; align-items:center;"><strong style="font-size:14px; color:var(--dark);">${c.razao}</strong><span style="font-size:11px; background:var(--bg-color); padding:4px 8px; border-radius:4px; color:var(--text-muted);">${c.cnpj || "Sem CNPJ"}</span></div><div style="font-size:12px; color:var(--text-muted); margin-top:8px;">${infoExtra}</div>${c.obs ? `<div style="font-size:11px; color:#92400e; background:#fef3c7; padding:8px; margin-top:8px; border-radius:4px; border-left:3px solid #f59e0b;">${c.obs}</div>` : ''}<div style="display:flex; gap:10px; margin-top:12px;"><button class="btn" style="background:var(--bg-color); color:var(--text-main); padding:8px; margin:0; font-size:11px;" onclick="editarCliente(${i})">EDITAR</button><button class="btn" style="background:#fee2e2; color:var(--danger); padding:8px; margin:0; font-size:11px;" onclick="excluirCliente(${i})">EXCLUIR</button></div></div>`;
       });
       document.getElementById('dashboardClientes').innerHTML = html || "<p style='color:var(--text-muted)'>Nenhum cliente encontrado na busca.</p>";
   }
 
   function autoPreencherCliente(razaoEscolhida) {
-    if(!window.marbeDB.clientes) return;
-    const c = window.marbeDB.clientes.find(x => x.razao === razaoEscolhida);
-    const boxCrm = document.getElementById('crmAlertaOrcamento');
-    
+    if(!window.marbeDB.clientes) return; const c = window.marbeDB.clientes.find(x => x.razao === razaoEscolhida); const boxCrm = document.getElementById('crmAlertaOrcamento');
     if(c) {
         document.getElementById('cnpj').value = c.cnpj || ''; document.getElementById('endereco').value = c.endereco || '';
         if (c.contato || c.whatsapp || c.obs) {
-            document.getElementById('crmContato').innerText = c.contato ? `Contato: ${c.contato}` : '';
-            document.getElementById('crmWhatsapp').innerText = c.whatsapp ? `Whats: ${c.whatsapp}` : '';
-            document.getElementById('crmObs').innerText = c.obs ? `Lembrete: ${c.obs}` : '';
-            boxCrm.style.display = 'block';
+            document.getElementById('crmContato').innerText = c.contato ? `Contato: ${c.contato}` : ''; document.getElementById('crmWhatsapp').innerText = c.whatsapp ? `Whats: ${c.whatsapp}` : ''; document.getElementById('crmObs').innerText = c.obs ? `Lembrete: ${c.obs}` : ''; boxCrm.style.display = 'block';
         } else { boxCrm.style.display = 'none'; }
     } else { boxCrm.style.display = 'none'; }
   }
@@ -783,7 +618,6 @@
       const p = parseFloat(document.getElementById('descPorc').value);
       if(!p || p <= 0) return alert("Digite uma porcentagem válida (Ex: 5)");
       if(itensTemp.length === 0) return alert("Não há itens na lista para aplicar desconto.");
-
       if(confirm(`Tem certeza que deseja aplicar ${p}% de desconto em TODOS os itens da lista?\nIsso reduzirá o valor unitário e total.`)) {
           itensTemp.forEach(it => { it.v = it.v * (1 - (p / 100)); });
           renderTabelaAtual(); alert("Desconto aplicado com sucesso!"); document.getElementById('descPorc').value = ""; 
@@ -791,236 +625,89 @@
   }
 
   function mudarInputsCalculo() {
-      document.querySelectorAll('.grupo-input').forEach(el => el.classList.add('hidden'));
-      document.getElementById('boxResultado').classList.add('hidden');
-      document.getElementById('alertaMemoria').style.display = 'none'; 
-      
-      const tipo = document.getElementById('tipoPeca').value;
-      document.getElementById('input-' + tipo).classList.remove('hidden');
-
-      if(tipo === 'revestimento') {
-          document.getElementById('colPecasHora').classList.add('hidden');
-          document.getElementById('colHorasGastas').classList.remove('hidden');
-          document.getElementById('colPerda').classList.add('hidden');
-      } else {
-          document.getElementById('colPecasHora').classList.remove('hidden');
-          document.getElementById('colHorasGastas').classList.add('hidden');
-          document.getElementById('colPerda').classList.remove('hidden');
-      }
+      document.querySelectorAll('.grupo-input').forEach(el => el.classList.add('hidden')); document.getElementById('boxResultado').classList.add('hidden'); document.getElementById('alertaMemoria').style.display = 'none'; 
+      const tipo = document.getElementById('tipoPeca').value; document.getElementById('input-' + tipo).classList.remove('hidden');
+      if(tipo === 'revestimento') { document.getElementById('colPecasHora').classList.add('hidden'); document.getElementById('colHorasGastas').classList.remove('hidden'); document.getElementById('colPerda').classList.add('hidden'); } 
+      else { document.getElementById('colPecasHora').classList.remove('hidden'); document.getElementById('colHorasGastas').classList.add('hidden'); document.getElementById('colPerda').classList.remove('hidden'); }
   }
 
   function simularCalculo() {
-      const tipo = document.getElementById('tipoPeca').value;
-      let perdaPerc = 0;
-      if (tipo !== 'revestimento') { perdaPerc = parseFloat(document.getElementById('percPerda').value) || 0; }
-
-      const densidade = parseFloat(document.getElementById('densidade').value) || 1.2;
-      const markup = parseFloat(document.getElementById('markup').value) || 2.5;
-      
-      const selMat = document.getElementById('matSelect');
-      if(selMat.selectedIndex < 0) return alert("Cadastre materiais na aba Custos primeiro!");
-      const custoKg = parseFloat(selMat.value);
-      const nomeMat = selMat.options[selMat.selectedIndex].text;
-      
-      const valorHora = parseFloat(document.getElementById('tipoTorno').value);
-      const selServico = document.getElementById('tipoServicoCalc');
-      const taxaImposto = parseFloat(selServico.value);
-      const nomeServico = selServico.options[selServico.selectedIndex].text;
-      const isGarantia = nomeServico.includes('GARANTIA');
-
+      const tipo = document.getElementById('tipoPeca').value; let perdaPerc = 0; if (tipo !== 'revestimento') { perdaPerc = parseFloat(document.getElementById('percPerda').value) || 0; }
+      const densidade = parseFloat(document.getElementById('densidade').value) || 1.2; const markup = parseFloat(document.getElementById('markup').value) || 2.5;
+      const selMat = document.getElementById('matSelect'); if(selMat.selectedIndex < 0) return alert("Cadastre materiais na aba Custos primeiro!");
+      const custoKg = parseFloat(selMat.value); const nomeMat = selMat.options[selMat.selectedIndex].text;
+      const valorHora = parseFloat(document.getElementById('tipoTorno').value); const selServico = document.getElementById('tipoServicoCalc'); const taxaImposto = parseFloat(selServico.value); const nomeServico = selServico.options[selServico.selectedIndex].text; const isGarantia = nomeServico.includes('GARANTIA');
       let volumeCm3 = 0; let pesoDiretoG = 0; let descMedidas = ""; let metaRevest = null; 
 
-      if (tipo === 'peso_direto') {
-          pesoDiretoG = parseFloat(document.getElementById('peso-input').value);
-          if(!pesoDiretoG) return alert("Informe o peso.");
-          descMedidas = "Peso " + pesoDiretoG + "g";
-      } 
+      if (tipo === 'peso_direto') { pesoDiretoG = parseFloat(document.getElementById('peso-input').value); if(!pesoDiretoG) return alert("Informe o peso."); descMedidas = "Peso " + pesoDiretoG + "g"; } 
       else if (tipo === 'revestimento') {
-          const ferro = parseFloat(document.getElementById('rev-ferro').value);
-          const acabado = parseFloat(document.getElementById('rev-acabado').value);
-          const comp = parseFloat(document.getElementById('rev-comp').value);
-          
+          const ferro = parseFloat(document.getElementById('rev-ferro').value); const acabado = parseFloat(document.getElementById('rev-acabado').value); const comp = parseFloat(document.getElementById('rev-comp').value);
           if(ferro && acabado && comp) {
               if (acabado <= ferro) return alert("O Ø Acabado deve ser MAIOR que o Ø Ferro.");
-              const espBase = (acabado - ferro) / 2;
-              const sobraUsinagem = espBase <= 30 ? 5 : 10;
-              const espFinal = espBase + sobraUsinagem;
-              
-              volumeCm3 = (Math.PI * (ferro + espFinal) * espFinal * comp) / 1000;
-              descMedidas = `Serviço de Revestimento Ø${ferro}xØ${acabado}x${comp}mm (camada ${espBase}mm)`;
-              metaRevest = { dFerro: ferro, dAcabado: acabado, lRolo: comp, tipo: 'revestimento' };
+              const espBase = (acabado - ferro) / 2; const sobraUsinagem = espBase <= 30 ? 5 : 10; const espFinal = espBase + sobraUsinagem;
+              volumeCm3 = (Math.PI * (ferro + espFinal) * espFinal * comp) / 1000; descMedidas = `Serviço de Revestimento Ø${ferro}xØ${acabado}x${comp}mm (camada ${espBase}mm)`; metaRevest = { dFerro: ferro, dAcabado: acabado, lRolo: comp, tipo: 'revestimento' };
           }
       }
-      else if (tipo === 'retangular') {
-          let c = parseFloat(document.getElementById('ret-comp').value), larg = parseFloat(document.getElementById('ret-larg').value), esp = parseFloat(document.getElementById('ret-esp').value);
-          if(c && larg && esp) { volumeCm3 = (c*larg*esp)/1000; descMedidas = `${c}x${larg}x${esp}mm`; }
-      } else if (tipo === 'quadrada') {
-          let ld = parseFloat(document.getElementById('quad-lado').value), esp = parseFloat(document.getElementById('quad-esp').value);
-          if(ld && esp) { volumeCm3 = (ld*ld*esp)/1000; descMedidas = `${ld}x${ld}x${esp}mm`; }
-      } else if (tipo === 'redonda') {
-          let d = parseFloat(document.getElementById('red-diam').value), esp = parseFloat(document.getElementById('red-esp').value);
-          if(d && esp) { volumeCm3 = (Math.PI * Math.pow(d/2, 2) * esp)/1000; descMedidas = `Ø${d} x ${esp}mm`; }
-      } else if (tipo === 'tubo') {
-          let ext = parseFloat(document.getElementById('tubo-ext').value), int = parseFloat(document.getElementById('tubo-int').value), c = parseFloat(document.getElementById('tubo-comp').value);
-          if(ext && int && c) {
-              let area = (Math.PI * Math.pow(ext/2, 2)) - (Math.PI * Math.pow(int/2, 2));
-              volumeCm3 = (area * c)/1000; descMedidas = `Ø${ext}xØ${int} x ${c}mm`;
-          }
-      } else if (tipo === 'oring') {
-          let di = parseFloat(document.getElementById('oring-di').value), fio = parseFloat(document.getElementById('oring-fio').value);
-          if(di && fio) {
-              let rFio=fio/2, rMed=(di+fio)/2;
-              volumeCm3 = (Math.PI * Math.pow(rFio, 2) * (2*Math.PI*rMed))/1000; descMedidas = `O-Ring Ø${di} x ${fio}mm`;
-          }
-      } else if (tipo === 'esfera') {
-          let d = parseFloat(document.getElementById('esf-diam').value);
-          if(d) { volumeCm3 = (4/3 * Math.PI * Math.pow(d/2, 3))/1000; descMedidas = `Esfera Ø${d}mm`; }
-      } else if (tipo === 'cone') {
-          let dm = parseFloat(document.getElementById('cone-maior').value), dmn = parseFloat(document.getElementById('cone-menor').value), h = parseFloat(document.getElementById('cone-alt').value);
-          if(dm && dmn && h) {
-              let r1=dm/2, r2=dmn/2;
-              volumeCm3 = ((Math.PI*h)/3 * (Math.pow(r1,2) + r1*r2 + Math.pow(r2,2)))/1000; descMedidas = `Cone ${dm}/${dmn} x ${h}mm`;
-          }
-      }
+      else if (tipo === 'retangular') { let c = parseFloat(document.getElementById('ret-comp').value), larg = parseFloat(document.getElementById('ret-larg').value), esp = parseFloat(document.getElementById('ret-esp').value); if(c && larg && esp) { volumeCm3 = (c*larg*esp)/1000; descMedidas = `${c}x${larg}x${esp}mm`; } } 
+      else if (tipo === 'quadrada') { let ld = parseFloat(document.getElementById('quad-lado').value), esp = parseFloat(document.getElementById('quad-esp').value); if(ld && esp) { volumeCm3 = (ld*ld*esp)/1000; descMedidas = `${ld}x${ld}x${esp}mm`; } } 
+      else if (tipo === 'redonda') { let d = parseFloat(document.getElementById('red-diam').value), esp = parseFloat(document.getElementById('red-esp').value); if(d && esp) { volumeCm3 = (Math.PI * Math.pow(d/2, 2) * esp)/1000; descMedidas = `Ø${d} x ${esp}mm`; } } 
+      else if (tipo === 'tubo') { let ext = parseFloat(document.getElementById('tubo-ext').value), int = parseFloat(document.getElementById('tubo-int').value), c = parseFloat(document.getElementById('tubo-comp').value); if(ext && int && c) { let area = (Math.PI * Math.pow(ext/2, 2)) - (Math.PI * Math.pow(int/2, 2)); volumeCm3 = (area * c)/1000; descMedidas = `Ø${ext}xØ${int} x ${c}mm`; } } 
+      else if (tipo === 'oring') { let di = parseFloat(document.getElementById('oring-di').value), fio = parseFloat(document.getElementById('oring-fio').value); if(di && fio) { let rFio=fio/2, rMed=(di+fio)/2; volumeCm3 = (Math.PI * Math.pow(rFio, 2) * (2*Math.PI*rMed))/1000; descMedidas = `O-Ring Ø${di} x ${fio}mm`; } } 
+      else if (tipo === 'esfera') { let d = parseFloat(document.getElementById('esf-diam').value); if(d) { volumeCm3 = (4/3 * Math.PI * Math.pow(d/2, 3))/1000; descMedidas = `Esfera Ø${d}mm`; } } 
+      else if (tipo === 'cone') { let dm = parseFloat(document.getElementById('cone-maior').value), dmn = parseFloat(document.getElementById('cone-menor').value), h = parseFloat(document.getElementById('cone-alt').value); if(dm && dmn && h) { let r1=dm/2, r2=dmn/2; volumeCm3 = ((Math.PI*h)/3 * (Math.pow(r1,2) + r1*r2 + Math.pow(r2,2)))/1000; descMedidas = `Cone ${dm}/${dmn} x ${h}mm`; } }
 
       if(volumeCm3 === 0 && pesoDiretoG === 0) return alert("Preencha as medidas corretamente.");
 
-      let pesoLiq = (tipo === 'peso_direto') ? pesoDiretoG : (volumeCm3 * densidade);
-      let fatorPerda = 1 + (perdaPerc / 100);
-      let pesoBrutoG = pesoLiq * fatorPerda;
-      let pesoBrutoKg = pesoBrutoG / 1000;
-
-      let custoMateria = pesoBrutoKg * custoKg;
-      let custoCola = 0;
-      if (tipo === 'revestimento') {
-          custoCola = custoMateria * 0.10;
-          document.getElementById('linhaCola').classList.remove('hidden');
-          document.getElementById('resCustoCola').innerText = window.fmtMoney(custoCola);
-      } else {
-          document.getElementById('linhaCola').classList.add('hidden');
-      }
+      let pesoLiq = (tipo === 'peso_direto') ? pesoDiretoG : (volumeCm3 * densidade); let fatorPerda = 1 + (perdaPerc / 100); let pesoBrutoG = pesoLiq * fatorPerda; let pesoBrutoKg = pesoBrutoG / 1000;
+      let custoMateria = pesoBrutoKg * custoKg; let custoCola = 0;
+      if (tipo === 'revestimento') { custoCola = custoMateria * 0.10; document.getElementById('linhaCola').classList.remove('hidden'); document.getElementById('resCustoCola').innerText = window.fmtMoney(custoCola); } 
+      else { document.getElementById('linhaCola').classList.add('hidden'); }
 
       let custoMO = 0;
-      if (tipo === 'revestimento') {
-          const hGastas = parseFloat(document.getElementById('horasGastas').value) || 0;
-          if(!hGastas) return alert("Informe as horas gastas.");
-          custoMO = valorHora * hGastas;
-      } else {
-          const pecasHora = parseFloat(document.getElementById('pecasHora').value);
-          if(!pecasHora) return alert("Informe peças por hora.");
-          custoMO = valorHora / pecasHora;
-      }
+      if (tipo === 'revestimento') { const hGastas = parseFloat(document.getElementById('horasGastas').value) || 0; if(!hGastas) return alert("Informe as horas gastas."); custoMO = valorHora * hGastas; } 
+      else { const pecasHora = parseFloat(document.getElementById('pecasHora').value); if(!pecasHora) return alert("Informe peças por hora."); custoMO = valorHora / pecasHora; }
 
-      let custoProd = custoMateria + custoCola + custoMO;
-      let precoBase = custoProd * markup;
-      let valorImposto = precoBase * (taxaImposto / 100);
-      let precoFinal = precoBase + valorImposto;
+      let custoProd = custoMateria + custoCola + custoMO; let precoBase = custoProd * markup; let valorImposto = precoBase * (taxaImposto / 100); let precoFinal = precoBase + valorImposto;
 
-      if(isGarantia) {
-          precoBase = 0;
-          valorImposto = 0;
-          precoFinal = 0;
-      }
+      if(isGarantia) { precoBase = 0; valorImposto = 0; precoFinal = 0; }
 
       let minPorPeca = 0;
-      if (tipo === 'revestimento') {
-          const hGastas = parseFloat(document.getElementById('horasGastas').value) || 0;
-          minPorPeca = hGastas * 60;
-      } else {
-          const pecasHora = parseFloat(document.getElementById('pecasHora').value) || 1;
-          minPorPeca = 60 / pecasHora;
-      }
+      if (tipo === 'revestimento') { const hGastas = parseFloat(document.getElementById('horasGastas').value) || 0; minPorPeca = hGastas * 60; } 
+      else { const pecasHora = parseFloat(document.getElementById('pecasHora').value) || 1; minPorPeca = 60 / pecasHora; }
 
-      let nomeFinalItem = (tipo === 'revestimento') 
-          ? descMedidas 
-          : `${document.getElementById('tipoPeca').options[document.getElementById('tipoPeca').selectedIndex].text} - ${nomeServico} ${descMedidas}`;
+      let nomeFinalItem = (tipo === 'revestimento') ? descMedidas : `${document.getElementById('tipoPeca').options[document.getElementById('tipoPeca').selectedIndex].text} - ${nomeServico} ${descMedidas}`;
+      if(isGarantia && !nomeFinalItem.includes('[GARANTIA]')) { nomeFinalItem = `[GARANTIA] ${nomeFinalItem}`; }
 
-      if(isGarantia && !nomeFinalItem.includes('[GARANTIA]')) {
-          nomeFinalItem = `[GARANTIA] ${nomeFinalItem}`;
-      }
+      ultimoCalculo = { n: nomeFinalItem, mat: nomeMat, med: descMedidas, q: 1, v: precoFinal, kg_unit: pesoBrutoKg, tempo_min: minPorPeca, meta: metaRevest };
 
-      ultimoCalculo = {
-          n: nomeFinalItem, mat: nomeMat, med: descMedidas, q: 1, v: precoFinal, kg_unit: pesoBrutoKg, tempo_min: minPorPeca, meta: metaRevest 
-      };
-
-      let analiseMemoria = verificarSimilaridadeNoHistorico(pesoBrutoKg, minPorPeca, tipo, metaRevest);
-      let boxAlerta = document.getElementById('alertaMemoria');
-      
-      if (analiseMemoria) {
-          boxAlerta.innerHTML = analiseMemoria.html;
-          boxAlerta.style.display = 'block';
-          if (analiseMemoria.alerta) {
-              boxAlerta.style.background = '#fef2f2'; boxAlerta.style.border = '1px solid #fecaca';
-          } else {
-              boxAlerta.style.background = '#f0fdf4'; boxAlerta.style.border = '1px solid #bbf7d0';
-          }
-      } else {
-          boxAlerta.style.display = 'none';
-      }
+      let analiseMemoria = verificarSimilaridadeNoHistorico(pesoBrutoKg, minPorPeca, tipo, metaRevest); let boxAlerta = document.getElementById('alertaMemoria');
+      if (analiseMemoria) { boxAlerta.innerHTML = analiseMemoria.html; boxAlerta.style.display = 'block'; if (analiseMemoria.alerta) { boxAlerta.style.background = '#fef2f2'; boxAlerta.style.border = '1px solid #fecaca'; } else { boxAlerta.style.background = '#f0fdf4'; boxAlerta.style.border = '1px solid #bbf7d0'; } } 
+      else { boxAlerta.style.display = 'none'; }
 
       document.getElementById('resDesc').innerText = descMedidas;
-      if(tipo === 'revestimento') {
-          document.getElementById('resPesoLiq').innerText = "- (Manta Bruta s/ sobra)";
-          document.getElementById('lblPesoBruto').innerText = "Peso Cobrado (Manta s/ folga):";
-      } else {
-          document.getElementById('resPesoLiq').innerText = pesoLiq.toFixed(1) + ' g';
-          document.getElementById('lblPesoBruto').innerText = `Peso Bruto (+${perdaPerc}%):`;
-      }
+      if(tipo === 'revestimento') { document.getElementById('resPesoLiq').innerText = "- (Manta Bruta s/ sobra)"; document.getElementById('lblPesoBruto').innerText = "Peso Cobrado (Manta s/ folga):"; } 
+      else { document.getElementById('resPesoLiq').innerText = pesoLiq.toFixed(1) + ' g'; document.getElementById('lblPesoBruto').innerText = `Peso Bruto (+${perdaPerc}%):`; }
+      document.getElementById('resPesoBruto').innerText = pesoBrutoG.toFixed(1) + ' g'; document.getElementById('resCustoMat').innerText = window.fmtMoney(custoMateria); document.getElementById('resCustoMO').innerText = window.fmtMoney(custoMO); document.getElementById('resCustoTot').innerText = window.fmtMoney(custoProd);
       
-      document.getElementById('resPesoBruto').innerText = pesoBrutoG.toFixed(1) + ' g';
-      document.getElementById('resCustoMat').innerText = window.fmtMoney(custoMateria);
-      document.getElementById('resCustoMO').innerText = window.fmtMoney(custoMO);
+      if(isGarantia) { document.getElementById('lblCustoTot').innerText = "Custo (Prejuízo Interno):"; document.getElementById('resCustoTot').style.color = "#fca5a5"; document.getElementById('resMarkup').innerText = "Garantia (Sem Receita)"; } 
+      else { document.getElementById('lblCustoTot').innerText = "Custo de Produção:"; document.getElementById('resCustoTot').style.color = "#fff"; document.getElementById('resMarkup').innerText = markup + "x (" + window.fmtMoney(precoBase) + ")"; }
       
-      document.getElementById('resCustoTot').innerText = window.fmtMoney(custoProd);
-      if(isGarantia) {
-          document.getElementById('lblCustoTot').innerText = "Custo (Prejuízo Interno):";
-          document.getElementById('resCustoTot').style.color = "#fca5a5";
-          document.getElementById('resMarkup').innerText = "Garantia (Sem Receita)";
-      } else {
-          document.getElementById('lblCustoTot').innerText = "Custo de Produção:";
-          document.getElementById('resCustoTot').style.color = "#fff";
-          document.getElementById('resMarkup').innerText = markup + "x (" + window.fmtMoney(precoBase) + ")";
-      }
-      
-      document.getElementById('resTaxa').innerText = taxaImposto;
-      document.getElementById('resValorImposto').innerText = window.fmtMoney(valorImposto);
-      document.getElementById('resPrecoVenda').innerText = window.fmtMoney(precoFinal);
-      document.getElementById('boxResultado').classList.remove('hidden');
+      document.getElementById('resTaxa').innerText = taxaImposto; document.getElementById('resValorImposto').innerText = window.fmtMoney(valorImposto); document.getElementById('resPrecoVenda').innerText = window.fmtMoney(precoFinal); document.getElementById('boxResultado').classList.remove('hidden');
   }
 
-  function adicionarAoOrcamento() {
-      if(!ultimoCalculo) return;
-      itensTemp.push({...ultimoCalculo}); 
-      renderTabelaAtual(); tab('orc');
-      document.getElementById('boxResultado').classList.add('hidden');
-      document.getElementById('alertaMemoria').style.display = 'none';
-      ultimoCalculo = null;
-  }
+  function adicionarAoOrcamento() { if(!ultimoCalculo) return; itensTemp.push({...ultimoCalculo}); renderTabelaAtual(); tab('orc'); document.getElementById('boxResultado').classList.add('hidden'); document.getElementById('alertaMemoria').style.display = 'none'; ultimoCalculo = null; }
 
   async function buscaCNPJ(v) {
     const cnpj = v.replace(/\D/g, ''); if (cnpj.length !== 14) return;
     try {
-      const r = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
-      const d = await r.json();
-      document.getElementById('razao').value = d.razao_social || "";
-      document.getElementById('endereco').value = d.logradouro ? `${d.logradouro}, ${d.numero} - ${d.bairro}, ${d.municipio} - ${d.uf}` : "";
+      const r = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`); const d = await r.json();
+      document.getElementById('razao').value = d.razao_social || ""; document.getElementById('endereco').value = d.logradouro ? `${d.logradouro}, ${d.numero} - ${d.bairro}, ${d.municipio} - ${d.uf}` : "";
       salvarClienteDb(d.razao_social, v, document.getElementById('endereco').value);
     } catch (e) {}
   }
 
-  function salvarClienteDb(razao, cnpj, endereco) {
-    if(!window.marbeDB.clientes) window.marbeDB.clientes = [];
-    const existe = window.marbeDB.clientes.find(c => c.razao === razao);
-    if(!existe && razao) {
-        window.marbeDB.clientes.push({ razao, cnpj, endereco });
-        window.salvarNuvem(); atualizarListaClientes();
-    }
-  }
-
-  function atualizarListaClientes() {
-    if(!window.marbeDB.clientes) return;
-    document.getElementById('listaClientesDatalist').innerHTML = window.marbeDB.clientes.map(c => `<option value="${c.razao}">`).join('');
-  }
+  function salvarClienteDb(razao, cnpj, endereco) { if(!window.marbeDB.clientes) window.marbeDB.clientes = []; const existe = window.marbeDB.clientes.find(c => c.razao === razao); if(!existe && razao) { window.marbeDB.clientes.push({ razao, cnpj, endereco }); window.salvarNuvem(); atualizarListaClientes(); } }
+  function atualizarListaClientes() { if(!window.marbeDB.clientes) return; document.getElementById('listaClientesDatalist').innerHTML = window.marbeDB.clientes.map(c => `<option value="${c.razao}">`).join(''); }
 
   function renderTabelaAtual() {
     let total = 0;
@@ -1039,27 +726,16 @@
 
   function salvarOrcamento() {
     if(itensTemp.length === 0) return alert("Adicione pelo menos um item ao orçamento.");
-    
-    const razaoComercial = document.getElementById('razao').value || "CLIENTE NÃO INFORMADO";
-    const cnpjComercial = document.getElementById('cnpj').value || "";
-    const enderecoComercial = document.getElementById('endereco').value || "";
-
+    const razaoComercial = document.getElementById('razao').value || "CLIENTE NÃO INFORMADO"; const cnpjComercial = document.getElementById('cnpj').value || ""; const enderecoComercial = document.getElementById('endereco').value || "";
     const orcData = { 
-        os: idEdicao ? idEdicao.os : window.marbeDB.os, 
-        cliente: razaoComercial, cnpj: cnpjComercial, endereco: enderecoComercial, 
-        itens: JSON.parse(JSON.stringify(itensTemp)), frete: document.getElementById('frete').value, 
-        prazo: document.getElementById('prazo').value, pagamento: document.getElementById('pagamento').value, 
-        total: itensTemp.reduce((a,b)=>a+(b.v*b.q),0), data_criacao: new Date().toISOString()
+        os: idEdicao ? idEdicao.os : window.marbeDB.os, cliente: razaoComercial, cnpj: cnpjComercial, endereco: enderecoComercial, itens: JSON.parse(JSON.stringify(itensTemp)), frete: document.getElementById('frete').value, prazo: document.getElementById('prazo').value, pagamento: document.getElementById('pagamento').value, total: itensTemp.reduce((a,b)=>a+(b.v*b.q),0), data_criacao: new Date().toISOString()
     };
-
     if (razaoComercial !== "CLIENTE NÃO INFORMADO") { salvarClienteDb(razaoComercial, cnpjComercial, enderecoComercial); }
 
     if(idEdicao) {
         if (idEdicao.origem === 'pedidos' && window.marbeDB.pedidos[idEdicao.index].data_criacao) { orcData.data_criacao = window.marbeDB.pedidos[idEdicao.index].data_criacao; } 
         else if (idEdicao.origem === 'orçamentos' && window.marbeDB.orçamentos[idEdicao.index].data_criacao) { orcData.data_criacao = window.marbeDB.orçamentos[idEdicao.index].data_criacao; }
-        
-        if(idEdicao.origem === 'pedidos') window.marbeDB.pedidos[idEdicao.index] = orcData;
-        else window.marbeDB.orçamentos[idEdicao.index] = orcData;
+        if(idEdicao.origem === 'pedidos') window.marbeDB.pedidos[idEdicao.index] = orcData; else window.marbeDB.orçamentos[idEdicao.index] = orcData;
         idEdicao = null; document.getElementById('btnCancelaEdit').style.display = 'none'; document.getElementById('osEdicaoLabel').innerText = "Nova";
     } else {
         if(!window.marbeDB.orçamentos) window.marbeDB.orçamentos = [];
@@ -1069,38 +745,17 @@
   }
 
   function renderOrcamentos() {
-    let dataInicioStr = document.getElementById('filtroInicio').value;
-    let dataFimStr = document.getElementById('filtroFim').value;
-    
-    let dataInicio = dataInicioStr ? new Date(dataInicioStr + "T00:00:00") : new Date(0);
-    let dataFim = dataFimStr ? new Date(dataFimStr + "T23:59:59") : new Date();
-
+    let dataInicioStr = document.getElementById('filtroInicio').value; let dataFimStr = document.getElementById('filtroFim').value;
+    let dataInicio = dataInicioStr ? new Date(dataInicioStr + "T00:00:00") : new Date(0); let dataFim = dataFimStr ? new Date(dataFimStr + "T23:59:59") : new Date();
     let html = '';
     (window.marbeDB.orçamentos || []).forEach((o, i) => {
         let exibir = false;
-        if (!o.data_criacao) exibir = true;
-        else { let dataOrc = new Date(o.data_criacao); if (dataOrc >= dataInicio && dataOrc <= dataFim) exibir = true; }
-        
+        if (!o.data_criacao) exibir = true; else { let dataOrc = new Date(o.data_criacao); if (dataOrc >= dataInicio && dataOrc <= dataFim) exibir = true; }
         if (exibir) {
             let dataFormatada = o.data_criacao ? new Date(o.data_criacao).toLocaleDateString('pt-BR') : "Antigo";
-            html += `
-              <div class="card-list">
-                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                    <strong style="font-size:14px; color:var(--dark);">OS: ${o.os} - ${o.cliente}</strong> 
-                    <span style="font-size:11px; background:var(--bg-color); padding:4px 8px; border-radius:4px; color:var(--text-muted);">${dataFormatada}</span>
-                </div>
-                <div style="font-size:16px; font-weight:700; color:var(--success); margin:10px 0;">${window.fmtMoney(o.total)}</div>
-                
-                <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
-                    <button class="btn" style="background:var(--bg-color); color:var(--dark); padding:10px; margin:0; flex:1;" onclick="gerarPDF('CLIENTE', ${i}, 'orçamentos')">PDF Cliente</button>
-                    <button class="btn" style="background:#f3e8ff; color:var(--prod); padding:10px; margin:0; flex:1;" onclick="gerarPDF('PRODUCAO', ${i}, 'orçamentos')">PDF Produção</button>
-                    <button class="btn" style="background:#e0f2fe; color:var(--info); padding:10px; margin:0; flex:1;" onclick="editarExistente('orçamentos', ${i})">Editar</button>
-                    <button class="btn" style="background:var(--primary); padding:10px; margin:0; flex:1;" onclick="fecharPedido(${i})">Aprovar OS</button>
-                </div>
-              </div>`;
+            html += `<div class="card-list"><div style="display:flex; justify-content:space-between; align-items:flex-start;"><strong style="font-size:14px; color:var(--dark);">OS: ${o.os} - ${o.cliente}</strong><span style="font-size:11px; background:var(--bg-color); padding:4px 8px; border-radius:4px; color:var(--text-muted);">${dataFormatada}</span></div><div style="font-size:16px; font-weight:700; color:var(--success); margin:10px 0;">${window.fmtMoney(o.total)}</div><div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;"><button class="btn" style="background:var(--bg-color); color:var(--dark); padding:10px; margin:0; flex:1;" onclick="gerarPDF('CLIENTE', ${i}, 'orçamentos')">PDF Cliente</button><button class="btn" style="background:#f3e8ff; color:var(--prod); padding:10px; margin:0; flex:1;" onclick="gerarPDF('PRODUCAO', ${i}, 'orçamentos')">PDF Produção</button><button class="btn" style="background:#e0f2fe; color:var(--info); padding:10px; margin:0; flex:1;" onclick="editarExistente('orçamentos', ${i})">Editar</button><button class="btn" style="background:var(--primary); padding:10px; margin:0; flex:1;" onclick="fecharPedido(${i})">Aprovar OS</button></div></div>`;
         }
     });
-    
     document.getElementById('listaOrcamentos').innerHTML = html || "<p style='text-align:center; padding:30px; background:var(--bg-color); border-radius:8px; color:var(--text-muted)'>Nenhum orçamento encontrado neste período.</p>";
   }
 
@@ -1113,231 +768,74 @@
       let orc = window.marbeDB.orçamentos.splice(idxFechar, 1)[0];
       orc.data_entrada = document.getElementById('modal-data-entrada').value; orc.data_limite = document.getElementById('modal-data-limite').value;
       if(!window.marbeDB.pedidos) window.marbeDB.pedidos = []; window.marbeDB.pedidos.push(orc); window.salvarNuvem();
-      document.getElementById('modal-fechar').style.display = 'none'; tab('pedidos');
-  }
-
-  function renderPedidos() {
-    document.getElementById('listaPedidos').innerHTML = (window.marbeDB.pedidos || []).map((p, i) => `
-      <div class="card-list" style="border-left-color:var(--success)">
-        <div style="font-size:15px; font-weight:700; color:var(--dark); margin-bottom:5px;">OS: ${p.os} - ${p.cliente}</div>
-        <div style="font-size:14px; font-weight:600; color:var(--success); margin-bottom:15px;">${window.fmtMoney(p.total)}</div>
-        
-        <div style="display:flex; gap:10px; margin:10px 0; flex-wrap:wrap;">
-            <button class="btn" style="background:var(--bg-color); color:var(--dark); width:auto; padding:10px; margin:0; flex:1" onclick="editarExistente('pedidos', ${i})">Editar</button>
-            <button class="btn" style="background:#f3e8ff; color:var(--prod); width:auto; padding:10px; margin:0; flex:1" onclick="gerarPDF('PRODUCAO', ${i}, 'pedidos')">PDF Prod.</button>
-            <button class="btn" style="background:#ffedd5; color:var(--compra); width:auto; padding:10px; margin:0; flex:1" onclick="gerarPDF('COMPRA', ${i}, 'pedidos')">PDF Compra</button>
-        </div>
-        
-        <button class="btn" style="background:transparent; color:var(--danger); border:1px solid #fca5a5; margin-top:10px; padding:10px;" onclick="estornarVenda(${i})">↩ Estornar para Orçamento</button>
-        
-        <div style="height:1px; background:var(--border); margin:15px 0;"></div>
-        
-        <div style="background:var(--bg-color); padding:15px; border-radius:8px;">
-            <span style="font-size:12px; font-weight:600; color:var(--dark); display:block; margin-bottom:10px;">Ação de Faturamento</span>
-            <input type="text" id="nf_${i}" placeholder="Nº da Nota Fiscal" style="margin-bottom:10px;">
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:15px;">
-                <input type="number" id="parc_${i}" placeholder="Qtd Parcelas">
-                <input type="date" id="data_${i}">
-            </div>
-            <button class="btn" style="background:var(--success); margin:0;" onclick="faturar(${i})">CONCLUIR E GERAR BOLETOS</button>
-        </div>
-      </div>`).join('');
-  }
-
-  function estornarVenda(i) {
-      if(!confirm("Deseja CANCELAR essa venda e voltar para Orçamento? O item sairá desta lista.")) return;
-      const item = window.marbeDB.pedidos.splice(i, 1)[0];
-      if(!window.marbeDB.orçamentos) window.marbeDB.orçamentos = [];
-      window.marbeDB.orçamentos.push(item); window.salvarNuvem(); updateUI();
-      alert("Venda estornada! O item voltou para a aba HISTÓRICO."); tab('historico');
-  }
-
-  function faturar(i) {
-    const nf = document.getElementById(`nf_${i}`).value, qtd = parseInt(document.getElementById(`parc_${i}`).value), dt = document.getElementById(`data_${i}`).value;
-    if(!nf || !qtd || !dt) return alert("Preencha NF, Parcelas e Data!");
-    const p = window.marbeDB.pedidos[i]; const dataBase = new Date(dt + "T12:00:00");
-    if(!window.marbeDB.financeiro) window.marbeDB.financeiro = [];
-    for(let j=0; j<qtd; j++) {
-        let v = new Date(dataBase); v.setMonth(v.getMonth() + j);
-        window.marbeDB.financeiro.push({ os: p.os, nf: nf, cliente: p.cliente, valor: p.total/qtd, venc: v.toLocaleDateString('pt-BR'), pago: false });
-    }
-    window.marbeDB.pedidos.splice(i, 1); window.salvarNuvem(); tab('financeiro');
+      document.getElementById('modal-fechar').style.display = 'none'; tab('producao');
   }
 
   function gerarPDFCronograma(tipo) {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      
-      doc.setFontSize(14); 
-      doc.setFont("helvetica", "bold"); 
-      doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 105, 15, {align: "center"});
-      
-      doc.setFontSize(10); 
-      doc.setFont("helvetica", "bold"); 
-      let titulo = tipo === 'DIRETORIA' ? "CRONOGRAMA DE PRODUCAO - VISAO DIRETORIA" : "CRONOGRAMA DE PRODUCAO - VISAO OPERACIONAL";
-      doc.text(titulo, 105, 22, {align: "center"});
-      
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "normal"); 
-      doc.text(`GERADO EM: ${new Date().toLocaleDateString('pt-BR')} as ${new Date().toLocaleTimeString('pt-BR')}`, 105, 27, {align: "center"});
-      
-      doc.setLineWidth(0.5); 
-      doc.line(15, 30, 195, 30);
-
-      let bodyData = [];
-      let totalDiretoria = 0;
-      let hojeStr = new Date().toISOString().split('T')[0];
+      const { jsPDF } = window.jspdf; const doc = new jsPDF();
+      doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 105, 15, {align: "center"});
+      doc.setFontSize(10); doc.setFont("helvetica", "bold"); let titulo = tipo === 'DIRETORIA' ? "CRONOGRAMA DE PRODUCAO - VISAO DIRETORIA" : "CRONOGRAMA DE PRODUCAO - VISAO OPERACIONAL"; doc.text(titulo, 105, 22, {align: "center"});
+      doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.text(`GERADO EM: ${new Date().toLocaleDateString('pt-BR')} as ${new Date().toLocaleTimeString('pt-BR')}`, 105, 27, {align: "center"});
+      doc.setLineWidth(0.5); doc.line(15, 30, 195, 30);
+      let bodyData = []; let totalDiretoria = 0; let hojeStr = new Date().toISOString().split('T')[0];
 
       (window.marbeDB.pedidos || []).forEach(p => {
-          let ent = p.data_entrada ? p.data_entrada.split('-').reverse().join('/') : "N/D"; 
-          let lim = p.data_limite ? p.data_limite.split('-').reverse().join('/') : "N/D";
-          let status = "Em Producao";
-          
-          if (p.data_limite) {
-              if (p.data_limite < hojeStr) { status = "ATRASADO"; }
-              else if (p.data_limite === hojeStr) { status = "ENTREGAR HOJE"; }
-              else { status = "No Prazo"; }
-          }
-          
+          let ent = p.data_entrada ? p.data_entrada.split('-').reverse().join('/') : "N/D"; let lim = p.data_limite ? p.data_limite.split('-').reverse().join('/') : "N/D"; let status = "Em Producao";
+          if (p.data_limite) { if (p.data_limite < hojeStr) { status = "ATRASADO"; } else if (p.data_limite === hojeStr) { status = "ENTREGAR HOJE"; } else { status = "No Prazo"; } }
           let clienteStr = p.cliente ? p.cliente.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().substring(0, 30) : "";
-
-          if (tipo === 'DIRETORIA') {
-              totalDiretoria += (p.total || 0);
-              bodyData.push([`OS ${p.os}`, clienteStr, ent, lim, status, window.fmtMoney(p.total)]);
-          } else {
-              bodyData.push([`OS ${p.os}`, clienteStr, ent, lim, status]);
-          }
+          if (tipo === 'DIRETORIA') { totalDiretoria += (p.total || 0); bodyData.push([`OS ${p.os}`, clienteStr, ent, lim, status, window.fmtMoney(p.total)]); } 
+          else { bodyData.push([`OS ${p.os}`, clienteStr, ent, lim, status]); }
       });
 
-      let headData = tipo === 'DIRETORIA' 
-          ? [['OS', 'CLIENTE', 'ENTRADA', 'PRAZO', 'STATUS', 'VALOR']] 
-          : [['OS', 'CLIENTE', 'ENTRADA', 'PRAZO', 'STATUS']];
-
-      doc.autoTable({
-          startY: 35,
-          head: headData,
-          body: bodyData,
-          theme: 'striped',
-          styles: { fontSize: 8, cellPadding: 3 },
-          headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
-          columnStyles: tipo === 'DIRETORIA' ? { 5: { halign: 'right' } } : {}
-      });
-
-      if (tipo === 'DIRETORIA') {
-          let finalY = doc.lastAutoTable.finalY + 10;
-          doc.setFontSize(12);
-          doc.setFont("helvetica", "bold");
-          doc.text(`TOTAL EM PRODUCAO (CARTEIRA ATIVA): ${window.fmtMoney(totalDiretoria)}`, 195, finalY, {align: 'right'});
-      }
-
+      let headData = tipo === 'DIRETORIA' ? [['OS', 'CLIENTE', 'ENTRADA', 'PRAZO', 'STATUS', 'VALOR']] : [['OS', 'CLIENTE', 'ENTRADA', 'PRAZO', 'STATUS']];
+      doc.autoTable({ startY: 35, head: headData, body: bodyData, theme: 'striped', styles: { fontSize: 8, cellPadding: 3 }, headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] }, columnStyles: tipo === 'DIRETORIA' ? { 5: { halign: 'right' } } : {} });
+      if (tipo === 'DIRETORIA') { let finalY = doc.lastAutoTable.finalY + 10; doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.text(`TOTAL EM PRODUCAO (CARTEIRA ATIVA): ${window.fmtMoney(totalDiretoria)}`, 195, finalY, {align: 'right'}); }
       window.abrirPDFMobile(doc.output('blob'), `CRONOGRAMA_${tipo}_${new Date().getTime()}`);
   }
 
   function gerarPDF(tipo, index, base) {
     const { jsPDF } = window.jspdf; const doc = new jsPDF(); const d = window.marbeDB[base][index];
     const clean = (t) => t ? t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase() : "";
-    
     doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 105, 15, {align: "center"});
-    doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.text("RUA SAO CARLOS, 84 - VILA MARIANA - RIBEIRAO PRETO / SP", 105, 20, {align: "center"});
-    doc.text("CNPJ: 61.149.312/0001-56", 105, 24, {align: "center"}); 
-    doc.setLineWidth(0.5); doc.line(20, 27, 190, 27);
+    doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.text("RUA SAO CARLOS, 84 - VILA MARIANA - RIBEIRAO PRETO / SP", 105, 20, {align: "center"}); doc.text("CNPJ: 61.149.312/0001-56", 105, 24, {align: "center"}); doc.setLineWidth(0.5); doc.line(20, 27, 190, 27);
     
     if (tipo === 'COMPRA') {
         doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.text(`PEDIDO DE COMPRA DE MATERIA-PRIMA`, 20, 35);
         doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`OS: ${d.os}   |   DATA DO PEDIDO: ${new Date().toLocaleDateString('pt-BR')}`, 20, 42);
-        
         let finalY = 50; let totalPesoCompra = 0; let arrayDeMantas = [];
-
-        d.itens.forEach(i => {
-            let q = i.q || 1; let pBaseUnit = (i.kg_unit || 0); totalPesoCompra += (pBaseUnit * q * 1.20); 
-            if(i.meta && i.meta.tipo === 'revestimento') { arrayDeMantas.push({n: i.n, mat: i.mat, meta: i.meta, qtd_pedida: q}); }
-        });
-
+        d.itens.forEach(i => { let q = i.q || 1; let pBaseUnit = (i.kg_unit || 0); totalPesoCompra += (pBaseUnit * q * 1.20); if(i.meta && i.meta.tipo === 'revestimento') { arrayDeMantas.push({n: i.n, mat: i.mat, meta: i.meta, qtd_pedida: q}); } });
         if (arrayDeMantas.length > 0) {
-            doc.setFillColor(245, 245, 245); doc.rect(20, finalY, 170, 8, 'F');
-            doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text(`ESPECIFICACOES DE CORTE (FABRICA DE MANTAS)`, 22, finalY + 5.5);
-            finalY += 12;
-
+            doc.setFillColor(245, 245, 245); doc.rect(20, finalY, 170, 8, 'F'); doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text(`ESPECIFICACOES DE CORTE (FABRICA DE MANTAS)`, 22, finalY + 5.5); finalY += 12;
             arrayDeMantas.forEach(r => {
-                const { dFerro, dAcabado, lRolo } = r.meta;
-                const espBase = (dAcabado - dFerro) / 2; const sobraUsinagem = espBase <= 30 ? 5 : 10; const espFinal = espBase + sobraUsinagem;
-                let qtdMantas = 1; if (espBase > 30 && espBase <= 49) qtdMantas = 2; else if (espBase >= 50) qtdMantas = 3;
-                const espPorManta = espFinal / qtdMantas; const larguraFolgaCorte = lRolo * 1.10; 
-                const comprimentoManta = ((dFerro + espFinal) * Math.PI) * 1.10; const totalMantas = qtdMantas * r.qtd_pedida;
-
-                doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text(`Material: ${clean(r.mat)}`, 20, finalY); finalY += 5;
-                doc.setFont("helvetica", "normal"); doc.text(`Qtd. de Mantas: ${totalMantas} un.`, 25, finalY); finalY += 5;
-                doc.text(`Espessura Final: ${espPorManta.toFixed(1)} mm`, 25, finalY); finalY += 5;
-                doc.text(`Medida p/ Corte (+10% Folga): Largura ${larguraFolgaCorte.toFixed(1)}mm  x  Comprimento ${comprimentoManta.toFixed(1)}mm`, 25, finalY); finalY += 10;
-            });
-        } else {
-            doc.setFontSize(10); doc.text(`Nenhum revestimento de rolo encontrado nesta OS.`, 20, finalY); finalY += 10;
-        }
-
-        doc.setLineWidth(0.5); doc.line(20, finalY, 190, finalY); finalY += 8;
-        doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(230, 126, 34);
-        doc.text(`PESO TOTAL P/ COMPRA (JA C/ 20% APROVEITAMENTO): ${totalPesoCompra.toFixed(3)} KG`, 20, finalY); doc.setTextColor(0,0,0);
-
-    } else if(tipo === 'PRODUCAO') {
-        doc.text(`VIA PRODUCAO - OS: ${d.os}`, 20, 35); doc.text(`PRAZO ENTREGA: ${clean(d.prazo)}`, 20, 40);
-        
-        let totalTempoMin = 0; let totalPesoBase = 0;
-        let formatT = (m) => { if (!m) return "N/D"; let hh = Math.floor(m / 60); let mm = Math.round(m % 60); return hh > 0 ? `${hh}h ${mm}m` : `${mm}m`; };
-        let arrayDeMantas = [];
-
-        doc.autoTable({ 
-            startY: 45, head: [['ITEM', 'MAT.', 'QTD', 'T. UNIT', 'T. TOTAL', 'PESO UNIT. COBRADO']], 
-            body: d.itens.map(i => {
-                let q = i.q || 1; let tUnit = i.tempo_min || 0; let tTot = tUnit * q; totalTempoMin += tTot;
-                let pBaseUnit = (i.kg_unit || 0); totalPesoBase += (pBaseUnit * q);
-                if(i.meta && i.meta.tipo === 'revestimento') { arrayDeMantas.push({n: i.n, mat: i.mat, meta: i.meta, qtd_pedida: q}); }
-                return [clean(i.n), clean(i.mat), q, formatT(tUnit), formatT(tTot), pBaseUnit.toFixed(3) + " KG"];
-            }), theme: 'grid', styles: { fontSize: 8, cellPadding: 2 }
-        });
-
-        let finalY = doc.lastAutoTable.finalY + 10;
-        
-        if (arrayDeMantas.length > 0) {
-            doc.setFillColor(245, 245, 245); doc.rect(20, finalY, 170, 8, 'F');
-            doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text(`CORTE DE MATERIAL (FABRICA) - INSTRUCOES OPERACIONAIS`, 22, finalY + 5.5); finalY += 12;
-            
-            arrayDeMantas.forEach(r => {
-                const { dFerro, dAcabado, lRolo } = r.meta;
-                const espBase = (dAcabado - dFerro) / 2; const sobraUsinagem = espBase <= 30 ? 5 : 10; const espFinal = espBase + sobraUsinagem;
+                const { dFerro, dAcabado, lRolo } = r.meta; const espBase = (dAcabado - dFerro) / 2; const sobraUsinagem = espBase <= 30 ? 5 : 10; const espFinal = espBase + sobraUsinagem;
                 let qtdMantas = 1; if (espBase > 30 && espBase <= 49) qtdMantas = 2; else if (espBase >= 50) qtdMantas = 3;
                 const espPorManta = espFinal / qtdMantas; const larguraFolgaCorte = lRolo * 1.10; const comprimentoManta = ((dFerro + espFinal) * Math.PI) * 1.10; const totalMantas = qtdMantas * r.qtd_pedida;
-
-                doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.text(`Ref: ${clean(r.n)} (${clean(r.mat)})`, 20, finalY); finalY += 4;
-                doc.setFont("helvetica", "normal"); doc.text(`Pedir a Fabrica: ${totalMantas} manta(s) de ${espPorManta.toFixed(1)}mm de espessura.`, 25, finalY); finalY += 4;
-                doc.text(`Medida p/ Corte: Largura ${larguraFolgaCorte.toFixed(1)}mm  x  Comprimento (Perimetro) ${comprimentoManta.toFixed(1)}mm.`, 25, finalY); finalY += 8;
+                doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text(`Material: ${clean(r.mat)}`, 20, finalY); finalY += 5; doc.setFont("helvetica", "normal"); doc.text(`Qtd. de Mantas: ${totalMantas} un.`, 25, finalY); finalY += 5; doc.text(`Espessura Final: ${espPorManta.toFixed(1)} mm`, 25, finalY); finalY += 5; doc.text(`Medida p/ Corte (+10% Folga): Largura ${larguraFolgaCorte.toFixed(1)}mm  x  Comprimento ${comprimentoManta.toFixed(1)}mm`, 25, finalY); finalY += 10;
+            });
+        } else { doc.setFontSize(10); doc.text(`Nenhum revestimento de rolo encontrado nesta OS.`, 20, finalY); finalY += 10; }
+        doc.setLineWidth(0.5); doc.line(20, finalY, 190, finalY); finalY += 8; doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(230, 126, 34); doc.text(`PESO TOTAL P/ COMPRA (JA C/ 20% APROVEITAMENTO): ${totalPesoCompra.toFixed(3)} KG`, 20, finalY); doc.setTextColor(0,0,0);
+    } else if(tipo === 'PRODUCAO') {
+        doc.text(`VIA PRODUCAO - OS: ${d.os}`, 20, 35); doc.text(`PRAZO ENTREGA: ${clean(d.prazo)}`, 20, 40);
+        let totalTempoMin = 0; let totalPesoBase = 0; let formatT = (m) => { if (!m) return "N/D"; let hh = Math.floor(m / 60); let mm = Math.round(m % 60); return hh > 0 ? `${hh}h ${mm}m` : `${mm}m`; }; let arrayDeMantas = [];
+        doc.autoTable({ startY: 45, head: [['ITEM', 'MAT.', 'QTD', 'T. UNIT', 'T. TOTAL', 'PESO UNIT. COBRADO']], body: d.itens.map(i => { let q = i.q || 1; let tUnit = i.tempo_min || 0; let tTot = tUnit * q; totalTempoMin += tTot; let pBaseUnit = (i.kg_unit || 0); totalPesoBase += (pBaseUnit * q); if(i.meta && i.meta.tipo === 'revestimento') { arrayDeMantas.push({n: i.n, mat: i.mat, meta: i.meta, qtd_pedida: q}); } return [clean(i.n), clean(i.mat), q, formatT(tUnit), formatT(tTot), pBaseUnit.toFixed(3) + " KG"]; }), theme: 'grid', styles: { fontSize: 8, cellPadding: 2 } });
+        let finalY = doc.lastAutoTable.finalY + 10;
+        if (arrayDeMantas.length > 0) {
+            doc.setFillColor(245, 245, 245); doc.rect(20, finalY, 170, 8, 'F'); doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text(`CORTE DE MATERIAL (FABRICA) - INSTRUCOES OPERACIONAIS`, 22, finalY + 5.5); finalY += 12;
+            arrayDeMantas.forEach(r => {
+                const { dFerro, dAcabado, lRolo } = r.meta; const espBase = (dAcabado - dFerro) / 2; const sobraUsinagem = espBase <= 30 ? 5 : 10; const espFinal = espBase + sobraUsinagem;
+                let qtdMantas = 1; if (espBase > 30 && espBase <= 49) qtdMantas = 2; else if (espBase >= 50) qtdMantas = 3;
+                const espPorManta = espFinal / qtdMantas; const larguraFolgaCorte = lRolo * 1.10; const comprimentoManta = ((dFerro + espFinal) * Math.PI) * 1.10; const totalMantas = qtdMantas * r.qtd_pedida;
+                doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.text(`Ref: ${clean(r.n)} (${clean(r.mat)})`, 20, finalY); finalY += 4; doc.setFont("helvetica", "normal"); doc.text(`Pedir a Fabrica: ${totalMantas} manta(s) de ${espPorManta.toFixed(1)}mm de espessura.`, 25, finalY); finalY += 4; doc.text(`Medida p/ Corte: Largura ${larguraFolgaCorte.toFixed(1)}mm  x  Comprimento (Perimetro) ${comprimentoManta.toFixed(1)}mm.`, 25, finalY); finalY += 8;
             });
         }
-
-        finalY += 5; doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text(`RESUMO DA ORDEM DE SERVICO:`, 20, finalY);
-        doc.setFont("helvetica", "normal"); doc.text(`TEMPO TOTAL DE MAQUINA: ${formatT(totalTempoMin)}`, 20, finalY + 6);
-        doc.text(`PESO TOTAL COBRADO (CLIENTE): ${totalPesoBase.toFixed(3)} KG`, 20, finalY + 12);
-        doc.setFont("helvetica", "bold"); doc.setTextColor(111, 66, 193); doc.text(`PESO P/ SEPARACAO (+20% SOBRA): ${(totalPesoBase * 1.20).toFixed(3)} KG`, 20, finalY + 18); doc.setTextColor(0,0,0);
-        
+        finalY += 5; doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text(`RESUMO DA ORDEM DE SERVICO:`, 20, finalY); doc.setFont("helvetica", "normal"); doc.text(`TEMPO TOTAL DE MAQUINA: ${formatT(totalTempoMin)}`, 20, finalY + 6); doc.text(`PESO TOTAL COBRADO (CLIENTE): ${totalPesoBase.toFixed(3)} KG`, 20, finalY + 12); doc.setFont("helvetica", "bold"); doc.setTextColor(111, 66, 193); doc.text(`PESO P/ SEPARACAO (+20% SOBRA): ${(totalPesoBase * 1.20).toFixed(3)} KG`, 20, finalY + 18); doc.setTextColor(0,0,0);
     } else {
-        doc.setFontSize(10); doc.text(`ORCAMENTO - OS: ${d.os} | DATA: ${new Date().toLocaleDateString('pt-BR')}`, 20, 35);
-        doc.text(`CLIENTE: ${clean(d.cliente)}`, 20, 40); doc.text(`CNPJ: ${d.cnpj || ""}`, 20, 45); doc.text(`ENDERECO:`, 20, 50);
-        
-        const splitEnd = doc.splitTextToSize(clean(d.endereco), 140); doc.text(splitEnd, 45, 50); 
-        let tableY = 60; if(splitEnd.length > 1) tableY += (splitEnd.length - 1) * 4;
-
-        doc.autoTable({ 
-            startY: tableY, head: [['DESCRICAO', 'MATERIAL', 'QTD', 'V. UNIT', 'V. TOTAL']], 
-            body: d.itens.map(i => [clean(i.n), clean(i.mat), i.q, window.fmtMoney(i.v), window.fmtMoney(i.v * i.q)]),
-            theme: 'striped', columnStyles: { 0: { cellWidth: 'auto' }, 1: { cellWidth: 30 }, 2: { cellWidth: 15, halign: 'center' }, 3: { cellWidth: 30, halign: 'right' }, 4: { cellWidth: 30, halign: 'right' } }, styles: { fontSize: 9, cellPadding: 2 }
-        });
-        
-        const fY = doc.lastAutoTable.finalY + 10;
-        doc.setFontSize(12); doc.text(`TOTAL GERAL: ${window.fmtMoney(d.total)}`, 190, fY, {align:'right'});
-        doc.setFontSize(8); doc.text(`FRETE: ${clean(d.frete)} | PRAZO: ${clean(d.prazo)}`, 20, fY + 5); doc.text(`PAGAMENTO: ${clean(d.pagamento)}`, 20, fY + 10);
+        doc.setFontSize(10); doc.text(`ORCAMENTO - OS: ${d.os} | DATA: ${new Date().toLocaleDateString('pt-BR')}`, 20, 35); doc.text(`CLIENTE: ${clean(d.cliente)}`, 20, 40); doc.text(`CNPJ: ${d.cnpj || ""}`, 20, 45); doc.text(`ENDERECO:`, 20, 50);
+        const splitEnd = doc.splitTextToSize(clean(d.endereco), 140); doc.text(splitEnd, 45, 50); let tableY = 60; if(splitEnd.length > 1) tableY += (splitEnd.length - 1) * 4;
+        doc.autoTable({ startY: tableY, head: [['DESCRICAO', 'MATERIAL', 'QTD', 'V. UNIT', 'V. TOTAL']], body: d.itens.map(i => [clean(i.n), clean(i.mat), i.q, window.fmtMoney(i.v), window.fmtMoney(i.v * i.q)]), theme: 'striped', columnStyles: { 0: { cellWidth: 'auto' }, 1: { cellWidth: 30 }, 2: { cellWidth: 15, halign: 'center' }, 3: { cellWidth: 30, halign: 'right' }, 4: { cellWidth: 30, halign: 'right' } }, styles: { fontSize: 9, cellPadding: 2 } });
+        const fY = doc.lastAutoTable.finalY + 10; doc.setFontSize(12); doc.text(`TOTAL GERAL: ${window.fmtMoney(d.total)}`, 190, fY, {align:'right'}); doc.setFontSize(8); doc.text(`FRETE: ${clean(d.frete)} | PRAZO: ${clean(d.prazo)}`, 20, fY + 5); doc.text(`PAGAMENTO: ${clean(d.pagamento)}`, 20, fY + 10);
     }
-    
-    let nomeArq = tipo === 'COMPRA' ? `PEDIDO_COMPRA_OS_${d.os}` : `${tipo}_OS_${d.os}`;
-    window.abrirPDFMobile(doc.output('blob'), nomeArq);
+    let nomeArq = tipo === 'COMPRA' ? `PEDIDO_COMPRA_OS_${d.os}` : `${tipo}_OS_${d.os}`; window.abrirPDFMobile(doc.output('blob'), nomeArq);
   }
 
   function renderSuprimentos() {
@@ -1351,11 +849,20 @@
     document.getElementById('dashboardSuprimentos').innerHTML = Object.keys(necessidade).length ? html + "</tbody></table>" : "<p style='color:var(--text-muted)'>Sem pedidos pendentes no momento.</p>";
   }
 
+  function liberarExpedicao(i) {
+      if(!confirm("A peça está pronta? Confirmar e enviar esta OS para o Financeiro faturar?")) return;
+      let p = window.marbeDB.pedidos.splice(i, 1)[0];
+      if(!window.marbeDB.expedidos) window.marbeDB.expedidos = [];
+      window.marbeDB.expedidos.push(p);
+      window.salvarNuvem();
+      updateUI();
+  }
+
   function renderProducao() {
-    let htmlCron = `<table><thead><tr><th>OS - Cliente</th><th>Entrada Produção</th><th>Prazo Limite</th><th>Status</th></tr></thead><tbody>`;
+    let htmlCron = `<table style="min-width:700px;"><thead><tr><th>OS - Cliente</th><th>Entrada Produção</th><th>Prazo Limite</th><th>Status</th><th style="text-align:center">Ações</th></tr></thead><tbody>`;
     let hojeStr = new Date().toISOString().split('T')[0];
     
-    (window.marbeDB.pedidos || []).forEach(p => {
+    (window.marbeDB.pedidos || []).forEach((p, i) => {
         let ent = p.data_entrada ? p.data_entrada.split('-').reverse().join('/') : "N/D"; let lim = p.data_limite ? p.data_limite.split('-').reverse().join('/') : "N/D";
         let status = "Em Produção"; let cor = "background:#f1f5f9; color:var(--dark);";
         
@@ -1369,6 +876,11 @@
             <td><b style="color:var(--dark)">OS ${p.os}</b><br><span style="font-size:11px; color:var(--text-muted)">${p.cliente.substring(0,25)}</span></td>
             <td style="text-align:center">${ent}</td><td style="text-align:center">${lim}</td>
             <td style="text-align:center"><span style="${cor} padding:4px 10px; border-radius:20px; font-size:11px;">${status}</span></td>
+            <td style="text-align:center; white-space: nowrap;">
+                <button class="btn" style="display:inline-block; width:auto; margin:0; background:var(--prod); padding:6px 10px; font-size:11px;" onclick="gerarPDF('PRODUCAO', ${i}, 'pedidos')">📄 PDF Prod</button>
+                <button class="btn" style="display:inline-block; width:auto; margin:0; background:var(--info); padding:6px 10px; font-size:11px;" onclick="editarExistente('pedidos', ${i})">✏️ Editar</button>
+                <button class="btn" style="display:inline-block; width:auto; margin:0; background:var(--success); padding:6px 10px; font-size:11px;" onclick="liberarExpedicao(${i})">✅ LIBERAR EXPEDIÇÃO</button>
+            </td>
         </tr>`;
     });
     htmlCron += `</tbody></table>`; document.getElementById('dashboardCronograma').innerHTML = (window.marbeDB.pedidos && window.marbeDB.pedidos.length) ? htmlCron : "<p style='color:var(--text-muted)'>Nenhum pedido ativo no cronograma.</p>";
@@ -1422,19 +934,6 @@
 
   function cancelarEdicao() {
       idEdicao = null; itensTemp = []; document.getElementById('btnCancelaEdit').style.display = 'none'; document.getElementById('osEdicaoLabel').innerText = "Nova"; renderTabelaAtual(); tab('calc');
-  }
-
-  function renderBoletos() {
-    document.getElementById('listaBoletos').innerHTML = (window.marbeDB.financeiro || []).map((f, i) => `
-    <div class="card-list" style="border-left-color:var(--info);">
-        <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-            <strong style="color:var(--dark); font-size:14px;">${f.cliente}</strong>
-            <span style="font-size:11px; background:var(--bg-color); padding:4px 8px; border-radius:4px; color:var(--text-muted);">OS: ${f.os} | NF: ${f.nf}</span>
-        </div>
-        <div style="font-size:16px; font-weight:700; color:var(--dark); margin-bottom:5px;">${window.fmtMoney(f.valor)}</div>
-        <div style="font-size:12px; color:var(--text-muted); margin-bottom:15px;">Vencimento: <strong style="color:var(--primary);">${f.venc}</strong></div>
-        <button class="btn" style="background:var(--success); margin:0;" onclick="window.marbeDB.financeiro.splice(${i},1); window.salvarNuvem(); updateUI();">✅ DAR BAIXA NO BOLETO</button>
-    </div>`).join('');
   }
 </script>
 </body>
