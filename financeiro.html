@@ -101,12 +101,13 @@
     label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
     input, select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; box-sizing: border-box; font-family: 'Inter', sans-serif; background: #fff; transition: all 0.2s; }
     input:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+    input:disabled, select:disabled { cursor: not-allowed; }
     
     .btn { padding: 12px 20px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s; text-align: center; }
     .btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
     
     .badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; display: inline-block; }
-    .badge-alert { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    .badge-alert { background: #fef2f2; color: #d97706; border: 1px solid #fde68a; }
     .badge-ok { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
 
     table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 15px; background: white; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
@@ -135,12 +136,11 @@
     <div id="projecao" class="section active">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
             <div style="font-size:14px; color:var(--text-muted);">
-                Pedidos que estão em andamento na produção. Configure o Sinal (Entrada) pago antecipadamente.
+                Defina e Confirme as condições de pagamento (Sinal / Condição) das OSs que estão na produção.
             </div>
             <button class="btn" style="background:var(--info); padding:8px 15px; font-size:12px; margin:0;" onclick="gerarPDFProjecao()">📄 IMPRIMIR PREVISÃO (PDF)</button>
         </div>
         <div id="listaProjecao"></div>
-        <button class="btn" style="width:100%; font-size:16px; margin-top:20px; padding:16px;" onclick="window.salvarNuvem()">SALVAR PROJEÇÕES</button>
     </div>
 
     <!-- 2. CONTAS A PAGAR (CUSTOS, DESPESAS FIXAS, INSUMOS) -->
@@ -262,13 +262,18 @@
     function renderProjecaoFinanceira() {
         let html = '';
         (window.marbeDB.pedidos || []).forEach((p, index) => {
-            if (!p.projecao) { p.projecao = { entrada: 0, condicao: '28dd' }; }
+            // Inicializa estrutura de projeção se for um pedido novo
+            if (!p.projecao) { p.projecao = { entrada: 0, condicao: '28dd', confirmado: false, sinal_lancado: false }; }
+            
             let valorEntrada = parseFloat(p.projecao.entrada) || 0;
-            let saldoRestante = (p.total || 0) - valorEntrada;
-            let badgeStatus = valorEntrada > 0 ? '<span class="badge badge-ok">Sinal Registrado</span>' : '<span class="badge badge-alert">Pendente de Sinal</span>';
+            let isConfirmado = p.projecao.confirmado;
+            
+            let badgeStatus = isConfirmado 
+                ? '<span class="badge badge-ok">✅ Negociação Confirmada</span>' 
+                : '<span class="badge badge-alert">⚠️ Aguardando Confirmação</span>';
 
             html += `
-            <div class="card-list" style="border-left-color:var(--warning);">
+            <div class="card-list" style="border-left-color:${isConfirmado ? 'var(--success)' : 'var(--warning)'};">
                 <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
                     <strong style="color:var(--dark); font-size:16px;">OS ${p.os} - ${p.cliente.substring(0, 30)}</strong>
                     ${badgeStatus}
@@ -277,31 +282,67 @@
                 <div class="form-grid">
                     <div>
                         <label>Sinal / Entrada Antecipada (R$)</label>
-                        <input type="number" id="entrada_${index}" value="${valorEntrada}" onchange="atualizarProjecao(${index}, ${p.total})">
+                        <input type="number" id="entrada_${index}" value="${valorEntrada}" ${isConfirmado ? 'disabled style="background:#f1f5f9;"' : ''}>
                     </div>
                     <div>
                         <label>Condição de Pagamento do Saldo</label>
-                        <select id="condicao_${index}" onchange="atualizarProjecao(${index}, ${p.total})">
+                        <select id="condicao_${index}" ${isConfirmado ? 'disabled style="background:#f1f5f9;"' : ''}>
                             <option value="a_vista" ${p.projecao.condicao === 'a_vista' ? 'selected' : ''}>À Vista na Entrega</option>
                             <option value="28dd" ${p.projecao.condicao === '28dd' ? 'selected' : ''}>Boleto 28 dias</option>
                             <option value="28_56dd" ${p.projecao.condicao === '28_56dd' ? 'selected' : ''}>Boleto 28/56 dias</option>
                         </select>
                     </div>
                 </div>
+                <div style="margin-top:15px; display:flex; gap:10px; justify-content:flex-end;">
+                    ${isConfirmado
+                        ? `<button class="btn" style="background:#e2e8f0; color:var(--dark); font-size:12px; padding:8px 15px;" onclick="editarProjecao(${index})">✏️ EDITAR / REABRIR</button>`
+                        : `<button class="btn" style="background:var(--success); font-size:12px; padding:8px 15px;" onclick="confirmarProjecao(${index}, ${p.total})">✔️ CONFIRMAR LANÇAMENTO</button>`
+                    }
+                </div>
             </div>`;
         });
         document.getElementById('listaProjecao').innerHTML = html || "<p style='text-align:center; color:var(--text-muted); padding:30px; background:white; border-radius:8px;'>Nenhum pedido em fase de produção na fábrica.</p>";
     }
-    
-    function atualizarProjecao(index, valorTotal) {
+
+    function confirmarProjecao(index, valorTotal) {
+        let p = window.marbeDB.pedidos[index];
         let novaEntrada = parseFloat(document.getElementById(`entrada_${index}`).value) || 0;
+        let condicao = document.getElementById(`condicao_${index}`).value;
+
         if (novaEntrada > valorTotal) { 
-            alert("Erro: O valor da entrada não pode ser maior que o valor total do pedido!"); 
-            document.getElementById(`entrada_${index}`).value = window.marbeDB.pedidos[index].projecao.entrada; 
-            return; 
+            return alert("Erro: O valor da entrada não pode ser maior que o valor total do pedido!"); 
         }
-        window.marbeDB.pedidos[index].projecao.entrada = novaEntrada;
-        window.marbeDB.pedidos[index].projecao.condicao = document.getElementById(`condicao_${index}`).value;
+
+        p.projecao.entrada = novaEntrada;
+        p.projecao.condicao = condicao;
+        p.projecao.confirmado = true;
+
+        // Automação para laçar o sinal imediatamente na aba Boletos
+        if (novaEntrada > 0 && !p.projecao.sinal_lancado) {
+            if(confirm(`O pedido possui um SINAL de ${window.fmtMoney(novaEntrada)}.\nDeseja lançar este valor agora na aba "A Receber (Boletos)"?`)) {
+                if(!window.marbeDB.financeiro) window.marbeDB.financeiro = [];
+                window.marbeDB.financeiro.push({ 
+                    id_titulo: Date.now(), 
+                    os: p.os, 
+                    nf: "SINAL / ANTECIPADO", 
+                    cliente: p.cliente, 
+                    valor: novaEntrada, 
+                    venc: new Date().toISOString().split('T')[0], // Sugere recebimento/vencimento pra hoje
+                    parcela: "Sinal", 
+                    pago: false 
+                });
+                p.projecao.sinal_lancado = true;
+                alert("Sinal lançado com sucesso na aba 'A Receber'!");
+            }
+        }
+
+        window.salvarNuvem(true);
+        renderProjecaoFinanceira();
+    }
+
+    function editarProjecao(index) {
+        window.marbeDB.pedidos[index].projecao.confirmado = false;
+        window.salvarNuvem(true);
         renderProjecaoFinanceira();
     }
 
@@ -312,25 +353,28 @@
         doc.setFontSize(14); doc.setFont("helvetica", "bold"); 
         doc.text("PREVISÃO DE FATURAMENTO - FÁBRICA", 105, 15, {align: "center"});
         doc.setFontSize(10); doc.setFont("helvetica", "normal");
-        doc.text(`GERADO EM: ${new Date().toLocaleDateString('pt-BR')}`, 105, 22, {align: "center"});
+        doc.text(`GERADO EM: ${new Date().toLocaleDateString('pt-BR')} (Apenas Negociações Confirmadas)`, 105, 22, {align: "center"});
         
         let bodyData = []; let totalGeral = 0; let totalSinal = 0; let totalSaldo = 0;
         
         (window.marbeDB.pedidos || []).forEach(p => {
-            let sinal = (p.projecao && p.projecao.entrada) ? parseFloat(p.projecao.entrada) : 0;
-            let saldo = (p.total || 0) - sinal;
-            totalGeral += (p.total || 0); totalSinal += sinal; totalSaldo += saldo;
-            
-            bodyData.push([
-                `OS ${p.os}`, 
-                p.cliente.substring(0, 25), 
-                window.fmtMoney(p.total || 0), 
-                window.fmtMoney(sinal), 
-                window.fmtMoney(saldo)
-            ]);
+            // Só imprime o que foi conferido e confirmado pelo financeiro
+            if(p.projecao && p.projecao.confirmado) {
+                let sinal = parseFloat(p.projecao.entrada) || 0;
+                let saldo = (p.total || 0) - sinal;
+                totalGeral += (p.total || 0); totalSinal += sinal; totalSaldo += saldo;
+                
+                bodyData.push([
+                    `OS ${p.os}`, 
+                    p.cliente.substring(0, 25), 
+                    window.fmtMoney(p.total || 0), 
+                    window.fmtMoney(sinal), 
+                    window.fmtMoney(saldo)
+                ]);
+            }
         });
         
-        if(bodyData.length === 0) return alert("Nenhum pedido na projeção.");
+        if(bodyData.length === 0) return alert("Não há pedidos com negociação CONFIRMADA para imprimir. Confirme os lançamentos primeiro.");
         
         doc.autoTable({ 
             startY: 30, 
@@ -343,8 +387,8 @@
         
         let finalY = doc.lastAutoTable.finalY + 10;
         doc.setFontSize(11); doc.setFont("helvetica", "bold");
-        doc.text(`TOTAL EM PEDIDOS NA FÁBRICA: ${window.fmtMoney(totalGeral)}`, 20, finalY);
-        doc.text(`SINAIS JÁ RECEBIDOS: ${window.fmtMoney(totalSinal)}`, 20, finalY + 6);
+        doc.text(`TOTAL EM PEDIDOS CONFIRMADOS: ${window.fmtMoney(totalGeral)}`, 20, finalY);
+        doc.text(`SINAIS LANÇADOS (ANTECIPADOS): ${window.fmtMoney(totalSinal)}`, 20, finalY + 6);
         doc.setTextColor(22, 163, 74); // Verde
         doc.text(`SALDO FUTURO A FATURAR: ${window.fmtMoney(totalSaldo)}`, 20, finalY + 14);
         
@@ -643,6 +687,7 @@
         let dataDigitada = prompt(`Data em que o dinheiro entrou na conta para ${f.cliente} (OS ${f.os}) [AAAA-MM-DD]:`, hojeStr);
         if(!dataDigitada) return;
 
+        // Permite aplicar juros ou conceder desconto na hora do pagamento
         let ajusteStr = prompt(`O valor original do boleto é ${window.fmtMoney(f.valor)}.\nHouve Juros ou Desconto?\n\n- Digite um valor POSITIVO para Juros (Ex: 15.50)\n- Digite um valor NEGATIVO para Desconto (Ex: -10.00)\n- Deixe 0 se o cliente pagou o valor exato.`, "0");
         if(ajusteStr === null) return;
 
@@ -652,7 +697,7 @@
         if(confirm(`Confirmar o recebimento de ${window.fmtMoney(valorFinal)} na data ${dataDigitada.split('-').reverse().join('/')}?`)) {
             window.marbeDB.financeiro[i].pago = true;
             window.marbeDB.financeiro[i].dataRecebimento = dataDigitada;
-            window.marbeDB.financeiro[i].valor = valorFinal; // Atualiza o valor final para o relatório DRE ficar com o valor real
+            window.marbeDB.financeiro[i].valor = valorFinal; // Atualiza para o valor real pago pro DRE ficar exato
             window.salvarNuvem(true); 
             renderBoletos();
         }
@@ -685,7 +730,7 @@
             }
         });
         
-        if(bodyData.length === 0) return alert("Nenhum boleto encontrado no filtro atual.");
+        if(bodyData.length === 0) return alert("Nenhum boleto encontrado no filtro atual para imprimir.");
         
         // Ordenar por data
         bodyData.sort((a,b) => {
