@@ -39,7 +39,6 @@
           if(!window.filtrosFinIniciados) {
               let hoje = new Date();
               let quinzePraFrente = new Date(); quinzePraFrente.setDate(hoje.getDate() + 15);
-              
               let umAnoAtras = new Date(); umAnoAtras.setFullYear(hoje.getFullYear() - 1);
               
               if(document.getElementById('filtroBoletoInicio')) {
@@ -66,10 +65,14 @@
     }
   </script>
 
+  <!-- Bibliotecas PDF adicionadas para o Financeiro -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+
   <style>
     :root { 
       --primary: #2563eb; --success: #16a34a; --warning: #d97706; --danger: #dc2626;
-      --dark: #1e293b; --bg-color: #f1f5f9; --card-bg: #ffffff; --border: #e2e8f0; --text-main: #334155; --text-muted: #64748b;
+      --dark: #1e293b; --bg-color: #f1f5f9; --card-bg: #ffffff; --border: #e2e8f0; --text-main: #334155; --text-muted: #64748b; --prod: #7c3aed;
     }
     
     body { font-family: 'Inter', sans-serif; background: var(--bg-color); margin: 0; padding: 20px; color: var(--text-main); }
@@ -147,11 +150,11 @@
                     <input type="text" id="despesaDesc" placeholder="Nome da despesa">
                 </div>
                 <div>
-                    <label>Valor (R$)</label>
+                    <label>Valor Previsto/Real (R$)</label>
                     <input type="number" id="despesaValor" placeholder="Ex: 150.00">
                 </div>
                 <div>
-                    <label>Vencimento / Data Pagamento</label>
+                    <label>Vencimento Original</label>
                     <input type="date" id="despesaData">
                 </div>
                 <div>
@@ -167,7 +170,11 @@
             <button class="btn" style="margin-top:15px; width:100%;" onclick="lancarDespesa()">CADASTRAR CONTA A PAGAR</button>
         </div>
 
-        <h3 style="margin-top:30px; font-size:16px; color:var(--dark);">Contas Abertas / Vencidas</h3>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:30px; margin-bottom:15px;">
+            <h3 style="margin:0; font-size:16px; color:var(--dark);">Contas Abertas / Vencidas</h3>
+            <button class="btn" style="background:var(--info); padding:8px 15px; font-size:12px; margin:0;" onclick="gerarPDFContasPagar()">📄 IMPRIMIR PENDÊNCIAS</button>
+        </div>
+        
         <div id="listaContasPagar"></div>
     </div>
 
@@ -219,6 +226,10 @@
             </div>
         </div>
         
+        <div id="botoesDRE" style="display:none; margin-top:15px;">
+            <button class="btn" style="background:var(--prod); width:100%;" onclick="gerarPDFDRE()">🖨️ IMPRIMIR DRE (PDF)</button>
+        </div>
+
         <div id="listaExtratoDetalhados" style="margin-top:20px;"></div>
     </div>
 
@@ -315,7 +326,12 @@
 
     function renderContasPagar() {
         let html = ''; let hojeStr = new Date().toISOString().split('T')[0];
-        (window.marbeDB.fin_despesas || []).forEach((d, i) => {
+        
+        // Ordenar por data de vencimento (mais antigas primeiro)
+        let despesasOrdenadas = (window.marbeDB.fin_despesas || []).map((d, index) => ({...d, indexOriginal: index}));
+        despesasOrdenadas.sort((a,b) => a.venc.localeCompare(b.venc));
+
+        despesasOrdenadas.forEach((d) => {
             if(!d.pago) {
                 let isAtrasado = d.venc < hojeStr;
                 let dataBr = d.venc.split('-').reverse().join('/');
@@ -326,9 +342,12 @@
                         <span class="badge ${isAtrasado ? 'badge-alert' : ''}" style="background:#e2e8f0; color:var(--dark)">${d.categoria}</span>
                     </div>
                     <div style="font-size:22px; font-weight:700; margin:10px 0; color:var(--danger)">- ${window.fmtMoney(d.valor)}</div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px;">
-                        <span style="font-size:13px; color:${isAtrasado ? 'var(--danger)' : 'var(--text-muted)'}">Vencimento: <b>${dataBr}</b> ${isAtrasado ? '<strong style="color:red">(ATRASADO)</strong>' : ''}</span>
-                        <button class="btn" style="background:var(--dark); padding:10px 15px; font-size:12px;" onclick="pagarDespesa(${i})">MARCAR COMO PAGO</button>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px; flex-wrap:wrap; gap:10px;">
+                        <span style="font-size:13px; color:${isAtrasado ? 'var(--danger)' : 'var(--text-muted)'}">Venc: <b>${dataBr}</b> ${isAtrasado ? '<strong style="color:red">(ATRASADO)</strong>' : ''}</span>
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn" style="background:#e2e8f0; color:var(--dark); padding:8px 12px; font-size:12px; margin:0;" onclick="editarDespesa(${d.indexOriginal})">✏️ EDITAR</button>
+                            <button class="btn" style="background:var(--dark); padding:8px 15px; font-size:12px; margin:0;" onclick="pagarDespesa(${d.indexOriginal})">MARCAR COMO PAGO</button>
+                        </div>
                     </div>
                 </div>`;
             }
@@ -336,13 +355,89 @@
         document.getElementById('listaContasPagar').innerHTML = html || "<p style='text-align:center; color:var(--text-muted); padding:30px; background:white; border-radius:8px;'>Todas as contas estão em dia. Nada a pagar!</p>";
     }
 
+    function editarDespesa(i) {
+        let d = window.marbeDB.fin_despesas[i];
+        document.getElementById('despesaDesc').value = d.desc;
+        document.getElementById('despesaValor').value = d.valor;
+        document.getElementById('despesaData').value = d.venc;
+        document.getElementById('despesaCategoria').value = d.categoria;
+        
+        window.marbeDB.fin_despesas.splice(i, 1);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        alert("Modifique os valores no formulário acima e clique em 'CADASTRAR' para salvar a correção.");
+    }
+
     function pagarDespesa(i) {
-        if(confirm("Confirmar o pagamento desta despesa?\nO valor será contabilizado no seu Relatório de Fluxos como 'Gasto' e sairá desta tela.")) {
-            window.marbeDB.fin_despesas[i].pago = true;
-            window.marbeDB.fin_despesas[i].dataPagamento = new Date().toISOString().split('T')[0];
-            window.salvarNuvem(true); 
-            renderContasPagar();
+        let hojeStr = new Date().toISOString().split('T')[0];
+        
+        // Pergunta a data exata em que foi pago
+        let dataDigitada = prompt("Data em que o pagamento foi realizado (AAAA-MM-DD):", hojeStr);
+        if(!dataDigitada) return; // Se cancelar, não faz nada
+        
+        let desp = window.marbeDB.fin_despesas[i];
+        desp.pago = true;
+        desp.dataPagamento = dataDigitada;
+        
+        // Lógica profissional para recorrência (Despesas Fixas e Variáveis)
+        if(desp.categoria === "Despesa Fixa" || desp.categoria === "Despesa Variável") {
+            if(confirm(`Essa conta é uma [${desp.categoria}].\nDeseja projetar/lançar essa mesma conta para o próximo mês para não esquecer?`)) {
+                let dataAntiga = new Date(desp.venc + "T12:00:00");
+                dataAntiga.setMonth(dataAntiga.getMonth() + 1); // Joga 1 mês pra frente
+                
+                window.marbeDB.fin_despesas.push({ 
+                    id: Date.now(), 
+                    desc: desp.desc, 
+                    valor: desp.valor, // Mantém o valor como sugestão
+                    venc: dataAntiga.toISOString().split('T')[0], 
+                    categoria: desp.categoria, 
+                    pago: false 
+                });
+                alert("Previsão do próximo mês gerada com sucesso! Você poderá editar o valor na lista quando a nova conta chegar.");
+            }
         }
+        
+        window.salvarNuvem(true); 
+        renderContasPagar();
+    }
+
+    function gerarPDFContasPagar() {
+        if(!window.jspdf) return alert("Aguarde a biblioteca PDF carregar completamente.");
+        const { jsPDF } = window.jspdf; const doc = new jsPDF();
+        
+        doc.setFontSize(14); doc.setFont("helvetica", "bold"); 
+        doc.text("RELATÓRIO DE PENDÊNCIAS - CONTAS A PAGAR", 105, 15, {align: "center"});
+        doc.setFontSize(10); doc.setFont("helvetica", "normal");
+        doc.text(`GERADO EM: ${new Date().toLocaleDateString('pt-BR')}`, 105, 22, {align: "center"});
+        
+        let bodyData = []; 
+        let totalPendente = 0;
+        
+        // Ordena para o PDF
+        let despesasPDF = (window.marbeDB.fin_despesas || []).filter(d => !d.pago);
+        despesasPDF.sort((a,b) => a.venc.localeCompare(b.venc));
+
+        despesasPDF.forEach(d => {
+            totalPendente += d.valor;
+            let dtBr = d.venc.split('-').reverse().join('/');
+            bodyData.push([d.desc, d.categoria, dtBr, window.fmtMoney(d.valor)]);
+        });
+        
+        if(bodyData.length === 0) return alert("Não há contas pendentes para imprimir.");
+
+        doc.autoTable({
+            startY: 30,
+            head: [['DESCRIÇÃO', 'CATEGORIA', 'VENCIMENTO', 'VALOR (R$)']],
+            body: bodyData,
+            theme: 'striped',
+            headStyles: { fillColor: [30, 41, 59] }, // Cor Dark
+            columnStyles: { 3: { halign: 'right' } }
+        });
+        
+        let finalY = doc.lastAutoTable.finalY + 10;
+        doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(220, 38, 38);
+        doc.text(`TOTAL PENDENTE A PAGAR: ${window.fmtMoney(totalPendente)}`, 195, finalY, {align: 'right'});
+        
+        window.open(URL.createObjectURL(doc.output('blob')), '_blank');
     }
 
     /* --- ABA 3: EXPEDIÇÃO E FATURAMENTO --- */
@@ -435,7 +530,7 @@
         tab('boletos');
     }
 
-    /* --- ABA 4: BOLETOS A RECEBER (COM FILTRO LIVRE) --- */
+    /* --- ABA 4: BOLETOS A RECEBER --- */
     function renderBoletos() {
         let dataInicioStr = document.getElementById('filtroBoletoInicio').value;
         let dataFimStr = document.getElementById('filtroBoletoFim').value;
@@ -445,8 +540,6 @@
         (window.marbeDB.financeiro || []).forEach((f, i) => {
             if(!f.pago) {
                 let exibir = false;
-                
-                // Validação de filtro com os campos Início e Fim
                 let passaInicio = !dataInicioStr || f.venc >= dataInicioStr;
                 let passaFim = !dataFimStr || f.venc <= dataFimStr;
 
@@ -465,7 +558,10 @@
                         <div style="font-size:22px; font-weight:700; color:var(--success); margin:10px 0;">+ ${window.fmtMoney(f.valor)}</div>
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px;">
                             <span style="font-size:13px; color:${isAtrasado ? 'var(--danger)' : 'var(--text-muted)'}">Vencimento: <b>${dataBr}</b> ${isAtrasado ? '<strong style="color:red">(ATRASADO)</strong>' : ''}</span>
-                            <button class="btn" style="background:var(--success); padding:10px 15px; font-size:12px;" onclick="darBaixaBoleto(${i})">DINHEIRO RECEBIDO ✅</button>
+                            <div style="display:flex; gap:10px;">
+                                <button class="btn" style="background:var(--danger); padding:10px 15px; font-size:12px; margin:0;" onclick="excluirBoleto(${i})">🗑️ EXCLUIR</button>
+                                <button class="btn" style="background:var(--success); padding:10px 15px; font-size:12px; margin:0;" onclick="darBaixaBoleto(${i})">DINHEIRO RECEBIDO ✅</button>
+                            </div>
                         </div>
                     </div>`;
                 }
@@ -474,13 +570,23 @@
         document.getElementById('listaBoletos').innerHTML = html || "<p style='text-align:center; color:var(--text-muted); padding:30px; background:white; border-radius:8px;'>Nenhum boleto pendente neste período.</p>";
     }
 
-    function darBaixaBoleto(i) {
-        if(confirm("Confirmar que este dinheiro já entrou na conta bancária da empresa?")) {
-            window.marbeDB.financeiro[i].pago = true;
-            window.marbeDB.financeiro[i].dataRecebimento = new Date().toISOString().split('T')[0];
+    function excluirBoleto(i) {
+        if(confirm("Tem certeza que deseja APAGAR este lançamento incorreto? (Isso não pode ser desfeito)")) {
+            window.marbeDB.financeiro.splice(i, 1);
             window.salvarNuvem(true); 
             renderBoletos();
         }
+    }
+
+    function darBaixaBoleto(i) {
+        let hojeStr = new Date().toISOString().split('T')[0];
+        let dataDigitada = prompt("Data em que o dinheiro entrou na conta (AAAA-MM-DD):", hojeStr);
+        if(!dataDigitada) return;
+
+        window.marbeDB.financeiro[i].pago = true;
+        window.marbeDB.financeiro[i].dataRecebimento = dataDigitada;
+        window.salvarNuvem(true); 
+        renderBoletos();
     }
 
     /* --- ABA 5: RELATÓRIOS (DRE / EXTRATO) --- */
@@ -547,7 +653,66 @@
         document.getElementById('relLiquido').style.color = resultado >= 0 ? "var(--primary)" : "var(--danger)";
         
         document.getElementById('painelRelatorio').style.display = 'grid';
+        document.getElementById('botoesDRE').style.display = 'block'; // Mostra botão de PDF
         document.getElementById('listaExtratoDetalhados').innerHTML = htmlExtrato;
+    }
+
+    function gerarPDFDRE() {
+        const dtIni = document.getElementById('relInicio').value;
+        const dtFim = document.getElementById('relFim').value;
+        if(!dtIni || !dtFim) return alert("Gere o relatório na tela primeiro.");
+        
+        if(!window.jspdf) return alert("Aguarde a biblioteca PDF carregar.");
+        const { jsPDF } = window.jspdf; const doc = new jsPDF();
+        
+        doc.setFontSize(14); doc.setFont("helvetica", "bold"); 
+        doc.text("DEMONSTRATIVO DE RESULTADOS (DRE) E FLUXO", 105, 15, {align: "center"});
+        doc.setFontSize(10); doc.setFont("helvetica", "normal");
+        doc.text(`PERÍODO: ${dtIni.split('-').reverse().join('/')} até ${dtFim.split('-').reverse().join('/')}`, 105, 22, {align: "center"});
+        
+        let totalRecebido = 0; let totalGasto = 0; let bodyData = [];
+        
+        // Coleta e ordena os dados
+        let extratoArray = [];
+        (window.marbeDB.financeiro || []).forEach(f => {
+            if (f.pago && f.dataRecebimento >= dtIni && f.dataRecebimento <= dtFim) {
+                totalRecebido += f.valor;
+                extratoArray.push({ dataIso: f.dataRecebimento, dataBr: f.dataRecebimento.split('-').reverse().join('/'), desc: `${f.cliente} (OS ${f.os})`, tipo: 'RECEITA (+)', valor: f.valor });
+            }
+        });
+        (window.marbeDB.fin_despesas || []).forEach(d => {
+            if (d.pago && d.dataPagamento >= dtIni && d.dataPagamento <= dtFim) {
+                totalGasto += d.valor;
+                extratoArray.push({ dataIso: d.dataPagamento, dataBr: d.dataPagamento.split('-').reverse().join('/'), desc: d.desc, tipo: `DESPESA (-)`, valor: d.valor * -1 });
+            }
+        });
+        
+        extratoArray.sort((a,b) => a.dataIso.localeCompare(b.dataIso));
+        extratoArray.forEach(item => {
+            bodyData.push([item.dataBr, item.desc, item.tipo, window.fmtMoney(Math.abs(item.valor))]);
+        });
+
+        doc.autoTable({
+            startY: 30,
+            head: [['DATA', 'DESCRIÇÃO/CLIENTE', 'TIPO', 'VALOR']],
+            body: bodyData,
+            theme: 'grid',
+            headStyles: { fillColor: [30, 41, 59] },
+            columnStyles: { 3: { halign: 'right' } }
+        });
+        
+        let finalY = doc.lastAutoTable.finalY + 10;
+        let resultado = totalRecebido - totalGasto;
+        
+        doc.setFontSize(11);
+        doc.text(`TOTAL ENTRADAS (RECEITAS): ${window.fmtMoney(totalRecebido)}`, 20, finalY);
+        doc.text(`TOTAL SAÍDAS (DESPESAS): ${window.fmtMoney(totalGasto)}`, 20, finalY + 6);
+        
+        doc.setFontSize(13); doc.setFont("helvetica", "bold"); 
+        doc.setTextColor(resultado >= 0 ? 22 : 220, resultado >= 0 ? 163 : 38, resultado >= 0 ? 74 : 38); // Verde se lucro, vermelho se prejuízo
+        doc.text(`RESULTADO DO CAIXA: ${window.fmtMoney(resultado)}`, 20, finalY + 15);
+        
+        window.open(URL.createObjectURL(doc.output('blob')), '_blank');
     }
 </script>
 </body>
