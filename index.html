@@ -340,7 +340,7 @@
     </div>
 
     <div style="overflow-x:auto;">
-        <table><thead><tr><th>Descrição</th><th>Material</th><th style="text-align:center">Qtd</th><th style="text-align:right">Unit. (R$)</th><th style="text-align:center">Ação</th></tr></thead><tbody id="corpoAtual"></tbody></table>
+        <table><thead><tr><th>Descrição</th><th>Material</th><th style="text-align:center">Tempo(m)</th><th style="text-align:center">Qtd</th><th style="text-align:right">Unit. (R$)</th><th style="text-align:center">Ação</th></tr></thead><tbody id="corpoAtual"></tbody></table>
     </div>
     
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-top:20px;">
@@ -678,7 +678,11 @@
       let nomeFinalItem = (tipo === 'revestimento') ? descMedidas : `${document.getElementById('tipoPeca').options[document.getElementById('tipoPeca').selectedIndex].text} - ${nomeServico} ${descMedidas}`;
       if(isGarantia && !nomeFinalItem.includes('[GARANTIA]')) { nomeFinalItem = `[GARANTIA] ${nomeFinalItem}`; }
 
-      ultimoCalculo = { n: nomeFinalItem, mat: nomeMat, med: descMedidas, q: 1, v: precoFinal, kg_unit: pesoBrutoKg, tempo_min: minPorPeca, meta: metaRevest };
+      ultimoCalculo = { 
+          n: nomeFinalItem, mat: nomeMat, med: descMedidas, q: 1, v: precoFinal, 
+          kg_unit: pesoBrutoKg, tempo_min: minPorPeca, meta: metaRevest,
+          params: { markup: markup, taxaImposto: taxaImposto, valorHora: valorHora, isGarantia: isGarantia, tipo: tipo }
+      };
 
       let analiseMemoria = verificarSimilaridadeNoHistorico(pesoBrutoKg, minPorPeca, tipo, metaRevest); let boxAlerta = document.getElementById('alertaMemoria');
       if (analiseMemoria) { boxAlerta.innerHTML = analiseMemoria.html; boxAlerta.style.display = 'block'; if (analiseMemoria.alerta) { boxAlerta.style.background = '#fef2f2'; boxAlerta.style.border = '1px solid #fecaca'; } else { boxAlerta.style.background = '#f0fdf4'; boxAlerta.style.border = '1px solid #bbf7d0'; } } 
@@ -713,16 +717,59 @@
     let total = 0;
     document.getElementById('corpoAtual').innerHTML = itensTemp.map((it, i) => {
         total += it.v * it.q;
+        let matOptions = (window.marbeDB.custos.mats || []).map(m => `<option value="${m.p}|${m.n}" ${it.mat === m.n ? 'selected' : ''}>${m.n}</option>`).join('');
         return `<tr>
-            <td><input class="editable-input" style="background:#fff" value="${it.n}" onchange="itensTemp[${i}].n=this.value"></td>
-            <td style="font-size:11px; color:var(--text-muted);">${it.mat}</td>
+            <td><input class="editable-input" style="background:#fff; width:100%; text-align:left;" value="${it.n}" onchange="itensTemp[${i}].n=this.value"></td>
+            <td>
+                <select class="editable-input" style="background:#fff; width:100%; padding:6px; font-size:11px;" onchange="recalcularItem(${i}, 'mat', this.value)">
+                    <option value="0|${it.mat}" style="display:none">${it.mat}</option>
+                    ${matOptions}
+                </select>
+            </td>
+            <td style="text-align:center"><input type="number" class="editable-input" style="width:60px" value="${it.tempo_min ? Math.round(it.tempo_min) : 0}" onchange="recalcularItem(${i}, 'tempo', parseFloat(this.value))"></td>
             <td style="text-align:center"><input type="number" class="editable-input" style="width:50px" value="${it.q}" onchange="itensTemp[${i}].q=parseInt(this.value); renderTabelaAtual()"></td>
-            <td style="text-align:right"><input type="number" class="editable-input" style="width:100px" value="${it.v.toFixed(2)}" onchange="itensTemp[${i}].v=parseFloat(this.value); renderTabelaAtual()"></td>
+            <td style="text-align:right"><input type="number" class="editable-input" style="width:90px" value="${it.v.toFixed(2)}" onchange="itensTemp[${i}].v=parseFloat(this.value); renderTabelaAtual()"></td>
             <td onclick="itensTemp.splice(${i},1);renderTabelaAtual()" style="cursor:pointer; color:var(--danger); font-weight:bold; text-align:center;">✕</td>
         </tr>`;
     }).join('');
     document.getElementById('totalOrc').innerText = window.fmtMoney(total);
   }
+
+  window.recalcularItem = function(i, campo, valor) {
+      let it = itensTemp[i];
+      
+      if (!it.params) {
+          if (campo === 'tempo') it.tempo_min = valor;
+          if (campo === 'mat') it.mat = valor.split('|')[1];
+          renderTabelaAtual();
+          return;
+      }
+      
+      let novoCustoKg = 0;
+      if (campo === 'mat') {
+          let partes = valor.split('|');
+          novoCustoKg = parseFloat(partes[0]);
+          it.mat = partes[1];
+      } else {
+          let matObj = window.marbeDB.custos.mats.find(m => m.n === it.mat);
+          novoCustoKg = matObj ? matObj.p : 0;
+      }
+      
+      if (campo === 'tempo') {
+          it.tempo_min = valor;
+      }
+      
+      let custoMateria = (it.kg_unit || 0) * novoCustoKg;
+      let custoCola = it.params.tipo === 'revestimento' ? custoMateria * 0.10 : 0;
+      let custoMO = ((it.tempo_min || 0) / 60) * it.params.valorHora;
+      let custoProd = custoMateria + custoCola + custoMO;
+      let precoBase = custoProd * it.params.markup;
+      let valorImposto = precoBase * (it.params.taxaImposto / 100);
+      
+      it.v = it.params.isGarantia ? 0 : (precoBase + valorImposto);
+      
+      renderTabelaAtual();
+  };
 
   function salvarOrcamento() {
     if(itensTemp.length === 0) return alert("Adicione pelo menos um item ao orçamento.");
@@ -753,11 +800,42 @@
         if (!o.data_criacao) exibir = true; else { let dataOrc = new Date(o.data_criacao); if (dataOrc >= dataInicio && dataOrc <= dataFim) exibir = true; }
         if (exibir) {
             let dataFormatada = o.data_criacao ? new Date(o.data_criacao).toLocaleDateString('pt-BR') : "Antigo";
-            html += `<div class="card-list"><div style="display:flex; justify-content:space-between; align-items:flex-start;"><strong style="font-size:14px; color:var(--dark);">OS: ${o.os} - ${o.cliente}</strong><span style="font-size:11px; background:var(--bg-color); padding:4px 8px; border-radius:4px; color:var(--text-muted);">${dataFormatada}</span></div><div style="font-size:16px; font-weight:700; color:var(--success); margin:10px 0;">${window.fmtMoney(o.total)}</div><div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;"><button class="btn" style="background:var(--bg-color); color:var(--dark); padding:10px; margin:0; flex:1;" onclick="gerarPDF('CLIENTE', ${i}, 'orçamentos')">PDF Cliente</button><button class="btn" style="background:#f3e8ff; color:var(--prod); padding:10px; margin:0; flex:1;" onclick="gerarPDF('PRODUCAO', ${i}, 'orçamentos')">PDF Produção</button><button class="btn" style="background:#e0f2fe; color:var(--info); padding:10px; margin:0; flex:1;" onclick="editarExistente('orçamentos', ${i})">Editar</button><button class="btn" style="background:var(--primary); padding:10px; margin:0; flex:1;" onclick="fecharPedido(${i})">Aprovar OS</button></div></div>`;
+            html += `<div class="card-list"><div style="display:flex; justify-content:space-between; align-items:flex-start;"><strong style="font-size:14px; color:var(--dark);">OS: ${o.os} - ${o.cliente}</strong><span style="font-size:11px; background:var(--bg-color); padding:4px 8px; border-radius:4px; color:var(--text-muted);">${dataFormatada}</span></div><div style="font-size:16px; font-weight:700; color:var(--success); margin:10px 0;">${window.fmtMoney(o.total)}</div><div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;"><button class="btn" style="background:var(--bg-color); color:var(--dark); padding:10px; margin:0; flex:1;" onclick="gerarPDF('CLIENTE', ${i}, 'orçamentos')">PDF Cliente</button><button class="btn" style="background:#f3e8ff; color:var(--prod); padding:10px; margin:0; flex:1;" onclick="gerarPDF('PRODUCAO', ${i}, 'orçamentos')">PDF Produção</button><button class="btn" style="background:#fef3c7; color:#b45309; padding:10px; margin:0; flex:1;" onclick="gerarGarantia(${i})">🔄 Garantia</button><button class="btn" style="background:#e0f2fe; color:var(--info); padding:10px; margin:0; flex:1;" onclick="editarExistente('orçamentos', ${i})">Editar</button><button class="btn" style="background:var(--primary); padding:10px; margin:0; flex:1;" onclick="fecharPedido(${i})">Aprovar OS</button></div></div>`;
         }
     });
     document.getElementById('listaOrcamentos').innerHTML = html || "<p style='text-align:center; padding:30px; background:var(--bg-color); border-radius:8px; color:var(--text-muted)'>Nenhum orçamento encontrado neste período.</p>";
   }
+
+  window.gerarGarantia = function(i) {
+      let orcBase = window.marbeDB.orçamentos[i];
+      if(!confirm(`Deseja gerar uma OS de GARANTIA para ${orcBase.cliente}? A OS irá direto para a Produção com valor R$ 0,00.`)) return;
+      
+      let hojeStr = new Date().toISOString().split('T')[0];
+      let dataLimite = prompt("Data limite para entregar essa garantia (AAAA-MM-DD):", hojeStr);
+      if(!dataLimite) return;
+
+      let clone = JSON.parse(JSON.stringify(orcBase));
+      clone.os = window.marbeDB.os++;
+      clone.data_criacao = new Date().toISOString();
+      clone.data_entrada = hojeStr;
+      clone.data_limite = dataLimite;
+      clone.pagamento = "GARANTIA (SEM CUSTO FINANCEIRO)";
+
+      clone.itens.forEach(it => {
+          if (!it.n.includes('[GARANTIA]')) it.n = '[GARANTIA] ' + it.n;
+          it.v = 0;
+          if(it.params) it.params.isGarantia = true;
+      });
+      clone.total = 0;
+
+      if(!window.marbeDB.pedidos) window.marbeDB.pedidos = [];
+      window.marbeDB.pedidos.push(clone);
+      window.salvarNuvem();
+
+      alert(`OS de Garantia ${clone.os} gerada e enviada para a Produção!`);
+      updateUI();
+      tab('producao');
+  };
 
   function fecharPedido(i) {
       idxFechar = i; let hoje = new Date().toISOString().split('T')[0];
