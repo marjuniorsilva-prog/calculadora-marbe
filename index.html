@@ -738,11 +738,17 @@
   window.recalcularItem = function(i, campo, valor) {
       let it = itensTemp[i];
       
+      // FIX: Se for uma OS antiga sem os parâmetros salvos, o sistema cria o parâmetro baseando-se no padrão atual da tela
       if (!it.params) {
-          if (campo === 'tempo') it.tempo_min = valor;
-          if (campo === 'mat') it.mat = valor.split('|')[1];
-          renderTabelaAtual();
-          return;
+          let vhGlobal = (window.marbeDB.custos && window.marbeDB.custos.vh) ? window.marbeDB.custos.vh : 50;
+          let isRev = it.n.toUpperCase().includes('REVESTIMENTO');
+          it.params = {
+              markup: parseFloat(document.getElementById('markup').value) || 2.5,
+              taxaImposto: parseFloat(document.getElementById('tipoServicoCalc').value) || 4.5,
+              valorHora: vhGlobal,
+              isGarantia: it.n.includes('[GARANTIA]'),
+              tipo: isRev ? 'revestimento' : 'geral'
+          };
       }
       
       let novoCustoKg = 0;
@@ -751,7 +757,7 @@
           novoCustoKg = parseFloat(partes[0]);
           it.mat = partes[1];
       } else {
-          let matObj = window.marbeDB.custos.mats.find(m => m.n === it.mat);
+          let matObj = (window.marbeDB.custos.mats || []).find(m => m.n === it.mat);
           novoCustoKg = matObj ? matObj.p : 0;
       }
       
