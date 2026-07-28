@@ -328,6 +328,11 @@
     <datalist id="listaClientesDatalist"></datalist>
     <label>Endereço Completo</label><input type="text" id="endereco">
     
+    <div class="row" style="margin-top:10px;">
+        <div class="col"><label style="margin-top:0">Nome do Contato</label><input type="text" id="orcContato" placeholder="Ex: João Silva"></div>
+        <div class="col"><label style="margin-top:0">Telefone / WhatsApp</label><input type="text" id="orcTelefone" placeholder="(16) 99999-9999"></div>
+    </div>
+    
     <div id="crmAlertaOrcamento" style="display:none; background:#eff6ff; padding:12px; border-left:4px solid var(--info); border-radius:6px; margin-top:15px; font-size:12px;">
         <strong style="color:var(--info);">Info CRM:</strong> <span id="crmContato"></span> | <span id="crmWhatsapp"></span><br>
         <span id="crmObs" style="color:var(--text-muted); font-style:italic; display:inline-block; margin-top:4px;"></span>
@@ -607,7 +612,10 @@
   function autoPreencherCliente(razaoEscolhida) {
     if(!window.marbeDB.clientes) return; const c = window.marbeDB.clientes.find(x => x.razao === razaoEscolhida); const boxCrm = document.getElementById('crmAlertaOrcamento');
     if(c) {
-        document.getElementById('cnpj').value = c.cnpj || ''; document.getElementById('endereco').value = c.endereco || '';
+        document.getElementById('cnpj').value = c.cnpj || ''; 
+        document.getElementById('endereco').value = c.endereco || '';
+        document.getElementById('orcContato').value = c.contato || '';
+        document.getElementById('orcTelefone').value = c.whatsapp || '';
         if (c.contato || c.whatsapp || c.obs) {
             document.getElementById('crmContato').innerText = c.contato ? `Contato: ${c.contato}` : ''; document.getElementById('crmWhatsapp').innerText = c.whatsapp ? `Whats: ${c.whatsapp}` : ''; document.getElementById('crmObs').innerText = c.obs ? `Lembrete: ${c.obs}` : ''; boxCrm.style.display = 'block';
         } else { boxCrm.style.display = 'none'; }
@@ -738,7 +746,6 @@
   window.recalcularItem = function(i, campo, valor) {
       let it = itensTemp[i];
       
-      // FIX: Se for uma OS antiga sem os parâmetros salvos, o sistema cria o parâmetro baseando-se no padrão atual da tela
       if (!it.params) {
           let vhGlobal = (window.marbeDB.custos && window.marbeDB.custos.vh) ? window.marbeDB.custos.vh : 50;
           let isRev = it.n.toUpperCase().includes('REVESTIMENTO');
@@ -781,7 +788,18 @@
     if(itensTemp.length === 0) return alert("Adicione pelo menos um item ao orçamento.");
     const razaoComercial = document.getElementById('razao').value || "CLIENTE NÃO INFORMADO"; const cnpjComercial = document.getElementById('cnpj').value || ""; const enderecoComercial = document.getElementById('endereco').value || "";
     const orcData = { 
-        os: idEdicao ? idEdicao.os : window.marbeDB.os, cliente: razaoComercial, cnpj: cnpjComercial, endereco: enderecoComercial, itens: JSON.parse(JSON.stringify(itensTemp)), frete: document.getElementById('frete').value, prazo: document.getElementById('prazo').value, pagamento: document.getElementById('pagamento').value, total: itensTemp.reduce((a,b)=>a+(b.v*b.q),0), data_criacao: new Date().toISOString()
+        os: idEdicao ? idEdicao.os : window.marbeDB.os, 
+        cliente: razaoComercial, 
+        cnpj: cnpjComercial, 
+        endereco: enderecoComercial, 
+        contato: document.getElementById('orcContato').value || "",
+        telefone: document.getElementById('orcTelefone').value || "",
+        itens: JSON.parse(JSON.stringify(itensTemp)), 
+        frete: document.getElementById('frete').value, 
+        prazo: document.getElementById('prazo').value, 
+        pagamento: document.getElementById('pagamento').value, 
+        total: itensTemp.reduce((a,b)=>a+(b.v*b.q),0), 
+        data_criacao: new Date().toISOString()
     };
     if (razaoComercial !== "CLIENTE NÃO INFORMADO") { salvarClienteDb(razaoComercial, cnpjComercial, enderecoComercial); }
 
@@ -880,8 +898,16 @@
   function gerarPDF(tipo, index, base) {
     const { jsPDF } = window.jspdf; const doc = new jsPDF(); const d = window.marbeDB[base][index];
     const clean = (t) => t ? t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase() : "";
-    doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 105, 15, {align: "center"});
-    doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.text("RUA SAO CARLOS, 84 - VILA MARIANA - RIBEIRAO PRETO / SP", 105, 20, {align: "center"}); doc.text("CNPJ: 61.149.312/0001-56", 105, 24, {align: "center"}); doc.setLineWidth(0.5); doc.line(20, 27, 190, 27);
+    
+    if (tipo === 'CLIENTE') {
+        doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("GRUPO MARBE POLIURETANO E SB BORRACHAS", 105, 12, {align: "center"});
+        doc.setFontSize(8); doc.setFont("helvetica", "bold"); doc.text("GRUPO MARBE - CNPJ: 41.755.585/0001-37   |   SB BORRACHAS - CNPJ: 61.149.312/0001-56", 105, 17, {align: "center"});
+        doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.text("RUA SAO CARLOS, 84 - VILA MARIANA - RIBEIRAO PRETO / SP", 105, 22, {align: "center"});
+        doc.setLineWidth(0.5); doc.line(20, 25, 190, 25);
+    } else {
+        doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("S B COMERCIO DE BORRACHAS E SERVICOS LTDA", 105, 15, {align: "center"});
+        doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.text("RUA SAO CARLOS, 84 - VILA MARIANA - RIBEIRAO PRETO / SP", 105, 20, {align: "center"}); doc.text("CNPJ: 61.149.312/0001-56", 105, 24, {align: "center"}); doc.setLineWidth(0.5); doc.line(20, 27, 190, 27);
+    }
     
     if (tipo === 'COMPRA') {
         doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.text(`PEDIDO DE COMPRA DE MATERIA-PRIMA`, 20, 35);
@@ -914,8 +940,14 @@
         }
         finalY += 5; doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text(`RESUMO DA ORDEM DE SERVICO:`, 20, finalY); doc.setFont("helvetica", "normal"); doc.text(`TEMPO TOTAL DE MAQUINA: ${formatT(totalTempoMin)}`, 20, finalY + 6); doc.text(`PESO TOTAL COBRADO (CLIENTE): ${totalPesoBase.toFixed(3)} KG`, 20, finalY + 12); doc.setFont("helvetica", "bold"); doc.setTextColor(111, 66, 193); doc.text(`PESO P/ SEPARACAO (+20% SOBRA): ${(totalPesoBase * 1.20).toFixed(3)} KG`, 20, finalY + 18); doc.setTextColor(0,0,0);
     } else {
-        doc.setFontSize(10); doc.text(`ORCAMENTO - OS: ${d.os} | DATA: ${new Date().toLocaleDateString('pt-BR')}`, 20, 35); doc.text(`CLIENTE: ${clean(d.cliente)}`, 20, 40); doc.text(`CNPJ: ${d.cnpj || ""}`, 20, 45); doc.text(`ENDERECO:`, 20, 50);
-        const splitEnd = doc.splitTextToSize(clean(d.endereco), 140); doc.text(splitEnd, 45, 50); let tableY = 60; if(splitEnd.length > 1) tableY += (splitEnd.length - 1) * 4;
+        doc.setFontSize(10); 
+        doc.text(`ORCAMENTO - OS: ${d.os} | DATA: ${new Date().toLocaleDateString('pt-BR')}`, 20, 32); 
+        doc.text(`CLIENTE: ${clean(d.cliente)}`, 20, 37); 
+        doc.text(`CNPJ: ${d.cnpj || ""}`, 20, 42); 
+        doc.text(`CONTATO: ${clean(d.contato || "")}   |   TELEFONE: ${clean(d.telefone || "")}`, 20, 47);
+        doc.text(`ENDERECO:`, 20, 52);
+        const splitEnd = doc.splitTextToSize(clean(d.endereco), 140); doc.text(splitEnd, 45, 52); 
+        let tableY = 60; if(splitEnd.length > 1) tableY += (splitEnd.length - 1) * 4;
         doc.autoTable({ startY: tableY, head: [['DESCRICAO', 'MATERIAL', 'QTD', 'V. UNIT', 'V. TOTAL']], body: d.itens.map(i => [clean(i.n), clean(i.mat), i.q, window.fmtMoney(i.v), window.fmtMoney(i.v * i.q)]), theme: 'striped', columnStyles: { 0: { cellWidth: 'auto' }, 1: { cellWidth: 30 }, 2: { cellWidth: 15, halign: 'center' }, 3: { cellWidth: 30, halign: 'right' }, 4: { cellWidth: 30, halign: 'right' } }, styles: { fontSize: 9, cellPadding: 2 } });
         const fY = doc.lastAutoTable.finalY + 10; doc.setFontSize(12); doc.text(`TOTAL GERAL: ${window.fmtMoney(d.total)}`, 190, fY, {align:'right'}); doc.setFontSize(8); doc.text(`FRETE: ${clean(d.frete)} | PRAZO: ${clean(d.prazo)}`, 20, fY + 5); doc.text(`PAGAMENTO: ${clean(d.pagamento)}`, 20, fY + 10);
     }
@@ -1012,7 +1044,12 @@
 
   function editarExistente(origem, index) {
       const base = window.marbeDB[origem][index]; idEdicao = { origem, index, os: base.os };
-      document.getElementById('cnpj').value = base.cnpj || ""; document.getElementById('razao').value = base.cliente; document.getElementById('endereco').value = base.endereco || ""; document.getElementById('osEdicaoLabel').innerText = base.os;
+      document.getElementById('cnpj').value = base.cnpj || ""; 
+      document.getElementById('razao').value = base.cliente; 
+      document.getElementById('endereco').value = base.endereco || ""; 
+      document.getElementById('orcContato').value = base.contato || ""; 
+      document.getElementById('orcTelefone').value = base.telefone || ""; 
+      document.getElementById('osEdicaoLabel').innerText = base.os;
       document.getElementById('btnCancelaEdit').style.display = 'block'; itensTemp = JSON.parse(JSON.stringify(base.itens)); renderTabelaAtual(); tab('orc');
   }
 
