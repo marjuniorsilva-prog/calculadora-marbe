@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sistema B2B v34.13 (Marbe)</title>
+  <title>Sistema B2B v34.14 (Marbe)</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -149,7 +150,7 @@
         <input type="text" id="loginUser" class="login-input" placeholder="Usuário">
         <input type="password" id="loginPass" class="login-input" placeholder="Senha">
         <button class="login-btn" onclick="fazerLogin()">ENTRAR</button>
-        <p style="font-size:12px; color:var(--text-muted); margin-top:20px; font-weight:500;">Versão Corporativa 34.13</p>
+        <p style="font-size:12px; color:var(--text-muted); margin-top:20px; font-weight:500;">Versão Corporativa 34.14</p>
     </div>
 </div>
 
@@ -177,7 +178,8 @@
         <option value="esfera">Esfera / Bola</option>
         <option value="cone">Cone / Batente</option>
         <option value="peso_direto">★ JÁ SEI O PESO (Modo Direto)</option>
-        <option value="revestimento">Revestimento (Rolo/Cilindro)</option>
+        <option value="revestimento">Revestimento (Rolo/Cilindro Padrão)</option>
+        <option value="revestimento_pol" style="color:var(--compra); font-weight:bold;">Revestimento (Ø Ferro em Polegadas + Camada mm)</option>
     </select>
 
     <div id="area-inputs" style="background: #f8fafc; padding: 15px; border-radius: 8px; border:1px solid var(--border); margin-top: 15px;">
@@ -241,6 +243,15 @@
                 <div class="col"><label style="margin-top:0">1. Ø Ferro (mm)</label><input type="number" id="rev-ferro" placeholder="Ex: 390"></div>
                 <div class="col"><label style="margin-top:0">2. Ø Acabado (mm)</label><input type="number" id="rev-acabado" placeholder="Ex: 420"></div>
                 <div class="col"><label style="margin-top:0">3. Comprimento</label><input type="number" id="rev-comp" placeholder="Ex: 1020"></div>
+            </div>
+        </div>
+
+        <div id="input-revestimento_pol" class="grupo-input hidden" style="border: 2px solid var(--compra); padding: 15px; border-radius: 8px; background: #fff7ed;">
+            <div style="color:var(--compra); font-weight:700; margin-bottom:15px; font-size:13px; text-align:center; letter-spacing: 0.5px;">MEDIDAS EM POLEGADAS E CAMADA</div>
+            <div class="row">
+                <div class="col"><label style="margin-top:0">1. Ø Ferro (Polegadas)</label><input type="number" id="rev-pol-ferro" placeholder="Ex: 18"></div>
+                <div class="col"><label style="margin-top:0">2. Camada (mm)</label><input type="number" id="rev-pol-camada" placeholder="Ex: 16"></div>
+                <div class="col"><label style="margin-top:0">3. Comp. (mm)</label><input type="number" id="rev-pol-comp" placeholder="Ex: 1400"></div>
             </div>
         </div>
     </div>
@@ -634,21 +645,39 @@
 
   function mudarInputsCalculo() {
       document.querySelectorAll('.grupo-input').forEach(el => el.classList.add('hidden')); document.getElementById('boxResultado').classList.add('hidden'); document.getElementById('alertaMemoria').style.display = 'none'; 
-      const tipo = document.getElementById('tipoPeca').value; document.getElementById('input-' + tipo).classList.remove('hidden');
-      if(tipo === 'revestimento') { document.getElementById('colPecasHora').classList.add('hidden'); document.getElementById('colHorasGastas').classList.remove('hidden'); document.getElementById('colPerda').classList.add('hidden'); } 
-      else { document.getElementById('colPecasHora').classList.remove('hidden'); document.getElementById('colHorasGastas').classList.add('hidden'); document.getElementById('colPerda').classList.remove('hidden'); }
+      const tipo = document.getElementById('tipoPeca').value; 
+      document.getElementById('input-' + tipo).classList.remove('hidden');
+      
+      const isRev = (tipo === 'revestimento' || tipo === 'revestimento_pol');
+      
+      if(isRev) { 
+          document.getElementById('colPecasHora').classList.add('hidden'); 
+          document.getElementById('colHorasGastas').classList.remove('hidden'); 
+          document.getElementById('colPerda').classList.add('hidden'); 
+      } else { 
+          document.getElementById('colPecasHora').classList.remove('hidden'); 
+          document.getElementById('colHorasGastas').classList.add('hidden'); 
+          document.getElementById('colPerda').classList.remove('hidden'); 
+      }
   }
 
   function simularCalculo() {
-      const tipo = document.getElementById('tipoPeca').value; let perdaPerc = 0; if (tipo !== 'revestimento') { perdaPerc = parseFloat(document.getElementById('percPerda').value) || 0; }
+      const tipoOriginal = document.getElementById('tipoPeca').value; 
+      const isRev = (tipoOriginal === 'revestimento' || tipoOriginal === 'revestimento_pol');
+      
+      let perdaPerc = 0; if (!isRev) { perdaPerc = parseFloat(document.getElementById('percPerda').value) || 0; }
       const densidade = parseFloat(document.getElementById('densidade').value) || 1.2; const markup = parseFloat(document.getElementById('markup').value) || 2.5;
       const selMat = document.getElementById('matSelect'); if(selMat.selectedIndex < 0) return alert("Cadastre materiais na aba Custos primeiro!");
       const custoKg = parseFloat(selMat.value); const nomeMat = selMat.options[selMat.selectedIndex].text;
       const valorHora = parseFloat(document.getElementById('tipoTorno').value); const selServico = document.getElementById('tipoServicoCalc'); const taxaImposto = parseFloat(selServico.value); const nomeServico = selServico.options[selServico.selectedIndex].text; const isGarantia = nomeServico.includes('GARANTIA');
       let volumeCm3 = 0; let pesoDiretoG = 0; let descMedidas = ""; let metaRevest = null; 
 
-      if (tipo === 'peso_direto') { pesoDiretoG = parseFloat(document.getElementById('peso-input').value); if(!pesoDiretoG) return alert("Informe o peso."); descMedidas = "Peso " + pesoDiretoG + "g"; } 
-      else if (tipo === 'revestimento') {
+      if (tipoOriginal === 'peso_direto') { 
+          pesoDiretoG = parseFloat(document.getElementById('peso-input').value); 
+          if(!pesoDiretoG) return alert("Informe o peso."); 
+          descMedidas = "Peso " + pesoDiretoG + "g"; 
+      } 
+      else if (tipoOriginal === 'revestimento') {
           const ferro = parseFloat(document.getElementById('rev-ferro').value); const acabado = parseFloat(document.getElementById('rev-acabado').value); const comp = parseFloat(document.getElementById('rev-comp').value);
           if(ferro && acabado && comp) {
               if (acabado <= ferro) return alert("O Ø Acabado deve ser MAIOR que o Ø Ferro.");
@@ -656,49 +685,86 @@
               volumeCm3 = (Math.PI * (ferro + espFinal) * espFinal * comp) / 1000; descMedidas = `Serviço de Revestimento Ø${ferro}xØ${acabado}x${comp}mm (camada ${espBase}mm)`; metaRevest = { dFerro: ferro, dAcabado: acabado, lRolo: comp, tipo: 'revestimento' };
           }
       }
-      else if (tipo === 'retangular') { let c = parseFloat(document.getElementById('ret-comp').value), larg = parseFloat(document.getElementById('ret-larg').value), esp = parseFloat(document.getElementById('ret-esp').value); if(c && larg && esp) { volumeCm3 = (c*larg*esp)/1000; descMedidas = `${c}x${larg}x${esp}mm`; } } 
-      else if (tipo === 'quadrada') { let ld = parseFloat(document.getElementById('quad-lado').value), esp = parseFloat(document.getElementById('quad-esp').value); if(ld && esp) { volumeCm3 = (ld*ld*esp)/1000; descMedidas = `${ld}x${ld}x${esp}mm`; } } 
-      else if (tipo === 'redonda') { let d = parseFloat(document.getElementById('red-diam').value), esp = parseFloat(document.getElementById('red-esp').value); if(d && esp) { volumeCm3 = (Math.PI * Math.pow(d/2, 2) * esp)/1000; descMedidas = `Ø${d} x ${esp}mm`; } } 
-      else if (tipo === 'tubo') { let ext = parseFloat(document.getElementById('tubo-ext').value), int = parseFloat(document.getElementById('tubo-int').value), c = parseFloat(document.getElementById('tubo-comp').value); if(ext && int && c) { let area = (Math.PI * Math.pow(ext/2, 2)) - (Math.PI * Math.pow(int/2, 2)); volumeCm3 = (area * c)/1000; descMedidas = `Ø${ext}xØ${int} x ${c}mm`; } } 
-      else if (tipo === 'oring') { let di = parseFloat(document.getElementById('oring-di').value), fio = parseFloat(document.getElementById('oring-fio').value); if(di && fio) { let rFio=fio/2, rMed=(di+fio)/2; volumeCm3 = (Math.PI * Math.pow(rFio, 2) * (2*Math.PI*rMed))/1000; descMedidas = `O-Ring Ø${di} x ${fio}mm`; } } 
-      else if (tipo === 'esfera') { let d = parseFloat(document.getElementById('esf-diam').value); if(d) { volumeCm3 = (4/3 * Math.PI * Math.pow(d/2, 3))/1000; descMedidas = `Esfera Ø${d}mm`; } } 
-      else if (tipo === 'cone') { let dm = parseFloat(document.getElementById('cone-maior').value), dmn = parseFloat(document.getElementById('cone-menor').value), h = parseFloat(document.getElementById('cone-alt').value); if(dm && dmn && h) { let r1=dm/2, r2=dmn/2; volumeCm3 = ((Math.PI*h)/3 * (Math.pow(r1,2) + r1*r2 + Math.pow(r2,2)))/1000; descMedidas = `Cone ${dm}/${dmn} x ${h}mm`; } }
+      else if (tipoOriginal === 'revestimento_pol') {
+          const ferroPol = parseFloat(document.getElementById('rev-pol-ferro').value); const camadaMm = parseFloat(document.getElementById('rev-pol-camada').value); const comp = parseFloat(document.getElementById('rev-pol-comp').value);
+          if(ferroPol && camadaMm && comp) {
+              const ferro = ferroPol * 25.4;
+              const acabado = ferro + (camadaMm * 2);
+              const espBase = camadaMm;
+              const sobraUsinagem = espBase <= 30 ? 5 : 10;
+              const espFinal = espBase + sobraUsinagem;
+              volumeCm3 = (Math.PI * (ferro + espFinal) * espFinal * comp) / 1000; 
+              descMedidas = `Serviço de Revestimento Ø${ferro.toFixed(1)}xØ${acabado.toFixed(1)}x${comp}mm (camada ${espBase}mm)`; 
+              metaRevest = { dFerro: ferro, dAcabado: acabado, lRolo: comp, tipo: 'revestimento' };
+          }
+      }
+      else if (tipoOriginal === 'retangular') { let c = parseFloat(document.getElementById('ret-comp').value), larg = parseFloat(document.getElementById('ret-larg').value), esp = parseFloat(document.getElementById('ret-esp').value); if(c && larg && esp) { volumeCm3 = (c*larg*esp)/1000; descMedidas = `${c}x${larg}x${esp}mm`; } } 
+      else if (tipoOriginal === 'quadrada') { let ld = parseFloat(document.getElementById('quad-lado').value), esp = parseFloat(document.getElementById('quad-esp').value); if(ld && esp) { volumeCm3 = (ld*ld*esp)/1000; descMedidas = `${ld}x${ld}x${esp}mm`; } } 
+      else if (tipoOriginal === 'redonda') { let d = parseFloat(document.getElementById('red-diam').value), esp = parseFloat(document.getElementById('red-esp').value); if(d && esp) { volumeCm3 = (Math.PI * Math.pow(d/2, 2) * esp)/1000; descMedidas = `Ø${d} x ${esp}mm`; } } 
+      else if (tipoOriginal === 'tubo') { let ext = parseFloat(document.getElementById('tubo-ext').value), int = parseFloat(document.getElementById('tubo-int').value), c = parseFloat(document.getElementById('tubo-comp').value); if(ext && int && c) { let area = (Math.PI * Math.pow(ext/2, 2)) - (Math.PI * Math.pow(int/2, 2)); volumeCm3 = (area * c)/1000; descMedidas = `Ø${ext}xØ${int} x ${c}mm`; } } 
+      else if (tipoOriginal === 'oring') { let di = parseFloat(document.getElementById('oring-di').value), fio = parseFloat(document.getElementById('oring-fio').value); if(di && fio) { let rFio=fio/2, rMed=(di+fio)/2; volumeCm3 = (Math.PI * Math.pow(rFio, 2) * (2*Math.PI*rMed))/1000; descMedidas = `O-Ring Ø${di} x ${fio}mm`; } } 
+      else if (tipoOriginal === 'esfera') { let d = parseFloat(document.getElementById('esf-diam').value); if(d) { volumeCm3 = (4/3 * Math.PI * Math.pow(d/2, 3))/1000; descMedidas = `Esfera Ø${d}mm`; } } 
+      else if (tipoOriginal === 'cone') { let dm = parseFloat(document.getElementById('cone-maior').value), dmn = parseFloat(document.getElementById('cone-menor').value), h = parseFloat(document.getElementById('cone-alt').value); if(dm && dmn && h) { let r1=dm/2, r2=dmn/2; volumeCm3 = ((Math.PI*h)/3 * (Math.pow(r1,2) + r1*r2 + Math.pow(r2,2)))/1000; descMedidas = `Cone ${dm}/${dmn} x ${h}mm`; } }
 
       if(volumeCm3 === 0 && pesoDiretoG === 0) return alert("Preencha as medidas corretamente.");
 
-      let pesoLiq = (tipo === 'peso_direto') ? pesoDiretoG : (volumeCm3 * densidade); let fatorPerda = 1 + (perdaPerc / 100); let pesoBrutoG = pesoLiq * fatorPerda; let pesoBrutoKg = pesoBrutoG / 1000;
+      let pesoLiq = (tipoOriginal === 'peso_direto') ? pesoDiretoG : (volumeCm3 * densidade); let fatorPerda = 1 + (perdaPerc / 100); let pesoBrutoG = pesoLiq * fatorPerda; let pesoBrutoKg = pesoBrutoG / 1000;
       let custoMateria = pesoBrutoKg * custoKg; let custoCola = 0;
-      if (tipo === 'revestimento') { custoCola = custoMateria * 0.10; document.getElementById('linhaCola').classList.remove('hidden'); document.getElementById('resCustoCola').innerText = window.fmtMoney(custoCola); } 
-      else { document.getElementById('linhaCola').classList.add('hidden'); }
+      
+      if (isRev) { 
+          custoCola = custoMateria * 0.10; 
+          document.getElementById('linhaCola').classList.remove('hidden'); 
+          document.getElementById('resCustoCola').innerText = window.fmtMoney(custoCola); 
+      } else { 
+          document.getElementById('linhaCola').classList.add('hidden'); 
+      }
 
       let custoMO = 0;
-      if (tipo === 'revestimento') { const hGastas = parseFloat(document.getElementById('horasGastas').value) || 0; if(!hGastas) return alert("Informe as horas gastas."); custoMO = valorHora * hGastas; } 
-      else { const pecasHora = parseFloat(document.getElementById('pecasHora').value); if(!pecasHora) return alert("Informe peças por hora."); custoMO = valorHora / pecasHora; }
+      if (isRev) { 
+          const hGastas = parseFloat(document.getElementById('horasGastas').value) || 0; 
+          if(!hGastas) return alert("Informe as horas gastas."); 
+          custoMO = valorHora * hGastas; 
+      } else { 
+          const pecasHora = parseFloat(document.getElementById('pecasHora').value); 
+          if(!pecasHora) return alert("Informe peças por hora."); 
+          custoMO = valorHora / pecasHora; 
+      }
 
       let custoProd = custoMateria + custoCola + custoMO; let precoBase = custoProd * markup; let valorImposto = precoBase * (taxaImposto / 100); let precoFinal = precoBase + valorImposto;
 
       if(isGarantia) { precoBase = 0; valorImposto = 0; precoFinal = 0; }
 
       let minPorPeca = 0;
-      if (tipo === 'revestimento') { const hGastas = parseFloat(document.getElementById('horasGastas').value) || 0; minPorPeca = hGastas * 60; } 
-      else { const pecasHora = parseFloat(document.getElementById('pecasHora').value) || 1; minPorPeca = 60 / pecasHora; }
+      if (isRev) { 
+          const hGastas = parseFloat(document.getElementById('horasGastas').value) || 0; 
+          minPorPeca = hGastas * 60; 
+      } else { 
+          const pecasHora = parseFloat(document.getElementById('pecasHora').value) || 1; 
+          minPorPeca = 60 / pecasHora; 
+      }
 
-      let nomeFinalItem = (tipo === 'revestimento') ? descMedidas : `${document.getElementById('tipoPeca').options[document.getElementById('tipoPeca').selectedIndex].text} - ${nomeServico} ${descMedidas}`;
+      let nomeFinalItem = isRev ? descMedidas : `${document.getElementById('tipoPeca').options[document.getElementById('tipoPeca').selectedIndex].text} - ${nomeServico} ${descMedidas}`;
       if(isGarantia && !nomeFinalItem.includes('[GARANTIA]')) { nomeFinalItem = `[GARANTIA] ${nomeFinalItem}`; }
 
       ultimoCalculo = { 
           n: nomeFinalItem, mat: nomeMat, med: descMedidas, q: 1, v: precoFinal, 
           kg_unit: pesoBrutoKg, tempo_min: minPorPeca, meta: metaRevest,
-          params: { markup: markup, taxaImposto: taxaImposto, valorHora: valorHora, isGarantia: isGarantia, tipo: tipo }
+          params: { markup: markup, taxaImposto: taxaImposto, valorHora: valorHora, isGarantia: isGarantia, tipo: isRev ? 'revestimento' : tipoOriginal }
       };
 
-      let analiseMemoria = verificarSimilaridadeNoHistorico(pesoBrutoKg, minPorPeca, tipo, metaRevest); let boxAlerta = document.getElementById('alertaMemoria');
+      let analiseMemoria = verificarSimilaridadeNoHistorico(pesoBrutoKg, minPorPeca, isRev ? 'revestimento' : tipoOriginal, metaRevest); let boxAlerta = document.getElementById('alertaMemoria');
       if (analiseMemoria) { boxAlerta.innerHTML = analiseMemoria.html; boxAlerta.style.display = 'block'; if (analiseMemoria.alerta) { boxAlerta.style.background = '#fef2f2'; boxAlerta.style.border = '1px solid #fecaca'; } else { boxAlerta.style.background = '#f0fdf4'; boxAlerta.style.border = '1px solid #bbf7d0'; } } 
       else { boxAlerta.style.display = 'none'; }
 
       document.getElementById('resDesc').innerText = descMedidas;
-      if(tipo === 'revestimento') { document.getElementById('resPesoLiq').innerText = "- (Manta Bruta s/ sobra)"; document.getElementById('lblPesoBruto').innerText = "Peso Cobrado (Manta s/ folga):"; } 
-      else { document.getElementById('resPesoLiq').innerText = pesoLiq.toFixed(1) + ' g'; document.getElementById('lblPesoBruto').innerText = `Peso Bruto (+${perdaPerc}%):`; }
+      if(isRev) { 
+          document.getElementById('resPesoLiq').innerText = "- (Manta Bruta s/ sobra)"; 
+          document.getElementById('lblPesoBruto').innerText = "Peso Cobrado (Manta s/ folga):"; 
+      } else { 
+          document.getElementById('resPesoLiq').innerText = pesoLiq.toFixed(1) + ' g'; 
+          document.getElementById('lblPesoBruto').innerText = `Peso Bruto (+${perdaPerc}%):`; 
+      }
+      
       document.getElementById('resPesoBruto').innerText = pesoBrutoG.toFixed(1) + ' g'; document.getElementById('resCustoMat').innerText = window.fmtMoney(custoMateria); document.getElementById('resCustoMO').innerText = window.fmtMoney(custoMO); document.getElementById('resCustoTot').innerText = window.fmtMoney(custoProd);
       
       if(isGarantia) { document.getElementById('lblCustoTot').innerText = "Custo (Prejuízo Interno):"; document.getElementById('resCustoTot').style.color = "#fca5a5"; document.getElementById('resMarkup').innerText = "Garantia (Sem Receita)"; } 
