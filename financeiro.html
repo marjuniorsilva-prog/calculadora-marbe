@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Financeiro - ERP Marbe</title>
+  <title>Financeiro Completo - ERP Marbe</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -28,18 +28,27 @@
     const db = getDatabase(app);
     window.marbeDB = null;
 
+    // Setando o filtro inicial para o mês atual
+    document.addEventListener("DOMContentLoaded", () => {
+        let hoje = new Date();
+        let primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+        document.getElementById('filtroDataIni').value = primeiroDia.toISOString().split('T')[0];
+        document.getElementById('filtroDataFim').value = hoje.toISOString().split('T')[0];
+    });
+
     onValue(ref(db, 'sistema/'), (snapshot) => {
       const data = snapshot.val();
       if (data) { 
           window.marbeDB = data; 
           if (!window.marbeDB.financeiro) window.marbeDB.financeiro = [];
           if (!window.marbeDB.fin_despesas) window.marbeDB.fin_despesas = [];
-          renderFinanceiro();
+          if(document.getElementById('filtroDataIni').value) renderFinanceiro();
       }
     });
 
-    window.salvarNuvem = function() { 
+    window.salvarNuvem = function(silencioso = false) { 
         set(ref(db, 'sistema/'), window.marbeDB)
+            .then(() => { if(!silencioso) alert("Financeiro atualizado!"); })
             .catch((error) => { alert("Erro ao salvar: " + error.message); });
     };
 
@@ -90,19 +99,20 @@
 
     .content-area { flex: 1; overflow-y: auto; padding: 30px; background: var(--bg-color); }
     
-    .btn { padding: 12px 20px; background: var(--accent); color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap: 8px; }
+    .btn { padding: 12px 20px; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
     .btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
     
     .card-panel { background: var(--card-bg); padding: 25px; border-radius: var(--border-radius); box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid var(--border); margin-bottom: 20px; }
     .card-header { font-size: 14px; font-weight: 700; color: var(--primary); margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
     
     label { display: block; margin-top: 0; font-weight: 600; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
-    input, select { width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-family: 'Inter'; outline: none; margin-bottom: 15px; }
-    input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    input, select { width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-family: 'Inter'; outline: none; margin-bottom: 15px; background: #f8fafc;}
+    input:focus, select:focus { border-color: var(--accent); background:#fff; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
     
     .row { display: flex; gap: 15px; }
     .col { flex: 1; min-width: 0; }
 
+    /* Estilos das Tabelas Financeiras */
     .table-container { background: #fff; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     table th { background: #f8fafc; border-bottom: 1px solid var(--border); padding: 14px 16px; text-align: left; font-weight: 600; color: var(--text-muted); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
@@ -110,8 +120,19 @@
     table tr:last-child td { border-bottom: none; }
     table tr:hover td { background-color: #f8fafc; }
 
+    .status-badge { padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; display: inline-flex; align-items: center; gap: 4px; }
+    .status-pago { background: #dcfce7; color: #16a34a; }
+    .status-pendente { background: #fef3c7; color: #d97706; }
+    .status-atrasado { background: #fee2e2; color: #dc2626; }
+
+    /* Dashboard Superior Financeiro */
+    .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+    .dash-card { background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .dash-card h3 { margin: 0 0 8px 0; font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; }
+    .dash-card .value { font-size: 24px; font-weight: 800; }
+
     @media (max-width: 1024px) {
-      .sidebar { position: fixed; height: 100%; transform: translateX(-100%); }
+      .sidebar { position: fixed; height: 100%; transform: translateX(-100%); z-index: 99; }
       .sidebar.open { transform: translateX(0); }
       .row { flex-direction: column; gap: 0; }
     }
@@ -150,73 +171,126 @@
       </header>
 
       <div class="content-area">
+          
+          <!-- Filtro Global de Data -->
+          <div style="background:var(--card-bg); padding:15px 20px; border-radius:12px; border:1px solid var(--border); margin-bottom:20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;">
+              <div><label style="margin-bottom:5px;">Período (Data Venc./Pgto) - Início</label><input type="date" id="filtroDataIni" style="margin-bottom:0; padding:10px;"></div>
+              <div><label style="margin-bottom:5px;">Período (Data Venc./Pgto) - Fim</label><input type="date" id="filtroDataFim" style="margin-bottom:0; padding:10px;"></div>
+              <button class="btn" style="background:var(--primary);" onclick="renderFinanceiro()"><i data-lucide="search"></i> FILTRAR CAIXA</button>
+          </div>
+
+          <!-- Mini Dashboard Financeiro -->
+          <div class="dash-grid">
+              <div class="dash-card">
+                  <h3 style="color:var(--success);">Realizado: Receitas (Pagas)</h3>
+                  <div class="value" style="color:var(--success);" id="kpiReceitaMesa">R$ 0,00</div>
+                  <div style="font-size:12px; color:var(--text-muted); margin-top:5px;">A Receber: <span id="kpiReceitaPend" style="font-weight:bold; color:var(--warning);">R$ 0,00</span></div>
+              </div>
+              <div class="dash-card">
+                  <h3 style="color:var(--danger);">Realizado: Despesas (Pagas)</h3>
+                  <div class="value" style="color:var(--danger);" id="kpiDespesaMesa">R$ 0,00</div>
+                  <div style="font-size:12px; color:var(--text-muted); margin-top:5px;">A Pagar: <span id="kpiDespesaPend" style="font-weight:bold; color:var(--warning);">R$ 0,00</span></div>
+              </div>
+              <div class="dash-card" style="background:var(--primary); color:white; border:none;">
+                  <h3 style="color:#cbd5e1;">Saldo Real em Caixa</h3>
+                  <div class="value" style="color:#10b981;" id="kpiSaldoMesa">R$ 0,00</div>
+                  <div style="font-size:12px; color:#94a3b8; margin-top:5px;">Considera apenas o que já foi PAGO/RECEBIDO.</div>
+              </div>
+          </div>
+
+          <!-- Lançamentos -->
           <div class="row">
               <div class="col">
-                  <div class="card-panel">
-                      <div class="card-header" style="color:var(--success);"><i data-lucide="arrow-down-to-line"></i> Nova Entrada (Receita)</div>
-                      <label>Descrição / Origem</label>
-                      <input type="text" id="descReceita" placeholder="Ex: Pagamento OS 630 - Cliente X">
+                  <div class="card-panel" style="border-top: 4px solid var(--success);">
+                      <div class="card-header" style="color:var(--success); border-bottom:none;"><i data-lucide="arrow-down-to-line"></i> Inserir Nova Receita</div>
+                      <label>Descrição (Cliente / OS)</label>
+                      <input type="text" id="descReceita" placeholder="Ex: Pagamento OS 630">
                       <div class="row">
                           <div class="col"><label>Valor (R$)</label><input type="number" id="valorReceita" placeholder="0.00"></div>
-                          <div class="col"><label>Data Recebimento</label><input type="date" id="dataReceita"></div>
+                          <div class="col"><label>Data Limite/Vencimento</label><input type="date" id="dataReceita"></div>
                       </div>
-                      <button class="btn" style="background:var(--success); width:100%; justify-content:center;" onclick="addLancamento('receita')">REGISTRAR ENTRADA</button>
+                      <label>Status do Pagamento</label>
+                      <select id="pagoReceita">
+                          <option value="true">✅ Já Recebido (Caiu na Conta)</option>
+                          <option value="false">⏳ Pendente (A Receber)</option>
+                      </select>
+                      <button class="btn" style="background:var(--success); width:100%;" onclick="addLancamento('receita')">LANÇAR RECEITA</button>
                   </div>
               </div>
+              
               <div class="col">
-                  <div class="card-panel">
-                      <div class="card-header" style="color:var(--danger);"><i data-lucide="arrow-up-from-line"></i> Nova Saída (Despesa)</div>
-                      <label>Descrição da Despesa</label>
-                      <input type="text" id="descDespesa" placeholder="Ex: Compra de PU / Energia">
+                  <div class="card-panel" style="border-top: 4px solid var(--danger);">
+                      <div class="card-header" style="color:var(--danger); border-bottom:none;"><i data-lucide="arrow-up-from-line"></i> Inserir Nova Despesa</div>
+                      <label>Descrição (Fornecedor / Conta)</label>
+                      <input type="text" id="descDespesa" placeholder="Ex: Compra de PU / CPFL">
                       <div class="row">
                           <div class="col"><label>Valor (R$)</label><input type="number" id="valorDespesa" placeholder="0.00"></div>
-                          <div class="col"><label>Data Pagamento</label><input type="date" id="dataDespesa"></div>
+                          <div class="col"><label>Data Limite/Vencimento</label><input type="date" id="dataDespesa"></div>
                       </div>
-                      <button class="btn" style="background:var(--danger); width:100%; justify-content:center;" onclick="addLancamento('despesa')">REGISTRAR SAÍDA</button>
+                      <label>Status do Pagamento</label>
+                      <select id="pagoDespesa">
+                          <option value="true">✅ Já Pago (Saiu da Conta)</option>
+                          <option value="false">⏳ Pendente (A Pagar)</option>
+                      </select>
+                      <button class="btn" style="background:var(--danger); width:100%;" onclick="addLancamento('despesa')">LANÇAR DESPESA</button>
                   </div>
               </div>
           </div>
 
-          <div class="card-panel" style="margin-top: 20px;">
-              <div class="card-header"><i data-lucide="list"></i> Extrato de Movimentações</div>
-              <div class="table-container">
-                  <table>
-                      <thead><tr><th>Data</th><th>Descrição</th><th>Tipo</th><th style="text-align:right">Valor</th><th style="text-align:center">Ação</th></tr></thead>
-                      <tbody id="tabelaFinanceiro"></tbody>
+          <!-- Tabela Centralizada de Contas a Pagar/Receber -->
+          <div class="card-panel" style="margin-top: 10px;">
+              <div class="card-header"><i data-lucide="layout-list"></i> Controle de Contas a Pagar e Receber</div>
+              
+              <div class="table-container" style="overflow-x:auto;">
+                  <table style="min-width: 800px;">
+                      <thead>
+                          <tr>
+                              <th>Vencimento / Data</th>
+                              <th>Descrição</th>
+                              <th>Tipo</th>
+                              <th style="text-align:right">Valor</th>
+                              <th style="text-align:center">Status</th>
+                              <th style="text-align:center">Ações</th>
+                          </tr>
+                      </thead>
+                      <tbody id="tabelaFinanceiro">
+                          <!-- Gerado via JS -->
+                      </tbody>
                   </table>
               </div>
           </div>
+
       </div>
   </main>
 </div>
 
 <script>
     lucide.createIcons();
-    document.getElementById('dataReceita').value = new Date().toISOString().split('T')[0];
-    document.getElementById('dataDespesa').value = new Date().toISOString().split('T')[0];
 
     window.addLancamento = function(tipo) {
-        let desc, valor, data;
+        let desc, valor, data, pago;
         if(tipo === 'receita') {
             desc = document.getElementById('descReceita').value;
             valor = parseFloat(document.getElementById('valorReceita').value);
             data = document.getElementById('dataReceita').value;
+            pago = document.getElementById('pagoReceita').value === 'true';
         } else {
             desc = document.getElementById('descDespesa').value;
             valor = parseFloat(document.getElementById('valorDespesa').value);
             data = document.getElementById('dataDespesa').value;
+            pago = document.getElementById('pagoDespesa').value === 'true';
         }
 
-        if(!desc || !valor || !data) return alert("Preencha todos os campos do lançamento.");
+        if(!desc || !valor || !data) return alert("Preencha Descrição, Valor e Data para lançar.");
 
-        let obj = { desc: desc, valor: valor, data: data, pago: true };
+        let obj = { desc: desc, valor: valor, data: data, pago: pago };
         
         if(tipo === 'receita') {
-            obj.dataRecebimento = data;
+            obj.dataRecebimento = data; 
             window.marbeDB.financeiro.push(obj);
             document.getElementById('descReceita').value = ""; document.getElementById('valorReceita').value = "";
         } else {
-            obj.dataPagamento = data;
+            obj.dataPagamento = data; 
             window.marbeDB.fin_despesas.push(obj);
             document.getElementById('descDespesa').value = ""; document.getElementById('valorDespesa').value = "";
         }
@@ -224,20 +298,69 @@
     };
 
     window.deletarLancamento = function(tipo, index) {
-        if(!confirm("Tem certeza que deseja excluir este lançamento?")) return;
+        if(!confirm("Tem certeza que deseja EXCLUIR este lançamento definitivamente?")) return;
         if(tipo === 'receita') { window.marbeDB.financeiro.splice(index, 1); } 
         else { window.marbeDB.fin_despesas.splice(index, 1); }
         window.salvarNuvem(); renderFinanceiro();
     };
 
+    window.alternarPagamento = function(tipo, index) {
+        if(tipo === 'receita') { 
+            let atual = window.marbeDB.financeiro[index].pago;
+            window.marbeDB.financeiro[index].pago = !atual;
+            if(!atual) window.marbeDB.financeiro[index].dataRecebimento = new Date().toISOString().split('T')[0]; // Se marcou como pago, atualiza a data para hoje
+        } else { 
+            let atual = window.marbeDB.fin_despesas[index].pago;
+            window.marbeDB.fin_despesas[index].pago = !atual;
+            if(!atual) window.marbeDB.fin_despesas[index].dataPagamento = new Date().toISOString().split('T')[0];
+        }
+        window.salvarNuvem(true); renderFinanceiro();
+    };
+
     function renderFinanceiro() {
         if (!window.marbeDB) return;
+
+        let inputIni = document.getElementById('filtroDataIni').value;
+        let inputFim = document.getElementById('filtroDataFim').value;
+        let hojeStr = new Date().toISOString().split('T')[0];
         
         let transacoes = [];
-        (window.marbeDB.financeiro || []).forEach((r, i) => { transacoes.push({ ...r, tipo: 'receita', indexReal: i, sortDate: r.dataRecebimento }); });
-        (window.marbeDB.fin_despesas || []).forEach((d, i) => { transacoes.push({ ...d, tipo: 'despesa', indexReal: i, sortDate: d.dataPagamento }); });
+        let rPagas = 0, rPend = 0, dPagas = 0, dPend = 0;
 
-        // Ordenar por data mais recente
+        // Puxando Receitas
+        (window.marbeDB.financeiro || []).forEach((r, i) => { 
+            let exibir = true; let dRef = r.dataRecebimento || r.data;
+            if (inputIni && inputFim && (dRef < inputIni || dRef > inputFim)) exibir = false;
+            
+            if(exibir) {
+                if(r.pago) rPagas += r.valor; else rPend += r.valor;
+                transacoes.push({ ...r, tipo: 'receita', indexReal: i, sortDate: dRef }); 
+            }
+        });
+
+        // Puxando Despesas
+        (window.marbeDB.fin_despesas || []).forEach((d, i) => { 
+            let exibir = true; let dRef = d.dataPagamento || d.data;
+            if (inputIni && inputFim && (dRef < inputIni || dRef > inputFim)) exibir = false;
+            
+            if(exibir) {
+                if(d.pago) dPagas += d.valor; else dPend += d.valor;
+                transacoes.push({ ...d, tipo: 'despesa', indexReal: i, sortDate: dRef }); 
+            }
+        });
+
+        // Atualizando Cards de KPI
+        document.getElementById('kpiReceitaMesa').innerText = window.fmtMoney(rPagas);
+        document.getElementById('kpiReceitaPend').innerText = window.fmtMoney(rPend);
+        document.getElementById('kpiDespesaMesa').innerText = window.fmtMoney(dPagas);
+        document.getElementById('kpiDespesaPend').innerText = window.fmtMoney(dPend);
+        
+        let saldoAtual = rPagas - dPagas;
+        let objSaldo = document.getElementById('kpiSaldoMesa');
+        objSaldo.innerText = window.fmtMoney(saldoAtual);
+        objSaldo.style.color = saldoAtual >= 0 ? '#10b981' : '#f43f5e'; // Verde se positivo, rosa se negativo
+
+        // Ordenar tabela por data (mais recente no topo)
         transacoes.sort((a, b) => new Date(b.sortDate) - new Date(a.sortDate));
 
         let html = '';
@@ -245,16 +368,39 @@
             let dataFmt = t.sortDate ? t.sortDate.split('-').reverse().join('/') : "N/D";
             let corT = t.tipo === 'receita' ? 'var(--success)' : 'var(--danger)';
             let sinal = t.tipo === 'receita' ? '+' : '-';
+            
+            // Lógica de Status Badge
+            let badgeHtml = '';
+            let btnAcaoStatus = '';
+            
+            if (t.pago) {
+                badgeHtml = `<span class="status-badge status-pago"><i data-lucide="check-circle" style="width:12px;"></i> PAGO</span>`;
+                btnAcaoStatus = `<button class="btn" style="background:#fef3c7; color:#b45309; padding:6px 12px; font-size:11px;" onclick="alternarPagamento('${t.tipo}', ${t.indexReal})" title="Desfazer e marcar como Pendente"><i data-lucide="rotate-ccw" style="width:14px;"></i> ESTORNAR</button>`;
+            } else {
+                let atrasado = t.sortDate < hojeStr;
+                if (atrasado) {
+                    badgeHtml = `<span class="status-badge status-atrasado"><i data-lucide="alert-circle" style="width:12px;"></i> ATRASADO</span>`;
+                } else {
+                    badgeHtml = `<span class="status-badge status-pendente"><i data-lucide="clock" style="width:12px;"></i> PENDENTE</span>`;
+                }
+                btnAcaoStatus = `<button class="btn" style="background:var(--success); color:white; padding:6px 12px; font-size:11px;" onclick="alternarPagamento('${t.tipo}', ${t.indexReal})" title="Dar baixa neste lançamento"><i data-lucide="check" style="width:14px;"></i> DAR BAIXA</button>`;
+            }
+
             html += `<tr>
                 <td style="font-weight:600;">${dataFmt}</td>
-                <td>${t.desc}</td>
-                <td><span style="background:${t.tipo==='receita'?'#dcfce7':'#fee2e2'}; color:${corT}; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:700; text-transform:uppercase;">${t.tipo}</span></td>
-                <td style="text-align:right; font-weight:700; color:${corT};">${sinal} ${window.fmtMoney(t.valor)}</td>
-                <td style="text-align:center;"><button style="background:transparent; border:none; cursor:pointer; color:var(--text-muted);" onclick="deletarLancamento('${t.tipo}', ${t.indexReal})"><i data-lucide="trash-2" style="width:16px;"></i></button></td>
+                <td><strong style="color:var(--dark); display:block;">${t.desc}</strong></td>
+                <td><span style="color:${corT}; font-weight:700; text-transform:uppercase; font-size:11px;">${t.tipo}</span></td>
+                <td style="text-align:right; font-weight:800; color:${corT}; font-size:14px;">${sinal} ${window.fmtMoney(t.valor)}</td>
+                <td style="text-align:center;">${badgeHtml}</td>
+                <td style="text-align:center; display:flex; gap:8px; justify-content:center;">
+                    ${btnAcaoStatus}
+                    <button class="btn" style="background:#fee2e2; color:var(--danger); padding:6px 10px;" onclick="deletarLancamento('${t.tipo}', ${t.indexReal})" title="Apagar Registro"><i data-lucide="trash-2" style="width:14px;"></i></button>
+                </td>
             </tr>`;
         });
 
-        document.getElementById('tabelaFinanceiro').innerHTML = html || '<tr><td colspan="5" style="text-align:center; padding:30px; color:var(--text-muted);">Nenhuma movimentação registrada.</td></tr>';
+        document.getElementById('tabelaFinanceiro').innerHTML = html || `<tr><td colspan="6" style="text-align:center; padding:40px; color:var(--text-muted);"><i data-lucide="inbox" style="width:32px; height:32px; opacity:0.5; margin-bottom:10px;"></i><br>Nenhuma movimentação encontrada neste período.</td></tr>`;
+        
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 </script>
