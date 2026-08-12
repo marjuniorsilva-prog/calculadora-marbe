@@ -36,13 +36,17 @@
     document.addEventListener("DOMContentLoaded", () => {
         document.getElementById('filtroDataIni').value = primeiroDia.toISOString().split('T')[0];
         document.getElementById('filtroDataFim').value = hoje.toISOString().split('T')[0];
+        if(window.marbeDB) renderDashboard();
     });
 
     onValue(ref(db, 'sistema/'), (snapshot) => {
       const data = snapshot.val();
       if (data) { 
           window.marbeDB = data; 
-          renderDashboard();
+          // Trava de segurança: só renderiza se a tela já estiver carregada
+          if(document.getElementById('filtroDataIni')) {
+              renderDashboard();
+          }
       }
     });
 
@@ -86,8 +90,6 @@
     .ranking-list li:last-child { border-bottom: none; }
     .rank-name { font-weight: 600; color: var(--dark); }
     .rank-val { font-weight: 700; color: var(--success); }
-    
-    .badge { padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; background: var(--bg-color); color: var(--text-muted); }
   </style>
 </head>
 <body>
@@ -144,7 +146,10 @@
         <!-- Faturamento por Empresa / Setor -->
         <div class="chart-container">
             <h3>Faturamento: Marbe (PU) vs SB Borrachas</h3>
-            <canvas id="chartSetor" height="200"></canvas>
+            <!-- BLOQUEIO DE TAMANHO PARA EVITAR CONGELAMENTO -->
+            <div style="position: relative; height: 250px; width: 100%;">
+                <canvas id="chartSetor"></canvas>
+            </div>
         </div>
 
         <!-- Ranking de Clientes -->
@@ -158,7 +163,10 @@
         <!-- Mapa de Perdas CRM -->
         <div class="chart-container">
             <h3>Análise de Perdas (Motivos de Recusa)</h3>
-            <canvas id="chartPerdas" height="200"></canvas>
+            <!-- BLOQUEIO DE TAMANHO PARA EVITAR CONGELAMENTO -->
+            <div style="position: relative; height: 250px; width: 100%;">
+                <canvas id="chartPerdas"></canvas>
+            </div>
         </div>
 
         <!-- Resumo Financeiro (DRE Rápida) -->
@@ -191,10 +199,15 @@
     window.renderDashboard = function() {
         if (!window.marbeDB) return;
 
-        let dataIniStr = document.getElementById('filtroDataIni').value;
-        let dataFimStr = document.getElementById('filtroDataFim').value;
+        let inputIni = document.getElementById('filtroDataIni');
+        let inputFim = document.getElementById('filtroDataFim');
+        
+        if(!inputIni || !inputFim) return; // Evita falhas antes da tela carregar 100%
 
-        // Variaveis Analíticas
+        let dataIniStr = inputIni.value;
+        let dataFimStr = inputFim.value;
+
+        // Variáveis Analíticas
         let totalFaturamento = 0;
         let qtdPedidos = 0;
         let fatMarbePU = 0;
@@ -210,7 +223,8 @@
         let dreSaidas = 0;
 
         // 1. Analisando PEDIDOS (Vendas Fechadas)
-        (window.marbeDB.pedidos || []).concat(window.marbeDB.expedidos || []).forEach(p => {
+        let basePedidos = (window.marbeDB.pedidos || []).concat(window.marbeDB.expedidos || []);
+        basePedidos.forEach(p => {
             let exibir = true;
             if (dataIniStr && dataFimStr) {
                 let d = p.data_criacao ? p.data_criacao.substring(0, 10) : '';
@@ -278,7 +292,7 @@
 
         // Atualizando Tela (KPIs)
         document.getElementById('kpiFaturamento').innerText = window.fmtMoney(totalFaturamento);
-        document.getElementById('kpiQtdPedidos').innerText = `${qtdPedidos} OSs geradas`;
+        document.getElementById('kpiQtdPedidos').innerText = `${qtdPedidos} OSs aprovadas na fábrica`;
 
         let ticket = qtdPedidos > 0 ? (totalFaturamento / qtdPedidos) : 0;
         document.getElementById('kpiTicket').innerText = window.fmtMoney(ticket);
@@ -329,7 +343,6 @@
         if (chartInstSetor) chartInstSetor.destroy();
 
         if (pu === 0 && borracha === 0) {
-            // Placeholder se não tiver dados
             pu = 1; borracha = 1; 
         }
 
@@ -346,6 +359,7 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: false, // Desativa animação pesada no carregamento rápido
                 plugins: {
                     legend: { position: 'bottom', labels: { font: { family: 'Inter' } } }
                 }
@@ -374,6 +388,7 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: false, // Desativa animação pesada
                 scales: {
                     y: { beginAtZero: true, ticks: { stepSize: 1 } }
                 },
@@ -383,7 +398,6 @@
             }
         });
     }
-
 </script>
 </body>
 </html>
