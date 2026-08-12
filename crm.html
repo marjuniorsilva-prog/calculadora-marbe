@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>CRM Comercial - Grupo Marbe</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyATu_V6e1shKRpgBOkX1lw2beyzUEZUCo0",
+      authDomain: "marbeapp-e2db8.firebaseapp.com",
+      projectId: "marbeapp-e2db8",
+      storageBucket: "marbeapp-e2db8.firebasestorage.app",
+      messagingSenderId: "435226749841",
+      appId: "1:435226749841:web:c2b5f5dee676412b228830"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    window.marbeDB = null;
+
+    onValue(ref(db, 'sistema/'), (snapshot) => {
+      const data = snapshot.val();
+      if (data) { 
+          window.marbeDB = data; 
+          if (!window.marbeDB.orçamentos) window.marbeDB.orçamentos = [];
+          if (!window.marbeDB.pedidos) window.marbeDB.pedidos = [];
+          renderKanban();
+          renderDashboardPerdas();
+      }
+    });
+
+    window.salvarNuvem = function(silencioso = false) { 
+        set(ref(db, 'sistema/'), window.marbeDB)
+            .then(() => { 
+                if(!silencioso) alert("CRM atualizado com sucesso!");
+            })
+            .catch((error) => { alert("Erro ao salvar: " + error.message); });
+    };
+
+    window.fmtMoney = (v) => {
+        return parseFloat(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+  </script>
+
+  <style>
+    :root { 
+      --primary: #2563eb; --success: #16a34a; --warning: #d97706; --danger: #dc2626;
+      --dark: #1e293b; --bg-color: #f1f5f9; --card-bg: #ffffff; --border: #e2e8f0; 
+      --text-main: #334155; --text-muted: #64748b;
+      --frio: #0ea5e9; --morno: #f59e0b; --quente: #ef4444; --pendente: #3b82f6; --perdido: #64748b;
+    }
+    
+    body { font-family: 'Inter', sans-serif; background: var(--bg-color); margin: 0; padding: 20px; color: var(--text-main); }
+    .container { max-width: 1400px; margin: auto; }
+    
+    .header { display: flex; justify-content: space-between; align-items: center; background: var(--dark); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .header h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+    
+    .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+    .dash-card { background: var(--card-bg); padding: 15px; border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .dash-card h3 { margin: 0 0 5px 0; font-size: 12px; color: var(--text-muted); text-transform: uppercase; }
+    .dash-card .value { font-size: 22px; font-weight: 700; color: var(--dark); }
+
+    /* Kanban Layout */
+    .kanban-board { display: flex; gap: 15px; overflow-x: auto; padding-bottom: 10px; align-items: flex-start; }
+    .kanban-col { flex: 1; min-width: 300px; background: #e2e8f0; padding: 12px; border-radius: 10px; display: flex; flex-direction: column; gap: 12px; }
+    .kanban-header { font-weight: 700; font-size: 14px; text-transform: uppercase; padding-bottom: 10px; border-bottom: 2px solid rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+    
+    .col-pendente .kanban-header { color: var(--pendente); }
+    .col-frio .kanban-header { color: var(--frio); }
+    .col-morno .kanban-header { color: var(--morno); }
+    .col-quente .kanban-header { color: var(--quente); }
+    .col-perdido .kanban-header { color: var(--perdido); }
+
+    /* Cards */
+    .k-card { background: var(--card-bg); padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 4px solid #cbd5e1; display: flex; flex-direction: column; gap: 8px; transition: transform 0.2s; }
+    .k-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .col-pendente .k-card { border-left-color: var(--pendente); }
+    .col-frio .k-card { border-left-color: var(--frio); }
+    .col-morno .k-card { border-left-color: var(--morno); }
+    .col-quente .k-card { border-left-color: var(--quente); }
+    .col-perdido .k-card { border-left-color: var(--perdido); opacity: 0.8; }
+
+    .c-title { font-weight: 700; font-size: 14px; color: var(--dark); }
+    .c-subtitle { font-size: 11px; color: var(--text-muted); }
+    .c-value { font-size: 16px; font-weight: 700; color: var(--success); }
+    
+    .c-actions { display: flex; gap: 5px; margin-top: 10px; flex-wrap: wrap; }
+    .btn-sm { padding: 6px 10px; border: none; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; flex: 1; text-align: center; }
+    .btn-frio { background: #e0f2fe; color: #0284c7; }
+    .btn-morno { background: #fef3c7; color: #b45309; }
+    .btn-quente { background: #fee2e2; color: #b91c1c; }
+    .btn-ganho { background: #dcfce7; color: #15803d; }
+    .btn-perder { background: #e2e8f0; color: #475569; }
+
+    /* Modal */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); display: none; z-index: 10000; align-items: center; justify-content: center; padding: 20px; }
+    .modal-content { background: #fff; width: 100%; max-width: 400px; padding: 25px; border-radius: 12px; }
+    .modal-title { margin-top: 0; color: var(--dark); font-size: 18px; margin-bottom: 15px; }
+    
+    select, input, textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; box-sizing: border-box; font-family: 'Inter', sans-serif; margin-bottom: 15px; }
+    .btn { padding: 12px 20px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%; }
+    
+    .motivo-tag { display: inline-block; padding: 4px 8px; background: #f1f5f9; color: var(--text-muted); border-radius: 4px; font-size: 10px; font-weight: bold; margin-top: 5px; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>CRM de Vendas - Funil de Orçamentos</h1>
+        <a href="index.html" style="color:white; text-decoration:none; font-size:13px; font-weight:600; background:rgba(255,255,255,0.2); padding:8px 15px; border-radius:6px;">Voltar ao ERP Principal</a>
+    </div>
+
+    <!-- Filtros do CRM -->
+    <div style="background:var(--card-bg); padding:15px; border-radius:10px; border:1px solid var(--border); margin-bottom:20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <div style="font-weight:700; font-size:12px; margin-bottom:10px; color:var(--primary); text-transform:uppercase;">Filtros de Pesquisa</div>
+        <div style="display:flex; gap:15px; flex-wrap:wrap; align-items:flex-end;">
+            <div style="flex:1; min-width:150px;">
+                <label style="margin-top:0; font-size:11px; color:var(--text-muted); margin-bottom:4px; display:block;">Data Início</label>
+                <input type="date" id="filtroDataIni" style="margin-bottom:0;">
+            </div>
+            <div style="flex:1; min-width:150px;">
+                <label style="margin-top:0; font-size:11px; color:var(--text-muted); margin-bottom:4px; display:block;">Data Fim</label>
+                <input type="date" id="filtroDataFim" style="margin-bottom:0;">
+            </div>
+            <div style="flex:1; min-width:150px;">
+                <label style="margin-top:0; font-size:11px; color:var(--text-muted); margin-bottom:4px; display:block;">Número da OS</label>
+                <input type="number" id="filtroOS" placeholder="Ex: 630" style="margin-bottom:0;" onkeyup="if(event.key==='Enter') renderKanban()">
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button class="btn" style="background:var(--dark); margin:0; width:auto; padding:10px 25px;" onclick="renderKanban()">FILTRAR</button>
+                <button class="btn" style="background:#e2e8f0; color:var(--dark); margin:0; width:auto; padding:10px 20px;" onclick="limparFiltrosCRM()">LIMPAR</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Rápido -->
+    <div class="dash-grid">
+        <div class="dash-card" style="border-bottom: 3px solid var(--pendente)">
+            <h3>Pendentes (Novos)</h3>
+            <div class="value" id="valPendente">R$ 0,00</div>
+        </div>
+        <div class="dash-card" style="border-bottom: 3px solid var(--frio)">
+            <h3>Frios (Afastados)</h3>
+            <div class="value" id="valFrio">R$ 0,00</div>
+        </div>
+        <div class="dash-card" style="border-bottom: 3px solid var(--morno)">
+            <h3>Mornos (Analisando)</h3>
+            <div class="value" id="valMorno">R$ 0,00</div>
+        </div>
+        <div class="dash-card" style="border-bottom: 3px solid var(--quente)">
+            <h3>Quentes (Quase Fechados)</h3>
+            <div class="value" id="valQuente">R$ 0,00</div>
+        </div>
+        <div class="dash-card" style="border-bottom: 3px solid var(--success)">
+            <h3>Pipeline Total (Aberto)</h3>
+            <div class="value" id="valTotal" style="color:var(--success)">R$ 0,00</div>
+        </div>
+    </div>
+
+    <!-- Quadro Kanban -->
+    <div class="kanban-board">
+        <!-- Coluna Pendente -->
+        <div class="kanban-col col-pendente">
+            <div class="kanban-header">📋 Pendentes <span id="countPendente">0</span></div>
+            <div id="colPendenteContent"></div>
+        </div>
+
+        <!-- Coluna Frio -->
+        <div class="kanban-col col-frio">
+            <div class="kanban-header">🧊 Frios <span id="countFrio">0</span></div>
+            <div id="colFrioContent"></div>
+        </div>
+
+        <!-- Coluna Morno -->
+        <div class="kanban-col col-morno">
+            <div class="kanban-header">🔥 Mornos <span id="countMorno">0</span></div>
+            <div id="colMornoContent"></div>
+        </div>
+
+        <!-- Coluna Quente -->
+        <div class="kanban-col col-quente">
+            <div class="kanban-header">🧨 Quentes <span id="countQuente">0</span></div>
+            <div id="colQuenteContent"></div>
+        </div>
+
+        <!-- Coluna Perdido -->
+        <div class="kanban-col col-perdido">
+            <div class="kanban-header">❌ Perdidos <span id="countPerdido">0</span></div>
+            <div id="colPerdidoContent"></div>
+        </div>
+    </div>
+    
+    <!-- Mapa de Perdas (Dashboard) -->
+    <div style="background:white; padding:20px; border-radius:12px; margin-top:20px; border:1px solid var(--border);">
+        <h3 style="color:var(--dark); margin-top:0;">Mapa de Perdas (Por que não fechamos?)</h3>
+        <p style="font-size:13px; color:var(--text-muted); margin-bottom:20px;">Visão inteligente dos motivos pelos quais os clientes recusaram orçamentos. Use isso para ajustar preços ou processos de fábrica.</p>
+        
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:15px;" id="dashPerdas">
+            <!-- Gerado via JS -->
+        </div>
+    </div>
+</div>
+
+<!-- Modal Aprovar (Ganhar) -->
+<div id="modalGanho" class="modal-overlay">
+    <div class="modal-content">
+        <h3 class="modal-title">🎉 Negócio Fechado!</h3>
+        <p style="font-size:13px; color:var(--text-muted);">Excelente! O orçamento virou um Pedido. Defina os prazos para enviar para a Produção.</p>
+        
+        <label>Data de Início na Fábrica</label>
+        <input type="date" id="ganhoEntrada">
+        
+        <label>Prazo Limite de Entrega</label>
+        <input type="date" id="ganhoLimite">
+        
+        <div style="display:flex; gap:10px; margin-top:10px;">
+            <button class="btn" style="background:var(--bg-color); color:var(--dark);" onclick="document.getElementById('modalGanho').style.display='none'">CANCELAR</button>
+            <button class="btn" style="background:var(--success);" onclick="confirmarGanho()">ENVIAR P/ PRODUÇÃO</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Perder -->
+<div id="modalPerdido" class="modal-overlay">
+    <div class="modal-content">
+        <h3 class="modal-title" style="color:var(--danger)">Registrar Perda</h3>
+        <p style="font-size:13px; color:var(--text-muted);">Qual foi o motivo principal da recusa do cliente?</p>
+        
+        <label>Motivo da Perda</label>
+        <select id="motivoPerda">
+            <option value="Preço">Preço alto / Concorrência</option>
+            <option value="Prazo">Prazo de entrega muito longo</option>
+            <option value="Frete">Custo do Frete</option>
+            <option value="Cancelado">Cliente adiou / Cancelou o projeto</option>
+            <option value="Outro">Outro motivo...</option>
+        </select>
+        
+        <label>Observação (Opcional)</label>
+        <textarea id="obsPerda" rows="2" placeholder="Ex: Achou caro o PU..."></textarea>
+        
+        <div style="display:flex; gap:10px; margin-top:10px;">
+            <button class="btn" style="background:var(--bg-color); color:var(--dark);" onclick="document.getElementById('modalPerdido').style.display='none'">CANCELAR</button>
+            <button class="btn" style="background:var(--danger);" onclick="confirmarPerda()">ARQUIVAR</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let idxAcao = null;
+
+    window.limparFiltrosCRM = function() {
+        document.getElementById('filtroDataIni').value = '';
+        document.getElementById('filtroDataFim').value = '';
+        document.getElementById('filtroOS').value = '';
+        renderKanban();
+    };
+
+    function renderKanban() {
+        if (!window.marbeDB) return;
+
+        let pendentes = '', frios = '', mornos = '', quentes = '', perdidos = '';
+        let vPend = 0, vFrio = 0, vMorno = 0, vQuente = 0, cPend = 0, cFrio = 0, cMorno = 0, cQuente = 0, cPerd = 0;
+
+        let dataIniStr = document.getElementById('filtroDataIni') ? document.getElementById('filtroDataIni').value : '';
+        let dataFimStr = document.getElementById('filtroDataFim') ? document.getElementById('filtroDataFim').value : '';
+        let numOsBusca = document.getElementById('filtroOS') ? document.getElementById('filtroOS').value : '';
+
+        (window.marbeDB.orçamentos || []).forEach((orc, index) => {
+            // VERIFICAÇÃO DO FILTRO
+            let exibir = true;
+            if (dataIniStr || dataFimStr) {
+                if (!orc.data_criacao) {
+                    exibir = false;
+                } else {
+                    let dOrc = orc.data_criacao.substring(0, 10);
+                    if (dataIniStr && dOrc < dataIniStr) exibir = false;
+                    if (dataFimStr && dOrc > dataFimStr) exibir = false;
+                }
+            }
+            if (numOsBusca && orc.os.toString() !== numOsBusca.toString()) {
+                exibir = false;
+            }
+
+            if (!exibir) return;
+
+            let status = orc.crm_status || 'pendente';
+            let dtStr = orc.data_criacao ? new Date(orc.data_criacao).toLocaleDateString('pt-BR') : 'N/D';
+            
+            let cardHtml = `
+            <div class="k-card">
+                <div class="c-title">OS ${orc.os} - ${orc.cliente.substring(0, 20)}</div>
+                <div class="c-subtitle">Gerado em: ${dtStr} | Contato: ${orc.contato || 'Não info.'}</div>
+                <div class="c-value">${window.fmtMoney(orc.total)}</div>
+                ${status === 'perdido' ? `<div class="motivo-tag">Motivo: ${orc.crm_motivo || 'N/D'}</div>` : ''}
+                
+                <div class="c-actions">`;
+
+            if (status === 'pendente') {
+                vPend += orc.total; cPend++;
+                cardHtml += `
+                    <button class="btn-sm btn-frio" onclick="mudarStatus(${index}, 'frio')">Frio</button>
+                    <button class="btn-sm btn-morno" onclick="mudarStatus(${index}, 'morno')">Morno</button>
+                    <button class="btn-sm btn-quente" onclick="mudarStatus(${index}, 'quente')">Quente</button>
+                    <button class="btn-sm btn-perder" onclick="abrirModalPerda(${index})">Perder</button>
+                `;
+            } else if (status === 'frio') {
+                vFrio += orc.total; cFrio++;
+                cardHtml += `
+                    <button class="btn-sm" style="background:#cbd5e1" onclick="mudarStatus(${index}, 'pendente')">Voltar</button>
+                    <button class="btn-sm btn-morno" onclick="mudarStatus(${index}, 'morno')">Morno</button>
+                    <button class="btn-sm btn-perder" onclick="abrirModalPerda(${index})">Perder</button>
+                `;
+            } else if (status === 'morno') {
+                vMorno += orc.total; cMorno++;
+                cardHtml += `
+                    <button class="btn-sm btn-frio" onclick="mudarStatus(${index}, 'frio')">Frio</button>
+                    <button class="btn-sm btn-quente" onclick="mudarStatus(${index}, 'quente')">Quente</button>
+                    <button class="btn-sm btn-perder" onclick="abrirModalPerda(${index})">Perder</button>
+                `;
+            } else if (status === 'quente') {
+                vQuente += orc.total; cQuente++;
+                cardHtml += `
+                    <button class="btn-sm btn-morno" onclick="mudarStatus(${index}, 'morno')">Morno</button>
+                    <button class="btn-sm btn-ganho" onclick="abrirModalGanho(${index})">✅ GANHAMOS</button>
+                    <button class="btn-sm btn-perder" onclick="abrirModalPerda(${index})">Perder</button>
+                `;
+            } else if (status === 'perdido') {
+                cPerd++;
+                cardHtml += `
+                    <button class="btn-sm" style="background:#cbd5e1; width:100%" onclick="mudarStatus(${index}, 'pendente')">↻ Reabrir Orçamento</button>
+                `;
+            }
+
+            cardHtml += `</div></div>`;
+
+            if (status === 'pendente') pendentes += cardHtml;
+            else if (status === 'frio') frios += cardHtml;
+            else if (status === 'morno') mornos += cardHtml;
+            else if (status === 'quente') quentes += cardHtml;
+            else if (status === 'perdido') perdidos += cardHtml;
+        });
+
+        document.getElementById('colPendenteContent').innerHTML = pendentes || '<div style="font-size:12px; color:var(--text-muted); text-align:center;">Vazio</div>';
+        document.getElementById('colFrioContent').innerHTML = frios || '<div style="font-size:12px; color:var(--text-muted); text-align:center;">Vazio</div>';
+        document.getElementById('colMornoContent').innerHTML = mornos || '<div style="font-size:12px; color:var(--text-muted); text-align:center;">Vazio</div>';
+        document.getElementById('colQuenteContent').innerHTML = quentes || '<div style="font-size:12px; color:var(--text-muted); text-align:center;">Vazio</div>';
+        document.getElementById('colPerdidoContent').innerHTML = perdidos || '<div style="font-size:12px; color:var(--text-muted); text-align:center;">Vazio</div>';
+
+        document.getElementById('countPendente').innerText = cPend;
+        document.getElementById('countFrio').innerText = cFrio;
+        document.getElementById('countMorno').innerText = cMorno;
+        document.getElementById('countQuente').innerText = cQuente;
+        document.getElementById('countPerdido').innerText = cPerd;
+
+        document.getElementById('valPendente').innerText = window.fmtMoney(vPend);
+        document.getElementById('valFrio').innerText = window.fmtMoney(vFrio);
+        document.getElementById('valMorno').innerText = window.fmtMoney(vMorno);
+        document.getElementById('valQuente').innerText = window.fmtMoney(vQuente);
+        document.getElementById('valTotal').innerText = window.fmtMoney(vPend + vFrio + vMorno + vQuente);
+        
+        renderDashboardPerdas(); 
+    }
+
+    window.mudarStatus = function(index, novoStatus) {
+        window.marbeDB.orçamentos[index].crm_status = novoStatus;
+        window.salvarNuvem(true);
+        renderKanban();
+    };
+
+    window.abrirModalGanho = function(index) {
+        idxAcao = index;
+        let hoje = new Date().toISOString().split('T')[0];
+        document.getElementById('ganhoEntrada').value = hoje;
+        document.getElementById('ganhoLimite').value = '';
+        document.getElementById('modalGanho').style.display = 'flex';
+    };
+
+    window.confirmarGanho = function() {
+        let lim = document.getElementById('ganhoLimite').value;
+        if(!lim) return alert("Por favor, preencha o prazo limite de entrega para a fábrica.");
+        
+        let orc = window.marbeDB.orçamentos.splice(idxAcao, 1)[0];
+        orc.data_entrada = document.getElementById('ganhoEntrada').value;
+        orc.data_limite = lim;
+        // Limpa lixo do CRM
+        delete orc.crm_status;
+        delete orc.crm_motivo;
+
+        window.marbeDB.pedidos.push(orc);
+        window.salvarNuvem(false);
+        
+        document.getElementById('modalGanho').style.display = 'none';
+        renderKanban();
+    };
+
+    window.abrirModalPerda = function(index) {
+        idxAcao = index;
+        document.getElementById('motivoPerda').value = 'Preço';
+        document.getElementById('obsPerda').value = '';
+        document.getElementById('modalPerdido').style.display = 'flex';
+    };
+
+    window.confirmarPerda = function() {
+        let motivo = document.getElementById('motivoPerda').value;
+        let obs = document.getElementById('obsPerda').value;
+        
+        window.marbeDB.orçamentos[idxAcao].crm_status = 'perdido';
+        window.marbeDB.orçamentos[idxAcao].crm_motivo = motivo;
+        window.marbeDB.orçamentos[idxAcao].crm_obs_perda = obs;
+        
+        window.salvarNuvem(true);
+        document.getElementById('modalPerdido').style.display = 'none';
+        renderKanban();
+    };
+
+    function renderDashboardPerdas() {
+        let perdas = { "Preço": 0, "Prazo": 0, "Frete": 0, "Cancelado": 0, "Outro": 0 };
+        let valores = { "Preço": 0, "Prazo": 0, "Frete": 0, "Cancelado": 0, "Outro": 0 };
+        
+        let dataIniStr = document.getElementById('filtroDataIni') ? document.getElementById('filtroDataIni').value : '';
+        let dataFimStr = document.getElementById('filtroDataFim') ? document.getElementById('filtroDataFim').value : '';
+        let numOsBusca = document.getElementById('filtroOS') ? document.getElementById('filtroOS').value : '';
+
+        (window.marbeDB.orçamentos || []).forEach(orc => {
+            let exibir = true;
+            if (dataIniStr || dataFimStr) {
+                if (!orc.data_criacao) {
+                    exibir = false;
+                } else {
+                    let dOrc = orc.data_criacao.substring(0, 10);
+                    if (dataIniStr && dOrc < dataIniStr) exibir = false;
+                    if (dataFimStr && dOrc > dataFimStr) exibir = false;
+                }
+            }
+            if (numOsBusca && orc.os.toString() !== numOsBusca.toString()) {
+                exibir = false;
+            }
+
+            if (!exibir) return;
+
+            if (orc.crm_status === 'perdido' && orc.crm_motivo) {
+                if (perdas[orc.crm_motivo] !== undefined) {
+                    perdas[orc.crm_motivo]++;
+                    valores[orc.crm_motivo] += orc.total;
+                }
+            }
+        });
+
+        let html = '';
+        let icones = { "Preço": "💰", "Prazo": "⏳", "Frete": "🚚", "Cancelado": "🚫", "Outro": "❓" };
+
+        Object.keys(perdas).forEach(motivo => {
+            if (perdas[motivo] > 0) {
+                html += `
+                <div style="background:#f8fafc; padding:15px; border-radius:8px; border:1px solid var(--border);">
+                    <div style="font-size:12px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">${icones[motivo]} Por ${motivo}</div>
+                    <div style="font-size:20px; font-weight:700; color:var(--danger); margin:5px 0;">${perdas[motivo]} OSs</div>
+                    <div style="font-size:13px; color:var(--dark); font-weight:600;">Oportunidade Perdida:<br><span style="color:var(--warning)">${window.fmtMoney(valores[motivo])}</span></div>
+                </div>`;
+            }
+        });
+
+        document.getElementById('dashPerdas').innerHTML = html || '<p style="color:var(--text-muted); grid-column: 1 / -1;">Nenhuma perda registrada neste período.</p>';
+    }
+</script>
+</body>
+</html>
