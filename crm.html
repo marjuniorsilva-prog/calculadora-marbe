@@ -36,6 +36,7 @@
           if (!window.marbeDB.orçamentos) window.marbeDB.orçamentos = [];
           if (!window.marbeDB.pedidos) window.marbeDB.pedidos = [];
           if (!window.marbeDB.expedidos) window.marbeDB.expedidos = [];
+          if (!window.marbeDB.leads) window.marbeDB.leads = []; // Nova base de contatos iniciais
           renderKanban();
       }
     });
@@ -162,6 +163,8 @@
     input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
     .btn { padding: 14px 20px; background: var(--accent); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s; outline: none; }
     .btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-main); }
+    .btn-outline:hover { background: var(--bg-color); }
     
     .motivo-tag { display: inline-block; padding: 4px 8px; background: #f1f5f9; color: var(--text-muted); border-radius: 4px; font-size: 10px; font-weight: bold; margin-top: 5px; }
 
@@ -250,7 +253,7 @@
                   </div>
                   <div style="display:flex; gap:10px;">
                       <button class="btn" style="background:var(--primary); width:auto;" onclick="renderKanban()">FILTRAR</button>
-                      <button class="btn" style="background:#e2e8f0; color:var(--primary); width:auto;" onclick="limparFiltrosCRM()">LIMPAR</button>
+                      <button class="btn btn-outline" style="width:auto;" onclick="limparFiltrosCRM()">LIMPAR</button>
                   </div>
               </div>
           </div>
@@ -262,7 +265,7 @@
               </div>
               <div class="qtd-box">
                   <div class="qtd" id="qtdGlobal">0</div>
-                  <div class="qtd-label">Cotações Realizadas no Período</div>
+                  <div class="qtd-label">Cotações Oficiais Realizadas</div>
               </div>
           </div>
 
@@ -289,7 +292,21 @@
               </div>
           </div>
 
+          <!-- KANBAN BOARD -->
           <div class="kanban-board">
+              
+              <!-- NOVA COLUNA: Caixa de Entrada (Leads / WhatsApp) -->
+              <div class="kanban-col col-lead" style="background: #f1f5f9; border: 1px dashed #cbd5e1;">
+                  <div class="kanban-header" style="color: var(--primary);">
+                      📥 Entrada (Whats) <span id="countLead">0</span>
+                  </div>
+                  <button class="btn btn-outline" style="width:100%; margin-bottom:10px; border-style:dashed; color:var(--primary);" onclick="abrirModalLead()">
+                      <i data-lucide="plus" style="width:16px;"></i> NOVO CONTATO
+                  </button>
+                  <div id="colLeadContent"></div>
+              </div>
+
+              <!-- COLUNAS NORMAIS -->
               <div class="kanban-col col-pendente">
                   <div class="kanban-header">📋 Pendentes <span id="countPendente">0</span></div>
                   <div id="colPendenteContent"></div>
@@ -314,12 +331,34 @@
           
           <div style="background:var(--card-bg); padding:25px; border-radius:12px; margin-top:20px; border:1px solid var(--border);">
               <h3 style="color:var(--primary); margin-top:0; font-size:16px;">Mapa de Perdas (Por que não fechamos?)</h3>
-              <p style="font-size:13px; color:var(--text-muted); margin-bottom:20px;">Visão inteligente dos motivos pelas quais os clientes recusaram orçamentos.</p>
+              <p style="font-size:13px; color:var(--text-muted); margin-bottom:20px;">Visão inteligente dos motivos pelas quais os clientes recusaram orçamentos ou materiais que não atendemos.</p>
               <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:15px;" id="dashPerdas"></div>
           </div>
 
       </div>
   </main>
+</div>
+
+<!-- Modal Novo Contato Inicial (WhatsApp) -->
+<div id="modalLead" class="modal-overlay">
+    <div class="modal-content">
+        <h3 class="modal-title" style="color:var(--primary)">📥 Novo Contato Inicial</h3>
+        <p style="font-size:13px; color:var(--text-muted); margin-bottom:20px;">Registre a triagem. Depois você decide se descarta ou se gera a OS oficial.</p>
+        
+        <label>Nome do Cliente / Empresa</label>
+        <input type="text" id="leadNome" placeholder="Ex: João - Metalúrgica">
+        
+        <label>WhatsApp / Telefone</label>
+        <input type="text" id="leadWhats" placeholder="(XX) 99999-9999">
+        
+        <label>Assunto / O que ele pediu?</label>
+        <textarea id="leadAssunto" rows="2" placeholder="Ex: Orçamento de rolo de PU, Peça de Nylon..."></textarea>
+        
+        <div style="display:flex; gap:15px; margin-top:20px;">
+            <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('modalLead').style.display='none'">CANCELAR</button>
+            <button class="btn" style="background:var(--primary); flex:1;" onclick="salvarLead()">SALVAR CONTATO</button>
+        </div>
+    </div>
 </div>
 
 <!-- Modal Aprovar (Ganhar) -->
@@ -335,7 +374,7 @@
         <input type="date" id="ganhoLimite">
         
         <div style="display:flex; gap:15px; margin-top:20px;">
-            <button class="btn" style="background:#e2e8f0; color:var(--primary); flex:1;" onclick="document.getElementById('modalGanho').style.display='none'">CANCELAR</button>
+            <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('modalGanho').style.display='none'">CANCELAR</button>
             <button class="btn" style="background:var(--success); flex:1;" onclick="confirmarGanho()">ENVIAR P/ PRODUÇÃO</button>
         </div>
     </div>
@@ -352,15 +391,16 @@
             <option value="Preço">Preço alto / Concorrência</option>
             <option value="Prazo">Prazo de entrega muito longo</option>
             <option value="Frete">Custo do Frete</option>
+            <option value="Fora de Linha">Material Fora de Linha / Não Atendido</option>
             <option value="Cancelado">Cliente adiou / Cancelou o projeto</option>
             <option value="Outro">Outro motivo...</option>
         </select>
         
         <label>Observação (Opcional)</label>
-        <textarea id="obsPerda" rows="2" placeholder="Ex: Achou caro o PU..."></textarea>
+        <textarea id="obsPerda" rows="2" placeholder="Ex: Achou caro o PU, Queria Nylon..."></textarea>
         
         <div style="display:flex; gap:15px; margin-top:20px;">
-            <button class="btn" style="background:#e2e8f0; color:var(--primary); flex:1;" onclick="document.getElementById('modalPerdido').style.display='none'">CANCELAR</button>
+            <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('modalPerdido').style.display='none'">CANCELAR</button>
             <button class="btn" style="background:var(--danger); flex:1;" onclick="confirmarPerda()">ARQUIVAR</button>
         </div>
     </div>
@@ -369,6 +409,92 @@
 <script>
     lucide.createIcons();
     let idxAcao = null;
+
+    // ----- NOVAS FUNÇÕES PARA LEADS (WhatsApp) -----
+    window.abrirModalLead = function() {
+        document.getElementById('leadNome').value = '';
+        document.getElementById('leadWhats').value = '';
+        document.getElementById('leadAssunto').value = '';
+        document.getElementById('modalLead').style.display = 'flex';
+    };
+
+    window.salvarLead = function() {
+        let nome = document.getElementById('leadNome').value;
+        if(!nome) return alert("Preencha ao menos o nome do cliente.");
+        
+        let novoLead = {
+            nome: nome,
+            telefone: document.getElementById('leadWhats').value,
+            assunto: document.getElementById('leadAssunto').value,
+            data_criacao: new Date().toISOString()
+        };
+        
+        if(!window.marbeDB.leads) window.marbeDB.leads = [];
+        window.marbeDB.leads.push(novoLead);
+        window.salvarNuvem(true);
+        
+        document.getElementById('modalLead').style.display = 'none';
+        renderKanban();
+    };
+
+    window.descartarLead = function(index) {
+        let motivo = prompt("Motivo do arquivamento (Ex: Queria Nylon, Achei curioso, etc):", "Fora de Linha");
+        if(motivo) {
+            let lead = window.marbeDB.leads[index];
+            
+            // Converte o Lead em um "Orçamento Perdido" para ir pro Mapa de Perdas
+            let orcPerdido = {
+                os: "CONTATO", // Não consome numeração oficial
+                cliente: lead.nome,
+                contato: lead.nome,
+                telefone: lead.telefone,
+                total: 0,
+                crm_status: 'perdido',
+                crm_motivo: 'Fora de Linha',
+                crm_obs_perda: motivo,
+                data_criacao: new Date().toISOString()
+            };
+            
+            if(!window.marbeDB.orçamentos) window.marbeDB.orçamentos = [];
+            window.marbeDB.orçamentos.push(orcPerdido);
+            window.marbeDB.leads.splice(index, 1);
+            
+            window.salvarNuvem(true);
+            renderKanban();
+        }
+    };
+
+    window.converterLeadOS = function(index) {
+        if(!confirm("Gerar uma Ordem de Serviço oficial para este contato? (Isso consumirá um número de OS sequencial).")) return;
+        
+        let lead = window.marbeDB.leads[index];
+        let novaOS = window.marbeDB.os++; // Consome a sequência oficial da fábrica
+        
+        let orcOficial = {
+            os: novaOS,
+            cliente: lead.nome,
+            contato: lead.nome,
+            telefone: lead.telefone,
+            itens: [], // Fica vazio pro usuário preencher no ERP Principal
+            total: 0,
+            frete: "POR CONTA DO CLIENTE",
+            prazo: "10 DIAS ÚTEIS",
+            pagamento: "A DEFINIR",
+            crm_status: 'pendente',
+            crm_obs: `(Vindo do WhatsApp) Assunto Original: ${lead.assunto}`,
+            data_criacao: new Date().toISOString()
+        };
+        
+        if(!window.marbeDB.orçamentos) window.marbeDB.orçamentos = [];
+        window.marbeDB.orçamentos.push(orcOficial);
+        window.marbeDB.leads.splice(index, 1);
+        
+        window.salvarNuvem(true);
+        renderKanban();
+        alert(`Sucesso! Contato virou a OS Oficial Nº ${novaOS}.\nAcesse o ERP Principal e busque por essa OS para incluir as medidas e valores.`);
+    };
+    // ------------------------------------------------
+
 
     window.limparFiltrosCRM = function() {
         document.getElementById('filtroDataIni').value = '';
@@ -398,13 +524,34 @@
                     if (dataFimStr && dItem > dataFimStr) exibir = false;
                 }
             }
-            if (numOsBusca && item.os.toString() !== numOsBusca.toString()) exibir = false;
+            if (numOsBusca && item.os && item.os.toString() !== numOsBusca.toString()) exibir = false;
             return exibir;
         };
 
+        // Renderiza Caixa de Entrada (Leads)
+        let leadsHtml = ''; let cLead = 0;
+        (window.marbeDB.leads || []).forEach((lead, index) => {
+            cLead++;
+            leadsHtml += `
+            <div class="k-card" style="border-left-color: var(--primary);">
+                <div class="c-title">${lead.nome}</div>
+                <div class="c-subtitle">Whats: ${lead.telefone}</div>
+                <div style="font-size:12px; color:var(--text-main); margin:8px 0; background:white; padding:8px; border-radius:6px; border:1px solid var(--border);">
+                    <strong style="color:var(--text-muted)">Assunto:</strong><br>${lead.assunto}
+                </div>
+                <div class="c-actions">
+                    <button class="btn-sm" style="background:#fee2e2; color:var(--danger);" onclick="descartarLead(${index})">❌ Descartar</button>
+                    <button class="btn-sm" style="background:var(--primary); color:white;" onclick="converterLeadOS(${index})">📄 Gerar OS</button>
+                </div>
+            </div>`;
+        });
+        document.getElementById('colLeadContent').innerHTML = leadsHtml || '<div style="font-size:12px; color:var(--text-muted); text-align:center;">Nenhum contato</div>';
+        document.getElementById('countLead').innerText = cLead;
+
+        // Renderiza Orçamentos e Restante
         (window.marbeDB.orçamentos || []).forEach((orc, index) => {
             if (!verificaFiltro(orc)) return;
-            vGlobal += (orc.total || 0); cGlobal++;
+            if (orc.os !== "CONTATO") { vGlobal += (orc.total || 0); cGlobal++; }
 
             let status = orc.crm_status || 'pendente';
             let dtStr = orc.data_criacao ? new Date(orc.data_criacao).toLocaleDateString('pt-BR') : 'N/D';
@@ -431,7 +578,9 @@
                 cardHtml += `<button class="btn-sm btn-morno" onclick="mudarStatus(${index}, 'morno')">Morno</button><button class="btn-sm btn-ganho" onclick="abrirModalGanho(${index})">✅ GANHAMOS</button><button class="btn-sm btn-perder" onclick="abrirModalPerda(${index})">Perder</button>`;
             } else if (status === 'perdido') {
                 cPerd++;
-                cardHtml += `<button class="btn-sm" style="background:#cbd5e1; width:100%" onclick="mudarStatus(${index}, 'pendente')">↻ Reabrir Orçamento</button>`;
+                if(orc.os !== "CONTATO") {
+                    cardHtml += `<button class="btn-sm" style="background:#cbd5e1; width:100%" onclick="mudarStatus(${index}, 'pendente')">↻ Reabrir Orçamento</button>`;
+                }
             }
             cardHtml += `</div></div>`;
 
@@ -509,8 +658,8 @@
     };
 
     function renderDashboardPerdas() {
-        let perdas = { "Preço": 0, "Prazo": 0, "Frete": 0, "Cancelado": 0, "Outro": 0 };
-        let valores = { "Preço": 0, "Prazo": 0, "Frete": 0, "Cancelado": 0, "Outro": 0 };
+        let perdas = { "Preço": 0, "Prazo": 0, "Frete": 0, "Fora de Linha": 0, "Cancelado": 0, "Outro": 0 };
+        let valores = { "Preço": 0, "Prazo": 0, "Frete": 0, "Fora de Linha": 0, "Cancelado": 0, "Outro": 0 };
         let dataIniStr = document.getElementById('filtroDataIni') ? document.getElementById('filtroDataIni').value : '';
         let dataFimStr = document.getElementById('filtroDataFim') ? document.getElementById('filtroDataFim').value : '';
         let numOsBusca = document.getElementById('filtroOS') ? document.getElementById('filtroOS').value : '';
@@ -524,21 +673,22 @@
                     if (dataFimStr && dOrc > dataFimStr) exibir = false;
                 }
             }
-            if (numOsBusca && orc.os.toString() !== numOsBusca.toString()) exibir = false;
+            if (numOsBusca && orc.os && orc.os.toString() !== numOsBusca.toString()) exibir = false;
             if (!exibir) return;
 
             if (orc.crm_status === 'perdido' && orc.crm_motivo) {
                 if (perdas[orc.crm_motivo] !== undefined) { perdas[orc.crm_motivo]++; valores[orc.crm_motivo] += orc.total; }
+                else { perdas['Outro']++; valores['Outro'] += orc.total; }
             }
         });
 
-        let html = ''; let icones = { "Preço": "💰", "Prazo": "⏳", "Frete": "🚚", "Cancelado": "🚫", "Outro": "❓" };
+        let html = ''; let icones = { "Preço": "💰", "Prazo": "⏳", "Frete": "🚚", "Fora de Linha": "🚫", "Cancelado": "✖️", "Outro": "❓" };
         Object.keys(perdas).forEach(motivo => {
             if (perdas[motivo] > 0) {
                 html += `
                 <div style="background:#f8fafc; padding:15px; border-radius:8px; border:1px solid var(--border);">
                     <div style="font-size:12px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">${icones[motivo]} Por ${motivo}</div>
-                    <div style="font-size:20px; font-weight:700; color:var(--danger); margin:5px 0;">${perdas[motivo]} OSs</div>
+                    <div style="font-size:20px; font-weight:700; color:var(--danger); margin:5px 0;">${perdas[motivo]} ${motivo === 'Fora de Linha' ? 'Contatos' : 'OSs'}</div>
                     <div style="font-size:13px; color:var(--dark); font-weight:600;">Oportunidade Perdida:<br><span style="color:var(--warning)">${window.fmtMoney(valores[motivo])}</span></div>
                 </div>`;
             }
