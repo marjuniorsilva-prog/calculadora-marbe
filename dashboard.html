@@ -85,6 +85,19 @@
     .chart-container { background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     .chart-container h3 { margin-top: 0; margin-bottom: 15px; color: var(--dark); font-size: 15px; font-weight: 700; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
 
+    /* Trava de segurança para impedir que o gráfico cresça infinitamente */
+    .chart-wrapper {
+        position: relative;
+        height: 250px;
+        max-height: 250px;
+        width: 100%;
+        overflow: hidden;
+    }
+    
+    canvas {
+        max-height: 250px !important;
+    }
+
     .ranking-list { list-style: none; padding: 0; margin: 0; }
     .ranking-list li { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px dashed var(--border); font-size: 13px; }
     .ranking-list li:last-child { border-bottom: none; }
@@ -146,8 +159,7 @@
         <!-- Faturamento por Empresa / Setor -->
         <div class="chart-container">
             <h3>Faturamento: Marbe (PU) vs SB Borrachas</h3>
-            <!-- BLOQUEIO DE TAMANHO PARA EVITAR CONGELAMENTO -->
-            <div style="position: relative; height: 250px; width: 100%;">
+            <div class="chart-wrapper">
                 <canvas id="chartSetor"></canvas>
             </div>
         </div>
@@ -163,8 +175,7 @@
         <!-- Mapa de Perdas CRM -->
         <div class="chart-container">
             <h3>Análise de Perdas (Motivos de Recusa)</h3>
-            <!-- BLOQUEIO DE TAMANHO PARA EVITAR CONGELAMENTO -->
-            <div style="position: relative; height: 250px; width: 100%;">
+            <div class="chart-wrapper">
                 <canvas id="chartPerdas"></canvas>
             </div>
         </div>
@@ -359,7 +370,7 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                animation: false, // Desativa animação pesada no carregamento rápido
+                animation: false,
                 plugins: {
                     legend: { position: 'bottom', labels: { font: { family: 'Inter' } } }
                 }
@@ -388,7 +399,7 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                animation: false, // Desativa animação pesada
+                animation: false,
                 scales: {
                     y: { beginAtZero: true, ticks: { stepSize: 1 } }
                 },
