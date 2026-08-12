@@ -32,8 +32,8 @@
           window.marbeDB = data; 
           if (!window.marbeDB.orçamentos) window.marbeDB.orçamentos = [];
           if (!window.marbeDB.pedidos) window.marbeDB.pedidos = [];
+          if (!window.marbeDB.expedidos) window.marbeDB.expedidos = [];
           renderKanban();
-          renderDashboardPerdas();
       }
     });
 
@@ -68,6 +68,15 @@
     .dash-card { background: var(--card-bg); padding: 15px; border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     .dash-card h3 { margin: 0 0 5px 0; font-size: 12px; color: var(--text-muted); text-transform: uppercase; }
     .dash-card .value { font-size: 22px; font-weight: 700; color: var(--dark); }
+
+    /* Painel Volume Global */
+    .global-panel { background: var(--dark); padding: 20px 25px; border-radius: 12px; margin-bottom: 20px; color: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-left: 5px solid #10b981; flex-wrap: wrap; gap: 15px; }
+    .global-panel h3 { margin: 0 0 5px 0; color: #cbd5e1; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .global-panel .val { font-size: 32px; font-weight: 800; color: #10b981; }
+    .global-panel .qtd-box { text-align: right; }
+    .global-panel .qtd { font-size: 24px; font-weight: 700; }
+    .global-panel .qtd-label { font-size: 12px; color: #cbd5e1; }
+    @media (max-width: 600px) { .global-panel .qtd-box { text-align: left; } }
 
     /* Kanban Layout */
     .kanban-board { display: flex; gap: 15px; overflow-x: auto; padding-bottom: 10px; align-items: flex-start; }
@@ -143,7 +152,19 @@
         </div>
     </div>
 
-    <!-- Dashboard Rápido -->
+    <!-- Volume Global (Novo Pedido) -->
+    <div class="global-panel">
+        <div>
+            <h3>Volume Global Emitido (Ganhos, Perdidos e Abertos)</h3>
+            <div class="val" id="valGlobal">R$ 0,00</div>
+        </div>
+        <div class="qtd-box">
+            <div class="qtd" id="qtdGlobal">0</div>
+            <div class="qtd-label">Cotações Realizadas no Período</div>
+        </div>
+    </div>
+
+    <!-- Dashboard Rápido (Apenas CRM Ativo) -->
     <div class="dash-grid">
         <div class="dash-card" style="border-bottom: 3px solid var(--pendente)">
             <h3>Pendentes (Novos)</h3>
@@ -270,28 +291,37 @@
 
         let pendentes = '', frios = '', mornos = '', quentes = '', perdidos = '';
         let vPend = 0, vFrio = 0, vMorno = 0, vQuente = 0, cPend = 0, cFrio = 0, cMorno = 0, cQuente = 0, cPerd = 0;
+        let vGlobal = 0, cGlobal = 0; // Novas variaveis para o Volume Global
 
         let dataIniStr = document.getElementById('filtroDataIni') ? document.getElementById('filtroDataIni').value : '';
         let dataFimStr = document.getElementById('filtroDataFim') ? document.getElementById('filtroDataFim').value : '';
         let numOsBusca = document.getElementById('filtroOS') ? document.getElementById('filtroOS').value : '';
 
-        (window.marbeDB.orçamentos || []).forEach((orc, index) => {
-            // VERIFICAÇÃO DO FILTRO
+        // Função interna para aplicar os filtros de forma uniforme
+        const verificaFiltro = (item) => {
             let exibir = true;
             if (dataIniStr || dataFimStr) {
-                if (!orc.data_criacao) {
+                if (!item.data_criacao) {
                     exibir = false;
                 } else {
-                    let dOrc = orc.data_criacao.substring(0, 10);
-                    if (dataIniStr && dOrc < dataIniStr) exibir = false;
-                    if (dataFimStr && dOrc > dataFimStr) exibir = false;
+                    let dItem = item.data_criacao.substring(0, 10);
+                    if (dataIniStr && dItem < dataIniStr) exibir = false;
+                    if (dataFimStr && dItem > dataFimStr) exibir = false;
                 }
             }
-            if (numOsBusca && orc.os.toString() !== numOsBusca.toString()) {
+            if (numOsBusca && item.os.toString() !== numOsBusca.toString()) {
                 exibir = false;
             }
+            return exibir;
+        };
 
-            if (!exibir) return;
+        // 1. Analisa a aba de Orçamentos (Kanban + Perdidos)
+        (window.marbeDB.orçamentos || []).forEach((orc, index) => {
+            if (!verificaFiltro(orc)) return;
+
+            // Adiciona ao Volume Global
+            vGlobal += (orc.total || 0);
+            cGlobal++;
 
             let status = orc.crm_status || 'pendente';
             let dtStr = orc.data_criacao ? new Date(orc.data_criacao).toLocaleDateString('pt-BR') : 'N/D';
@@ -350,6 +380,25 @@
             else if (status === 'perdido') perdidos += cardHtml;
         });
 
+        // 2. Analisa os Pedidos (Ganhos que estão na Produção)
+        (window.marbeDB.pedidos || []).forEach(p => {
+            if (!verificaFiltro(p)) return;
+            vGlobal += (p.total || 0);
+            cGlobal++;
+        });
+
+        // 3. Analisa os Expedidos (Ganhos que já foram entregues/faturados)
+        (window.marbeDB.expedidos || []).forEach(e => {
+            if (!verificaFiltro(e)) return;
+            vGlobal += (e.total || 0);
+            cGlobal++;
+        });
+
+        // Atualizando o Painel Global
+        document.getElementById('valGlobal').innerText = window.fmtMoney(vGlobal);
+        document.getElementById('qtdGlobal').innerText = cGlobal;
+
+        // Atualizando as Colunas
         document.getElementById('colPendenteContent').innerHTML = pendentes || '<div style="font-size:12px; color:var(--text-muted); text-align:center;">Vazio</div>';
         document.getElementById('colFrioContent').innerHTML = frios || '<div style="font-size:12px; color:var(--text-muted); text-align:center;">Vazio</div>';
         document.getElementById('colMornoContent').innerHTML = mornos || '<div style="font-size:12px; color:var(--text-muted); text-align:center;">Vazio</div>';
