@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Expedição e Entregas - Grupo Marbe</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyATu_V6e1shKRpgBOkX1lw2beyzUEZUCo0",
+      authDomain: "marbeapp-e2db8.firebaseapp.com",
+      projectId: "marbeapp-e2db8",
+      storageBucket: "marbeapp-e2db8.firebasestorage.app",
+      messagingSenderId: "435226749841",
+      appId: "1:435226749841:web:c2b5f5dee676412b228830"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    window.marbeDB = null;
+
+    onValue(ref(db, 'sistema/'), (snapshot) => {
+      const data = snapshot.val();
+      if (data) { 
+          window.marbeDB = data; 
+          if (!window.marbeDB.expedidos) window.marbeDB.expedidos = [];
+          if (!window.marbeDB.arquivados) window.marbeDB.arquivados = [];
+          renderExpedicao();
+      }
+    });
+
+    window.salvarNuvem = function(silencioso = false) { 
+        set(ref(db, 'sistema/'), window.marbeDB)
+            .then(() => { if(!silencioso) alert("Expedição atualizada!"); })
+            .catch((error) => { alert("Erro ao salvar: " + error.message); });
+    };
+
+    window.abrirPDFMobile = (blob, nome) => {
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        const a = document.createElement('a');
+        a.href = url; a.download = `${nome}.pdf`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    };
+  </script>
+
+  <!-- jsPDF para gerar o termo de assinatura -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+
+  <style>
+    :root { 
+      --primary: #2563eb; --success: #16a34a; --warning: #d97706; --danger: #dc2626;
+      --dark: #1e293b; --bg-color: #f1f5f9; --card-bg: #ffffff; --border: #e2e8f0; 
+      --text-main: #334155; --text-muted: #64748b;
+    }
+    
+    body { font-family: 'Inter', sans-serif; background: var(--bg-color); margin: 0; padding: 20px; color: var(--text-main); }
+    .container { max-width: 1000px; margin: auto; }
+    
+    .header { display: flex; justify-content: space-between; align-items: center; background: var(--dark); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .header h1 { margin: 0; font-size: 20px; font-weight: 700; }
+    
+    .card-list { background: var(--card-bg); border: 1px solid var(--border); padding: 20px; border-radius: 10px; margin-bottom: 15px; border-left: 5px solid var(--success); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .card-title { font-size: 16px; font-weight: 700; color: var(--dark); margin-bottom: 5px; }
+    .card-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 15px; }
+    
+    .btn { padding: 10px 15px; border: none; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+    .btn-pdf { background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; }
+    .btn-pdf:hover { background: #bae6fd; }
+    .btn-arquivar { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .btn-arquivar:hover { background: #bbf7d0; }
+    
+    .botoes-acao { display: flex; gap: 10px; flex-wrap: wrap; }
+    
+    .empty-state { text-align: center; padding: 40px; background: white; border-radius: 12px; border: 1px dashed var(--border); color: var(--text-muted); }
+  </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>📦 Expedição e Retirada</h1>
+        <a href="index.html" style="color:white; text-decoration:none; font-size:13px; font-weight:600; background:rgba(255,255,255,0.2); padding:8px 15px; border-radius:6px;">Voltar ao ERP Principal</a>
+    </div>
+
+    <div style="background:white; padding:20px; border-radius:12px; margin-bottom:20px; border:1px solid var(--border);">
+        <p style="margin:0; font-size:14px; color:var(--text-muted);">
+            <strong>Atenção:</strong> Aqui estão todas as peças que a Produção já liberou e estão prontas para o cliente retirar ou para transporte. Imprima o Termo de Assinatura antes da entrega.
+        </p>
+    </div>
+
+    <div id="listaExpedicao">
+        <!-- Preenchido via JS -->
+    </div>
+</div>
+
+<script>
+    function renderExpedicao() {
+        if (!window.marbeDB || !window.marbeDB.expedidos || window.marbeDB.expedidos.length === 0) {
+            document.getElementById('listaExpedicao').innerHTML = `<div class="empty-state"><h3>Tudo limpo por aqui!</h3>Nenhum material aguardando expedição no momento.</div>`;
+            return;
+        }
+
+        let html = '';
+        window.marbeDB.expedidos.forEach((os, index) => {
+            let qtdItens = os.itens ? os.itens.length : 0;
+            html += `
+            <div class="card-list">
+                <div class="card-title">OS: ${os.os} - ${os.cliente}</div>
+                <div class="card-sub"><strong>Frete:</strong> ${os.frete || 'Não informado'} | <strong>Itens:</strong> ${qtdItens} peça(s) pronta(s)</div>
+                <div class="botoes-acao">
+                    <button class="btn btn-pdf" onclick="gerarTermoPDF(${index})">🖨️ GERAR TERMO DE ASSINATURA</button>
+                    <button class="btn btn-arquivar" onclick="arquivarOS(${index})">✅ PEÇA ENTREGUE / ARQUIVAR</button>
+                </div>
+            </div>`;
+        });
+        
+        document.getElementById('listaExpedicao').innerHTML = html;
+    }
+
+    window.gerarTermoPDF = function(index) {
+        const d = window.marbeDB.expedidos[index];
+        const { jsPDF } = window.jspdf; 
+        const doc = new jsPDF();
+        
+        const clean = (t) => t ? t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase() : "";
+
+        // Cabeçalho da Empresa
+        doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.text("TERMO DE RECEBIMENTO E CONFORMIDADE", 105, 20, {align: "center"});
+        doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text("GRUPO MARBE POLIURETANO / SB BORRACHAS", 105, 26, {align: "center"});
+        doc.setLineWidth(0.5); doc.line(20, 30, 190, 30);
+
+        // Dados da OS
+        doc.setFontSize(12); doc.setFont("helvetica", "bold"); 
+        doc.text(`ORDEM DE SERVIÇO (OS): ${d.os}`, 20, 40);
+        doc.setFontSize(10); doc.setFont("helvetica", "normal");
+        doc.text(`CLIENTE: ${clean(d.cliente)}`, 20, 47);
+        doc.text(`CNPJ: ${d.cnpj || 'Não informado'}`, 20, 52);
+        doc.text(`DATA DA EMISSÃO DESTE TERMO: ${new Date().toLocaleDateString('pt-BR')}`, 20, 57);
+
+        // Tabela de Itens
+        doc.setFont("helvetica", "bold"); doc.text("RELAÇÃO DE MATERIAIS ENTREGUES:", 20, 67);
+        let itensTable = d.itens.map(i => [clean(i.n), clean(i.mat), i.q]);
+        
+        doc.autoTable({ 
+            startY: 70, 
+            head: [['DESCRIÇÃO DA PEÇA / SERVIÇO', 'MATERIAL', 'QTD']], 
+            body: itensTable, 
+            theme: 'grid', 
+            headStyles: { fillColor: [30, 41, 59] },
+            styles: { fontSize: 9, cellPadding: 3 }
+        });
+
+        // Termo de Responsabilidade Jurídica
+        let finalY = doc.lastAutoTable.finalY + 15;
+        doc.setFont("helvetica", "bold");
+        doc.text("DECLARAÇÃO DO RECEBEDOR:", 20, finalY);
+        
+        doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+        let textoDeclaracao = "Declaro que recebi os materiais/peças listados acima nas exatas quantidades descritas, conferidos no ato da entrega, e que os mesmos se encontram em perfeitas condições de uso, acabamento e fabricação, estando em total conformidade com o orçamento previamente aprovado e solicitado.";
+        const splitDecl = doc.splitTextToSize(textoDeclaracao, 170);
+        doc.text(splitDecl, 20, finalY + 7);
+
+        // Área de Assinatura
+        finalY += 35;
+        doc.line(40, finalY, 170, finalY); // Linha de assinatura
+        doc.setFont("helvetica", "bold"); doc.text("ASSINATURA DO RESPONSÁVEL PELA RETIRADA", 105, finalY + 5, {align: "center"});
+        
+        finalY += 15;
+        doc.setFont("helvetica", "normal");
+        doc.text("NOME LEGÍVEL: ______________________________________________________________", 20, finalY);
+        finalY += 10;
+        doc.text("RG / CPF: _________________________________", 20, finalY);
+        finalY += 10;
+        doc.text("DATA DA RETIRADA: _____ / _____ / ________", 20, finalY);
+
+        window.abrirPDFMobile(doc.output('blob'), `TERMO_RETIRADA_OS_${d.os}`);
+    };
+
+    window.arquivarOS = function(index) {
+        if(!confirm("Tem certeza? Isso vai limpar a OS da expedição e movê-la para os Arquivados permanentes.")) return;
+        
+        let osEntregue = window.marbeDB.expedidos.splice(index, 1)[0];
+        
+        // Adiciona data e hora exata da entrega
+        osEntregue.data_entrega = new Date().toISOString();
+        
+        if(!window.marbeDB.arquivados) window.marbeDB.arquivados = [];
+        window.marbeDB.arquivados.push(osEntregue);
+        
+        window.salvarNuvem();
+        renderExpedicao();
+    };
+</script>
+</body>
+</html>
