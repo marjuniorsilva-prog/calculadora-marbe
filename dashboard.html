@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Dashboard Diretoria - Grupo Marbe</title>
+  <title>Dashboard Diretoria - ERP Marbe</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
-  <!-- Importando o Chart.js para os gráficos bonitos -->
+  <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <script type="module">
@@ -29,9 +29,7 @@
     const db = getDatabase(app);
     window.marbeDB = null;
 
-    // Inicializando datas para pegar o mês atual
-    let hoje = new Date();
-    let primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    let hoje = new Date(); let primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
     
     document.addEventListener("DOMContentLoaded", () => {
         document.getElementById('filtroDataIni').value = primeiroDia.toISOString().split('T')[0];
@@ -43,33 +41,60 @@
       const data = snapshot.val();
       if (data) { 
           window.marbeDB = data; 
-          // Trava de segurança: só renderiza se a tela já estiver carregada
-          if(document.getElementById('filtroDataIni')) {
-              renderDashboard();
-          }
+          if(document.getElementById('filtroDataIni')) renderDashboard();
       }
     });
 
-    window.fmtMoney = (v) => {
-        return parseFloat(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    }
+    window.fmtMoney = (v) => { return parseFloat(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
   </script>
 
   <style>
     :root { 
-      --primary: #2563eb; --success: #16a34a; --warning: #d97706; --danger: #dc2626;
-      --dark: #1e293b; --bg-color: #f1f5f9; --card-bg: #ffffff; --border: #e2e8f0; 
+      --primary: #0f172a; --primary-hover: #1e293b; --accent: #2563eb;
+      --success: #10b981; --danger: #ef4444; --info: #0ea5e9; --warning: #f59e0b;
+      --bg-color: #f8fafc; --card-bg: #ffffff; --border: #e2e8f0; 
       --text-main: #334155; --text-muted: #64748b;
-      --pu-color: #8b5cf6; --borracha-color: #f97316;
+      --sidebar-width: 260px; --sidebar-collapsed: 70px; --header-height: 70px;
     }
     
-    body { font-family: 'Inter', sans-serif; background: var(--bg-color); margin: 0; padding: 20px; color: var(--text-main); }
-    .container { max-width: 1200px; margin: auto; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg-color); margin: 0; padding: 0; color: var(--text-main); font-size: 14px; overflow-x: hidden; }
     
-    .header { display: flex; justify-content: space-between; align-items: center; background: var(--dark); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-    .header h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+    .app-layout { display: flex; height: 100vh; overflow: hidden; }
     
-    .btn { padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+    /* Sidebar */
+    .sidebar { width: var(--sidebar-width); background: var(--primary); color: #fff; display: flex; flex-direction: column; transition: width 0.3s ease; flex-shrink: 0; z-index: 50; }
+    .sidebar.collapsed { width: var(--sidebar-collapsed); }
+    .sidebar-brand { height: var(--header-height); display: flex; align-items: center; padding: 0 20px; font-size: 18px; font-weight: 800; border-bottom: 1px solid rgba(255,255,255,0.1); white-space: nowrap; overflow: hidden; }
+    .sidebar-brand i { margin-right: 12px; color: var(--accent); }
+    .sidebar-nav { flex: 1; overflow-y: auto; padding: 15px 10px; display: flex; flex-direction: column; gap: 4px; }
+    .nav-label { font-size: 11px; color: #94a3b8; font-weight: 600; text-transform: uppercase; padding: 10px; margin-top: 10px; }
+    .sidebar.collapsed .nav-label { display: none; }
+    .tab-btn { display: flex; align-items: center; padding: 12px 10px; color: #cbd5e1; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 14px; transition: all 0.2s; white-space: nowrap; border: none; background: transparent; width: 100%; cursor: pointer; text-align: left; }
+    .tab-btn i { width: 20px; height: 20px; margin-right: 15px; flex-shrink: 0; }
+    .tab-btn:hover { background: rgba(255,255,255,0.05); color: #fff; }
+    .tab-btn.active { background: var(--accent); color: #fff; font-weight: 600; }
+    .sidebar.collapsed .tab-btn span { display: none; }
+    .sidebar.collapsed .tab-btn { justify-content: center; padding: 12px 0; }
+    .sidebar.collapsed .tab-btn i { margin-right: 0; }
+
+    /* Main Content */
+    .main-wrapper { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .topbar { height: var(--header-height); background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 25px; flex-shrink: 0; }
+    .topbar-left { display: flex; align-items: center; gap: 20px; }
+    .btn-toggle { background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 6px; }
+    .view-title { font-size: 18px; font-weight: 700; color: var(--primary); margin: 0; }
+    
+    .topbar-right { display: flex; align-items: center; gap: 20px; }
+    .user-profile { display: flex; align-items: center; gap: 10px; padding: 6px 12px; background: var(--bg-color); border-radius: 20px; border: 1px solid var(--border); }
+    .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
+    .user-info { display: flex; flex-direction: column; }
+    .user-name { font-size: 13px; font-weight: 600; color: var(--primary); }
+    .user-role { font-size: 11px; color: var(--text-muted); }
+
+    .content-area { flex: 1; overflow-y: auto; padding: 30px; background: var(--bg-color); }
+    
+    .btn { padding: 12px 20px; background: var(--accent); color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; }
     .btn:hover { filter: brightness(1.1); }
 
     .dash-grid-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; }
@@ -85,155 +110,98 @@
     .chart-container { background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     .chart-container h3 { margin-top: 0; margin-bottom: 15px; color: var(--dark); font-size: 15px; font-weight: 700; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
 
-    /* Trava de segurança para impedir que o gráfico cresça infinitamente */
-    .chart-wrapper {
-        position: relative;
-        height: 250px;
-        max-height: 250px;
-        width: 100%;
-        overflow: hidden;
-    }
-    
-    canvas {
-        max-height: 250px !important;
-    }
+    .chart-wrapper { position: relative; height: 250px; max-height: 250px; width: 100%; overflow: hidden; }
+    canvas { max-height: 250px !important; }
 
     .ranking-list { list-style: none; padding: 0; margin: 0; }
     .ranking-list li { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px dashed var(--border); font-size: 13px; }
     .ranking-list li:last-child { border-bottom: none; }
     .rank-name { font-weight: 600; color: var(--dark); }
     .rank-val { font-weight: 700; color: var(--success); }
+
+    input[type="date"] { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-family: 'Inter'; outline: none; }
+    input[type="date"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
   </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="header">
-        <h1>Painel de Diretoria - Grupo Marbe</h1>
-        <a href="index.html" style="color:white; text-decoration:none; font-size:13px; font-weight:600; background:rgba(255,255,255,0.2); padding:8px 15px; border-radius:6px;">Voltar ao ERP</a>
-    </div>
+<div class="app-layout" id="appContainer">
+    
+  <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand"><i data-lucide="layers"></i><span>Marbe OS</span></div>
+      <div class="sidebar-nav">
+          <div class="nav-label">Visão Geral</div>
+          <button class="tab-btn active" onclick="window.location.href='dashboard.html'"><i data-lucide="layout-dashboard"></i> <span>Dashboard</span></button>
+          <div class="nav-label">Comercial</div>
+          <button class="tab-btn" onclick="window.location.href='index.html'"><i data-lucide="calculator"></i> <span>Calculadora</span></button>
+          <button class="tab-btn" onclick="window.location.href='crm.html'"><i data-lucide="pie-chart"></i> <span>CRM Vendas</span></button>
+          <div class="nav-label">Operação & Fábrica</div>
+          <button class="tab-btn" onclick="window.location.href='pedido_entregue.html'"><i data-lucide="package-check"></i> <span>Expedição</span></button>
+          <div class="nav-label">Administração</div>
+          <button class="tab-btn" onclick="window.location.href='financeiro.html'"><i data-lucide="circle-dollar-sign"></i> <span>Financeiro</span></button>
+      </div>
+  </aside>
 
-    <!-- Filtros de Período -->
-    <div style="background:var(--card-bg); padding:15px 20px; border-radius:12px; border:1px solid var(--border); margin-bottom:20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;">
-        <div>
-            <label style="display:block; font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:5px;">Data Início (Criação da OS)</label>
-            <input type="date" id="filtroDataIni" style="padding:10px; border:1px solid var(--border); border-radius:6px; font-family:'Inter';">
-        </div>
-        <div>
-            <label style="display:block; font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:5px;">Data Fim (Criação da OS)</label>
-            <input type="date" id="filtroDataFim" style="padding:10px; border:1px solid var(--border); border-radius:6px; font-family:'Inter';">
-        </div>
-        <button class="btn" onclick="renderDashboard()">ATUALIZAR PAINEL</button>
-    </div>
+  <main class="main-wrapper">
+      <header class="topbar">
+          <div class="topbar-left">
+              <button class="btn-toggle" onclick="document.getElementById('sidebar').classList.toggle('collapsed')"><i data-lucide="menu"></i></button>
+              <h2 class="view-title">Dashboard Analítico</h2>
+          </div>
+          <div class="topbar-right">
+              <div class="user-profile">
+                  <div class="avatar">AD</div>
+                  <div class="user-info"><span class="user-name">Administrador</span><span class="user-role">Acesso Total</span></div>
+              </div>
+          </div>
+      </header>
 
-    <!-- KPIs Principais -->
-    <div class="dash-grid-top">
-        <div class="dash-card" style="--primary: var(--success);">
-            <h3>Vendas Fechadas (Pedidos)</h3>
-            <div class="value" id="kpiFaturamento">R$ 0,00</div>
-            <div class="sub-value" id="kpiQtdPedidos">0 OSs aprovadas na fábrica</div>
-        </div>
-        
-        <div class="dash-card" style="--primary: var(--info);">
-            <h3>Ticket Médio</h3>
-            <div class="value" id="kpiTicket">R$ 0,00</div>
-            <div class="sub-value">Valor médio por Ordem de Serviço</div>
-        </div>
+      <div class="content-area">
+          <div style="background:var(--card-bg); padding:15px 20px; border-radius:12px; border:1px solid var(--border); margin-bottom:20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;">
+              <div><label style="display:block; font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:5px;">Data Início (OS)</label><input type="date" id="filtroDataIni"></div>
+              <div><label style="display:block; font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:5px;">Data Fim (OS)</label><input type="date" id="filtroDataFim"></div>
+              <button class="btn" onclick="renderDashboard()"><i data-lucide="refresh-cw" style="width:16px; display:inline-block; vertical-align:middle; margin-right:5px;"></i> ATUALIZAR DADOS</button>
+          </div>
 
-        <div class="dash-card" style="--primary: var(--morno);">
-            <h3>Funil Ativo (CRM)</h3>
-            <div class="value" id="kpiFunil">R$ 0,00</div>
-            <div class="sub-value" id="kpiQtdFunil">0 orçamentos quentes/mornos em aberto</div>
-        </div>
+          <div class="dash-grid-top">
+              <div class="dash-card" style="--primary: var(--success);"><h3>Vendas Fechadas (Pedidos)</h3><div class="value" id="kpiFaturamento">R$ 0,00</div><div class="sub-value" id="kpiQtdPedidos">0 OSs aprovadas na fábrica</div></div>
+              <div class="dash-card" style="--primary: var(--info);"><h3>Ticket Médio</h3><div class="value" id="kpiTicket">R$ 0,00</div><div class="sub-value">Valor médio por Ordem de Serviço</div></div>
+              <div class="dash-card" style="--primary: var(--warning);"><h3>Funil Ativo (CRM)</h3><div class="value" id="kpiFunil">R$ 0,00</div><div class="sub-value" id="kpiQtdFunil">0 orçamentos em aberto</div></div>
+              <div class="dash-card" style="--primary: #8b5cf6;"><h3>Taxa de Conversão</h3><div class="value" id="kpiConversao">0%</div><div class="sub-value">Sucesso nas negociações do mês</div></div>
+          </div>
 
-        <div class="dash-card" style="--primary: var(--pu-color);">
-            <h3>Taxa de Conversão (Win Rate)</h3>
-            <div class="value" id="kpiConversao">0%</div>
-            <div class="sub-value">Taxa de sucesso nas negociações do mês</div>
-        </div>
-    </div>
-
-    <!-- Seção de Gráficos e Rankings -->
-    <div class="chart-grid">
-        
-        <!-- Faturamento por Empresa / Setor -->
-        <div class="chart-container">
-            <h3>Faturamento: Marbe (PU) vs SB Borrachas</h3>
-            <div class="chart-wrapper">
-                <canvas id="chartSetor"></canvas>
-            </div>
-        </div>
-
-        <!-- Ranking de Clientes -->
-        <div class="chart-container">
-            <h3>Top 5 Clientes (Curva A)</h3>
-            <ul class="ranking-list" id="listaTopClientes">
-                <!-- Gerado via JS -->
-            </ul>
-        </div>
-
-        <!-- Mapa de Perdas CRM -->
-        <div class="chart-container">
-            <h3>Análise de Perdas (Motivos de Recusa)</h3>
-            <div class="chart-wrapper">
-                <canvas id="chartPerdas"></canvas>
-            </div>
-        </div>
-
-        <!-- Resumo Financeiro (DRE Rápida) -->
-        <div class="chart-container">
-            <h3>Saúde Financeira do Período</h3>
-            <div style="margin-top: 15px;">
-                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                    <span style="color:var(--text-muted); font-weight:600;">(+) Dinheiro Recebido Real:</span>
-                    <span style="color:var(--success); font-weight:700;" id="dreEntradas">R$ 0,00</span>
-                </div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--border);">
-                    <span style="color:var(--text-muted); font-weight:600;">(-) Despesas Pagas Reais:</span>
-                    <span style="color:var(--danger); font-weight:700;" id="dreSaidas">R$ 0,00</span>
-                </div>
-                <div style="display:flex; justify-content:space-between;">
-                    <span style="color:var(--dark); font-weight:800; font-size:16px;">(=) Saldo de Caixa:</span>
-                    <span style="font-weight:800; font-size:18px;" id="dreSaldo">R$ 0,00</span>
-                </div>
-                <p style="font-size:11px; color:var(--text-muted); margin-top:15px; font-style:italic;">*Baseado nas baixas e contas pagas da aba Financeiro no período selecionado.</p>
-            </div>
-        </div>
-
-    </div>
+          <div class="chart-grid">
+              <div class="chart-container"><h3>Faturamento: Marbe (PU) vs SB Borrachas</h3><div class="chart-wrapper"><canvas id="chartSetor"></canvas></div></div>
+              <div class="chart-container"><h3>Top 5 Clientes (Curva A)</h3><ul class="ranking-list" id="listaTopClientes"></ul></div>
+              <div class="chart-container"><h3>Análise de Perdas (Recusas)</h3><div class="chart-wrapper"><canvas id="chartPerdas"></canvas></div></div>
+              <div class="chart-container">
+                  <h3>Saúde Financeira do Período</h3>
+                  <div style="margin-top: 15px;">
+                      <div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span style="color:var(--text-muted); font-weight:600;">(+) Dinheiro Recebido Real:</span><span style="color:var(--success); font-weight:700;" id="dreEntradas">R$ 0,00</span></div>
+                      <div style="display:flex; justify-content:space-between; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--border);"><span style="color:var(--text-muted); font-weight:600;">(-) Despesas Pagas Reais:</span><span style="color:var(--danger); font-weight:700;" id="dreSaidas">R$ 0,00</span></div>
+                      <div style="display:flex; justify-content:space-between;"><span style="color:var(--dark); font-weight:800; font-size:16px;">(=) Saldo de Caixa:</span><span style="font-weight:800; font-size:18px;" id="dreSaldo">R$ 0,00</span></div>
+                      <p style="font-size:11px; color:var(--text-muted); margin-top:15px; font-style:italic;">*Baseado nas contas da aba Financeiro no período.</p>
+                  </div>
+              </div>
+          </div>
+      </div>
+  </main>
 </div>
 
 <script>
-    let chartInstSetor = null;
-    let chartInstPerdas = null;
+    lucide.createIcons();
+    let chartInstSetor = null; let chartInstPerdas = null;
 
     window.renderDashboard = function() {
         if (!window.marbeDB) return;
+        let inputIni = document.getElementById('filtroDataIni'); let inputFim = document.getElementById('filtroDataFim');
+        if(!inputIni || !inputFim) return;
 
-        let inputIni = document.getElementById('filtroDataIni');
-        let inputFim = document.getElementById('filtroDataFim');
-        
-        if(!inputIni || !inputFim) return; // Evita falhas antes da tela carregar 100%
+        let dataIniStr = inputIni.value; let dataFimStr = inputFim.value;
+        let totalFaturamento = 0; let qtdPedidos = 0; let fatMarbePU = 0; let fatSBBorrachas = 0; let clientesMap = {};
+        let totalFunilAtivo = 0; let qtdFunil = 0; let orcamentosPerdidos = 0; let motivosPerda = { "Preço": 0, "Prazo": 0, "Frete": 0, "Cancelado": 0, "Outro": 0 };
+        let dreEntradas = 0; let dreSaidas = 0;
 
-        let dataIniStr = inputIni.value;
-        let dataFimStr = inputFim.value;
-
-        // Variáveis Analíticas
-        let totalFaturamento = 0;
-        let qtdPedidos = 0;
-        let fatMarbePU = 0;
-        let fatSBBorrachas = 0;
-        let clientesMap = {};
-
-        let totalFunilAtivo = 0;
-        let qtdFunil = 0;
-        let orcamentosPerdidos = 0;
-        let motivosPerda = { "Preço": 0, "Prazo": 0, "Frete": 0, "Cancelado": 0, "Outro": 0 };
-
-        let dreEntradas = 0;
-        let dreSaidas = 0;
-
-        // 1. Analisando PEDIDOS (Vendas Fechadas)
         let basePedidos = (window.marbeDB.pedidos || []).concat(window.marbeDB.expedidos || []);
         basePedidos.forEach(p => {
             let exibir = true;
@@ -241,73 +209,39 @@
                 let d = p.data_criacao ? p.data_criacao.substring(0, 10) : '';
                 if (d && (d < dataIniStr || d > dataFimStr)) exibir = false;
             }
-
             if (exibir) {
-                let valorOS = p.total || 0;
-                totalFaturamento += valorOS;
-                qtdPedidos++;
-
-                // Separando Marbe vs SB Borrachas
+                let valorOS = p.total || 0; totalFaturamento += valorOS; qtdPedidos++;
                 let isPU = false;
-                (p.itens || []).forEach(it => {
-                    let textCheck = ((it.n || '') + (it.mat || '')).toUpperCase();
-                    if (textCheck.includes('PU') || textCheck.includes('POLIURETANO')) {
-                        isPU = true;
-                    }
-                });
-
-                if (isPU) { fatMarbePU += valorOS; } 
-                else { fatSBBorrachas += valorOS; }
-
-                // Mapeando Clientes
+                (p.itens || []).forEach(it => { let tCheck = ((it.n || '') + (it.mat || '')).toUpperCase(); if (tCheck.includes('PU') || tCheck.includes('POLIURETANO')) isPU = true; });
+                if (isPU) { fatMarbePU += valorOS; } else { fatSBBorrachas += valorOS; }
                 let nomeCli = p.cliente ? p.cliente.toUpperCase() : 'NÃO INFORMADO';
                 if (!clientesMap[nomeCli]) clientesMap[nomeCli] = { valor: 0, qtd: 0 };
-                clientesMap[nomeCli].valor += valorOS;
-                clientesMap[nomeCli].qtd++;
+                clientesMap[nomeCli].valor += valorOS; clientesMap[nomeCli].qtd++;
             }
         });
 
-        // 2. Analisando ORÇAMENTOS / CRM (Funil e Perdas)
         (window.marbeDB.orçamentos || []).forEach(orc => {
             let exibir = true;
             if (dataIniStr && dataFimStr) {
                 let d = orc.data_criacao ? orc.data_criacao.substring(0, 10) : '';
                 if (d && (d < dataIniStr || d > dataFimStr)) exibir = false;
             }
-
             if (exibir) {
                 let st = orc.crm_status || 'pendente';
                 if (st === 'perdido') {
-                    orcamentosPerdidos++;
-                    let mot = orc.crm_motivo || 'Outro';
-                    if (motivosPerda[mot] !== undefined) motivosPerda[mot]++;
-                    else motivosPerda['Outro']++;
-                } else {
-                    totalFunilAtivo += (orc.total || 0);
-                    qtdFunil++;
-                }
+                    orcamentosPerdidos++; let mot = orc.crm_motivo || 'Outro';
+                    if (motivosPerda[mot] !== undefined) motivosPerda[mot]++; else motivosPerda['Outro']++;
+                } else { totalFunilAtivo += (orc.total || 0); qtdFunil++; }
             }
         });
 
-        // 3. Analisando Financeiro Real (DRE)
-        (window.marbeDB.financeiro || []).forEach(f => {
-            if (f.pago && f.dataRecebimento >= dataIniStr && f.dataRecebimento <= dataFimStr) {
-                dreEntradas += f.valor;
-            }
-        });
-        (window.marbeDB.fin_despesas || []).forEach(d => {
-            if (d.pago && d.dataPagamento >= dataIniStr && d.dataPagamento <= dataFimStr) {
-                dreSaidas += d.valor;
-            }
-        });
+        (window.marbeDB.financeiro || []).forEach(f => { if (f.pago && f.dataRecebimento >= dataIniStr && f.dataRecebimento <= dataFimStr) dreEntradas += f.valor; });
+        (window.marbeDB.fin_despesas || []).forEach(d => { if (d.pago && d.dataPagamento >= dataIniStr && d.dataPagamento <= dataFimStr) dreSaidas += d.valor; });
 
-        // Atualizando Tela (KPIs)
         document.getElementById('kpiFaturamento').innerText = window.fmtMoney(totalFaturamento);
         document.getElementById('kpiQtdPedidos').innerText = `${qtdPedidos} OSs aprovadas na fábrica`;
-
         let ticket = qtdPedidos > 0 ? (totalFaturamento / qtdPedidos) : 0;
         document.getElementById('kpiTicket').innerText = window.fmtMoney(ticket);
-
         document.getElementById('kpiFunil').innerText = window.fmtMoney(totalFunilAtivo);
         document.getElementById('kpiQtdFunil').innerText = `${qtdFunil} orçamentos na mesa`;
 
@@ -319,95 +253,33 @@
         document.getElementById('dreSaidas').innerText = `- ${window.fmtMoney(dreSaidas)}`;
         let saldo = dreEntradas - dreSaidas;
         document.getElementById('dreSaldo').innerText = window.fmtMoney(saldo);
-        document.getElementById('dreSaldo').style.color = saldo >= 0 ? "var(--primary)" : "var(--danger)";
+        document.getElementById('dreSaldo').style.color = saldo >= 0 ? "var(--success)" : "var(--danger)";
 
-        // Atualizando Lista Top Clientes
         let arrClientes = Object.keys(clientesMap).map(k => ({ nome: k, valor: clientesMap[k].valor, qtd: clientesMap[k].qtd }));
         arrClientes.sort((a, b) => b.valor - a.valor);
-        
-        let htmlCli = '';
-        let top5 = arrClientes.slice(0, 5);
+        let htmlCli = ''; let top5 = arrClientes.slice(0, 5);
         if (top5.length === 0) htmlCli = '<li style="color:var(--text-muted); justify-content:center;">Nenhum fechamento no período.</li>';
         top5.forEach((c, idx) => {
             let medalha = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : `${idx+1}º`));
-            htmlCli += `
-            <li>
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <span style="font-size:16px;">${medalha}</span>
-                    <div style="display:flex; flex-direction:column;">
-                        <span class="rank-name">${c.nome.substring(0, 25)}</span>
-                        <span style="font-size:10px; color:var(--text-muted);">${c.qtd} pedido(s)</span>
-                    </div>
-                </div>
-                <span class="rank-val">${window.fmtMoney(c.valor)}</span>
-            </li>`;
+            htmlCli += `<li><div style="display:flex; align-items:center; gap:10px;"><span style="font-size:16px;">${medalha}</span><div style="display:flex; flex-direction:column;"><span class="rank-name">${c.nome.substring(0, 25)}</span><span style="font-size:10px; color:var(--text-muted);">${c.qtd} pedido(s)</span></div></div><span class="rank-val">${window.fmtMoney(c.valor)}</span></li>`;
         });
         document.getElementById('listaTopClientes').innerHTML = htmlCli;
 
-        // GRÁFICOS (Chart.js)
-        atualizarGraficoSetor(fatMarbePU, fatSBBorrachas);
-        atualizarGraficoPerdas(motivosPerda);
+        atualizarGraficoSetor(fatMarbePU, fatSBBorrachas); atualizarGraficoPerdas(motivosPerda);
     };
 
     function atualizarGraficoSetor(pu, borracha) {
         const ctx = document.getElementById('chartSetor').getContext('2d');
         if (chartInstSetor) chartInstSetor.destroy();
-
-        if (pu === 0 && borracha === 0) {
-            pu = 1; borracha = 1; 
-        }
-
-        chartInstSetor = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Marbe (PU Alta Performance)', 'SB (Borrachas)'],
-                datasets: [{
-                    data: [pu, borracha],
-                    backgroundColor: ['#8b5cf6', '#f97316'],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: false,
-                plugins: {
-                    legend: { position: 'bottom', labels: { font: { family: 'Inter' } } }
-                }
-            }
-        });
+        if (pu === 0 && borracha === 0) { pu = 1; borracha = 1; }
+        chartInstSetor = new Chart(ctx, { type: 'doughnut', data: { labels: ['Marbe (PU Alta Performance)', 'SB (Borrachas)'], datasets: [{ data: [pu, borracha], backgroundColor: ['#8b5cf6', '#f97316'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { position: 'bottom', labels: { font: { family: 'Inter' } } } } } });
     }
 
     function atualizarGraficoPerdas(motivos) {
         const ctx = document.getElementById('chartPerdas').getContext('2d');
         if (chartInstPerdas) chartInstPerdas.destroy();
-
-        let labels = Object.keys(motivos);
-        let dados = Object.values(motivos);
-
-        chartInstPerdas = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Orçamentos Perdidos',
-                    data: dados,
-                    backgroundColor: '#dc2626',
-                    borderRadius: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: false,
-                scales: {
-                    y: { beginAtZero: true, ticks: { stepSize: 1 } }
-                },
-                plugins: {
-                    legend: { display: false }
-                }
-            }
-        });
+        let labels = Object.keys(motivos); let dados = Object.values(motivos);
+        chartInstPerdas = new Chart(ctx, { type: 'bar', data: { labels: labels, datasets: [{ label: 'Orçamentos Perdidos', data: dados, backgroundColor: '#ef4444', borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, plugins: { legend: { display: false } } } });
     }
 </script>
 </body>
