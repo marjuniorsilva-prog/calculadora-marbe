@@ -3,11 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>CRM Comercial - Grupo Marbe</title>
+  <title>CRM Comercial - ERP Marbe</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Ícones -->
+  <script src="https://unpkg.com/lucide@latest"></script>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -52,33 +55,74 @@
 
   <style>
     :root { 
-      --primary: #2563eb; --success: #16a34a; --warning: #d97706; --danger: #dc2626;
-      --dark: #1e293b; --bg-color: #f1f5f9; --card-bg: #ffffff; --border: #e2e8f0; 
+      --primary: #0f172a; --primary-hover: #1e293b; --accent: #2563eb; --accent-hover: #1d4ed8;
+      --success: #10b981; --danger: #ef4444; --info: #0ea5e9; --warning: #f59e0b;
+      --bg-color: #f8fafc; --card-bg: #ffffff; --border: #e2e8f0; 
       --text-main: #334155; --text-muted: #64748b;
       --frio: #0ea5e9; --morno: #f59e0b; --quente: #ef4444; --pendente: #3b82f6; --perdido: #64748b;
+      --sidebar-width: 260px; --sidebar-collapsed: 70px; --header-height: 70px; --border-radius: 10px;
     }
     
-    body { font-family: 'Inter', sans-serif; background: var(--bg-color); margin: 0; padding: 20px; color: var(--text-main); }
-    .container { max-width: 1400px; margin: auto; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg-color); margin: 0; padding: 0; color: var(--text-main); font-size: 14px; overflow-x: hidden; }
     
-    .header { display: flex; justify-content: space-between; align-items: center; background: var(--dark); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-    .header h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+    /* App Layout (Shell) */
+    .app-layout { display: flex; height: 100vh; overflow: hidden; }
     
+    /* Sidebar */
+    .sidebar { width: var(--sidebar-width); background: var(--primary); color: #fff; display: flex; flex-direction: column; transition: width 0.3s ease; flex-shrink: 0; z-index: 50; }
+    .sidebar.collapsed { width: var(--sidebar-collapsed); }
+    .sidebar-brand { height: var(--header-height); display: flex; align-items: center; padding: 0 20px; font-size: 18px; font-weight: 800; border-bottom: 1px solid rgba(255,255,255,0.1); letter-spacing: -0.5px; white-space: nowrap; overflow: hidden; }
+    .sidebar-brand i { margin-right: 12px; color: var(--accent); }
+    .sidebar-nav { flex: 1; overflow-y: auto; padding: 15px 10px; display: flex; flex-direction: column; gap: 4px; }
+    .sidebar-nav::-webkit-scrollbar { width: 4px; }
+    .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+    
+    .nav-label { font-size: 11px; color: #94a3b8; font-weight: 600; text-transform: uppercase; padding: 10px 10px 5px; margin-top: 10px; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; }
+    .sidebar.collapsed .nav-label { display: none; }
+    
+    .tab-btn { display: flex; align-items: center; padding: 12px 10px; color: #cbd5e1; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 14px; transition: all 0.2s; white-space: nowrap; border: none; background: transparent; width: 100%; cursor: pointer; text-align: left; }
+    .tab-btn i { width: 20px; height: 20px; margin-right: 15px; flex-shrink: 0; }
+    .tab-btn:hover { background: rgba(255,255,255,0.05); color: #fff; }
+    .tab-btn.active { background: var(--accent); color: #fff; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .tab-btn span { transition: opacity 0.2s; }
+    .sidebar.collapsed .tab-btn span { display: none; }
+    .sidebar.collapsed .tab-btn { justify-content: center; padding: 12px 0; }
+    .sidebar.collapsed .tab-btn i { margin-right: 0; }
+
+    /* Main Content Area */
+    .main-wrapper { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    
+    /* Header */
+    .topbar { height: var(--header-height); background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 25px; z-index: 40; flex-shrink: 0; }
+    .topbar-left { display: flex; align-items: center; gap: 20px; }
+    .btn-toggle { background: transparent; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 6px; padding: 6px; transition: 0.2s; }
+    .btn-toggle:hover { background: var(--bg-color); color: var(--primary); }
+    .view-title { font-size: 18px; font-weight: 700; color: var(--primary); margin: 0; }
+    
+    .topbar-right { display: flex; align-items: center; gap: 20px; }
+    .user-profile { display: flex; align-items: center; gap: 10px; padding: 6px 12px; background: var(--bg-color); border-radius: 20px; border: 1px solid var(--border); cursor: pointer; }
+    .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
+    .user-info { display: flex; flex-direction: column; }
+    .user-name { font-size: 13px; font-weight: 600; color: var(--primary); }
+    .user-role { font-size: 11px; color: var(--text-muted); }
+
+    /* Content */
+    .content-area { flex: 1; overflow-y: auto; padding: 30px; background: var(--bg-color); }
+    
+    /* CRM Específico */
     .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
     .dash-card { background: var(--card-bg); padding: 15px; border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     .dash-card h3 { margin: 0 0 5px 0; font-size: 12px; color: var(--text-muted); text-transform: uppercase; }
     .dash-card .value { font-size: 22px; font-weight: 700; color: var(--dark); }
 
-    /* Painel Volume Global */
     .global-panel { background: var(--dark); padding: 20px 25px; border-radius: 12px; margin-bottom: 20px; color: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-left: 5px solid #10b981; flex-wrap: wrap; gap: 15px; }
     .global-panel h3 { margin: 0 0 5px 0; color: #cbd5e1; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
     .global-panel .val { font-size: 32px; font-weight: 800; color: #10b981; }
     .global-panel .qtd-box { text-align: right; }
     .global-panel .qtd { font-size: 24px; font-weight: 700; }
     .global-panel .qtd-label { font-size: 12px; color: #cbd5e1; }
-    @media (max-width: 600px) { .global-panel .qtd-box { text-align: left; } }
 
-    /* Kanban Layout */
     .kanban-board { display: flex; gap: 15px; overflow-x: auto; padding-bottom: 10px; align-items: flex-start; }
     .kanban-col { flex: 1; min-width: 300px; background: #e2e8f0; padding: 12px; border-radius: 10px; display: flex; flex-direction: column; gap: 12px; }
     .kanban-header { font-weight: 700; font-size: 14px; text-transform: uppercase; padding-bottom: 10px; border-bottom: 2px solid rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
@@ -89,7 +133,6 @@
     .col-quente .kanban-header { color: var(--quente); }
     .col-perdido .kanban-header { color: var(--perdido); }
 
-    /* Cards */
     .k-card { background: var(--card-bg); padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 4px solid #cbd5e1; display: flex; flex-direction: column; gap: 8px; transition: transform 0.2s; }
     .k-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
     .col-pendente .k-card { border-left-color: var(--pendente); }
@@ -110,133 +153,180 @@
     .btn-ganho { background: #dcfce7; color: #15803d; }
     .btn-perder { background: #e2e8f0; color: #475569; }
 
-    /* Modal */
-    .modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); display: none; z-index: 10000; align-items: center; justify-content: center; padding: 20px; }
-    .modal-content { background: #fff; width: 100%; max-width: 400px; padding: 25px; border-radius: 12px; }
-    .modal-title { margin-top: 0; color: var(--dark); font-size: 18px; margin-bottom: 15px; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); display: none; z-index: 10000; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
+    .modal-content { background: #fff; width: 100%; max-width: 450px; padding: 35px; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
+    .modal-title { margin-top: 0; color: var(--dark); font-size: 20px; font-weight: 700; border-bottom: 1px solid var(--border); padding-bottom: 15px; margin-bottom: 20px; }
     
-    select, input, textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; box-sizing: border-box; font-family: 'Inter', sans-serif; margin-bottom: 15px; }
-    .btn { padding: 12px 20px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%; }
+    label { display: block; margin-top: 0; font-weight: 600; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+    select, input, textarea { width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; box-sizing: border-box; font-family: 'Inter', sans-serif; margin-bottom: 15px; outline: none; transition: 0.2s; }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+    .btn { padding: 14px 20px; background: var(--accent); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s; outline: none; }
+    .btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
     
     .motivo-tag { display: inline-block; padding: 4px 8px; background: #f1f5f9; color: var(--text-muted); border-radius: 4px; font-size: 10px; font-weight: bold; margin-top: 5px; }
+
+    @media (max-width: 1024px) {
+      .sidebar { position: fixed; height: 100%; transform: translateX(-100%); }
+      .sidebar.open { transform: translateX(0); }
+    }
   </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="header">
-        <h1>CRM de Vendas - Funil de Orçamentos</h1>
-        <a href="index.html" style="color:white; text-decoration:none; font-size:13px; font-weight:600; background:rgba(255,255,255,0.2); padding:8px 15px; border-radius:6px;">Voltar ao ERP Principal</a>
-    </div>
-
-    <!-- Filtros do CRM -->
-    <div style="background:var(--card-bg); padding:15px; border-radius:10px; border:1px solid var(--border); margin-bottom:20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-        <div style="font-weight:700; font-size:12px; margin-bottom:10px; color:var(--primary); text-transform:uppercase;">Filtros de Pesquisa</div>
-        <div style="display:flex; gap:15px; flex-wrap:wrap; align-items:flex-end;">
-            <div style="flex:1; min-width:150px;">
-                <label style="margin-top:0; font-size:11px; color:var(--text-muted); margin-bottom:4px; display:block;">Data Início</label>
-                <input type="date" id="filtroDataIni" style="margin-bottom:0;">
-            </div>
-            <div style="flex:1; min-width:150px;">
-                <label style="margin-top:0; font-size:11px; color:var(--text-muted); margin-bottom:4px; display:block;">Data Fim</label>
-                <input type="date" id="filtroDataFim" style="margin-bottom:0;">
-            </div>
-            <div style="flex:1; min-width:150px;">
-                <label style="margin-top:0; font-size:11px; color:var(--text-muted); margin-bottom:4px; display:block;">Número da OS</label>
-                <input type="number" id="filtroOS" placeholder="Ex: 630" style="margin-bottom:0;" onkeyup="if(event.key==='Enter') renderKanban()">
-            </div>
-            <div style="display:flex; gap:10px;">
-                <button class="btn" style="background:var(--dark); margin:0; width:auto; padding:10px 25px;" onclick="renderKanban()">FILTRAR</button>
-                <button class="btn" style="background:#e2e8f0; color:var(--dark); margin:0; width:auto; padding:10px 20px;" onclick="limparFiltrosCRM()">LIMPAR</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Volume Global (Novo Pedido) -->
-    <div class="global-panel">
-        <div>
-            <h3>Volume Global Emitido (Ganhos, Perdidos e Abertos)</h3>
-            <div class="val" id="valGlobal">R$ 0,00</div>
-        </div>
-        <div class="qtd-box">
-            <div class="qtd" id="qtdGlobal">0</div>
-            <div class="qtd-label">Cotações Realizadas no Período</div>
-        </div>
-    </div>
-
-    <!-- Dashboard Rápido (Apenas CRM Ativo) -->
-    <div class="dash-grid">
-        <div class="dash-card" style="border-bottom: 3px solid var(--pendente)">
-            <h3>Pendentes (Novos)</h3>
-            <div class="value" id="valPendente">R$ 0,00</div>
-        </div>
-        <div class="dash-card" style="border-bottom: 3px solid var(--frio)">
-            <h3>Frios (Afastados)</h3>
-            <div class="value" id="valFrio">R$ 0,00</div>
-        </div>
-        <div class="dash-card" style="border-bottom: 3px solid var(--morno)">
-            <h3>Mornos (Analisando)</h3>
-            <div class="value" id="valMorno">R$ 0,00</div>
-        </div>
-        <div class="dash-card" style="border-bottom: 3px solid var(--quente)">
-            <h3>Quentes (Quase Fechados)</h3>
-            <div class="value" id="valQuente">R$ 0,00</div>
-        </div>
-        <div class="dash-card" style="border-bottom: 3px solid var(--success)">
-            <h3>Pipeline Total (Aberto)</h3>
-            <div class="value" id="valTotal" style="color:var(--success)">R$ 0,00</div>
-        </div>
-    </div>
-
-    <!-- Quadro Kanban -->
-    <div class="kanban-board">
-        <!-- Coluna Pendente -->
-        <div class="kanban-col col-pendente">
-            <div class="kanban-header">📋 Pendentes <span id="countPendente">0</span></div>
-            <div id="colPendenteContent"></div>
-        </div>
-
-        <!-- Coluna Frio -->
-        <div class="kanban-col col-frio">
-            <div class="kanban-header">🧊 Frios <span id="countFrio">0</span></div>
-            <div id="colFrioContent"></div>
-        </div>
-
-        <!-- Coluna Morno -->
-        <div class="kanban-col col-morno">
-            <div class="kanban-header">🔥 Mornos <span id="countMorno">0</span></div>
-            <div id="colMornoContent"></div>
-        </div>
-
-        <!-- Coluna Quente -->
-        <div class="kanban-col col-quente">
-            <div class="kanban-header">🧨 Quentes <span id="countQuente">0</span></div>
-            <div id="colQuenteContent"></div>
-        </div>
-
-        <!-- Coluna Perdido -->
-        <div class="kanban-col col-perdido">
-            <div class="kanban-header">❌ Perdidos <span id="countPerdido">0</span></div>
-            <div id="colPerdidoContent"></div>
-        </div>
-    </div>
+<div class="app-layout" id="appContainer">
     
-    <!-- Mapa de Perdas (Dashboard) -->
-    <div style="background:white; padding:20px; border-radius:12px; margin-top:20px; border:1px solid var(--border);">
-        <h3 style="color:var(--dark); margin-top:0;">Mapa de Perdas (Por que não fechamos?)</h3>
-        <p style="font-size:13px; color:var(--text-muted); margin-bottom:20px;">Visão inteligente dos motivos pelos quais os clientes recusaram orçamentos. Use isso para ajustar preços ou processos de fábrica.</p>
-        
-        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:15px;" id="dashPerdas">
-            <!-- Gerado via JS -->
-        </div>
-    </div>
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+          <i data-lucide="layers"></i>
+          <span>Marbe OS</span>
+      </div>
+      
+      <div class="sidebar-nav">
+          <div class="nav-label">Visão Geral</div>
+          <button class="tab-btn" onclick="window.location.href='dashboard.html'">
+              <i data-lucide="layout-dashboard"></i> <span>Dashboard</span>
+          </button>
+
+          <div class="nav-label">Comercial</div>
+          <button class="tab-btn" onclick="window.location.href='index.html'">
+              <i data-lucide="calculator"></i> <span>Calculadora</span>
+          </button>
+          <button class="tab-btn active" onclick="window.location.href='crm.html'">
+              <i data-lucide="pie-chart"></i> <span>CRM Vendas</span>
+          </button>
+
+          <div class="nav-label">Operação & Fábrica</div>
+          <button class="tab-btn" onclick="window.location.href='pedido_entregue.html'">
+              <i data-lucide="package-check"></i> <span>Expedição</span>
+          </button>
+          
+          <div class="nav-label">Administração</div>
+          <button class="tab-btn" onclick="window.location.href='financeiro.html'">
+              <i data-lucide="circle-dollar-sign"></i> <span>Financeiro</span>
+          </button>
+      </div>
+  </aside>
+
+  <!-- ÁREA PRINCIPAL -->
+  <main class="main-wrapper">
+      
+      <!-- HEADER -->
+      <header class="topbar">
+          <div class="topbar-left">
+              <button class="btn-toggle" onclick="document.getElementById('sidebar').classList.toggle('collapsed')">
+                  <i data-lucide="menu"></i>
+              </button>
+              <h2 class="view-title">Gestão de Funil CRM</h2>
+          </div>
+          <div class="topbar-right">
+              <div class="user-profile">
+                  <div class="avatar">AD</div>
+                  <div class="user-info">
+                      <span class="user-name">Administrador</span>
+                      <span class="user-role">Acesso Total</span>
+                  </div>
+              </div>
+          </div>
+      </header>
+
+      <!-- CONTEÚDO CRM -->
+      <div class="content-area">
+          
+          <div style="background:var(--card-bg); padding:20px; border-radius:10px; border:1px solid var(--border); margin-bottom:20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+              <div style="font-weight:700; font-size:12px; margin-bottom:15px; color:var(--primary); text-transform:uppercase;"><i data-lucide="filter" style="width:14px; display:inline-block; vertical-align:middle; margin-right:4px;"></i> Filtros de Pesquisa</div>
+              <div style="display:flex; gap:15px; flex-wrap:wrap; align-items:flex-end;">
+                  <div style="flex:1; min-width:150px;">
+                      <label>Data Início</label>
+                      <input type="date" id="filtroDataIni" style="margin-bottom:0;">
+                  </div>
+                  <div style="flex:1; min-width:150px;">
+                      <label>Data Fim</label>
+                      <input type="date" id="filtroDataFim" style="margin-bottom:0;">
+                  </div>
+                  <div style="flex:1; min-width:150px;">
+                      <label>Número da OS</label>
+                      <input type="number" id="filtroOS" placeholder="Ex: 630" style="margin-bottom:0;" onkeyup="if(event.key==='Enter') renderKanban()">
+                  </div>
+                  <div style="display:flex; gap:10px;">
+                      <button class="btn" style="background:var(--primary); width:auto;" onclick="renderKanban()">FILTRAR</button>
+                      <button class="btn" style="background:#e2e8f0; color:var(--primary); width:auto;" onclick="limparFiltrosCRM()">LIMPAR</button>
+                  </div>
+              </div>
+          </div>
+
+          <div class="global-panel">
+              <div>
+                  <h3>Volume Global Emitido (Ganhos, Perdidos e Abertos)</h3>
+                  <div class="val" id="valGlobal">R$ 0,00</div>
+              </div>
+              <div class="qtd-box">
+                  <div class="qtd" id="qtdGlobal">0</div>
+                  <div class="qtd-label">Cotações Realizadas no Período</div>
+              </div>
+          </div>
+
+          <div class="dash-grid">
+              <div class="dash-card" style="border-bottom: 3px solid var(--pendente)">
+                  <h3>Pendentes (Novos)</h3>
+                  <div class="value" id="valPendente">R$ 0,00</div>
+              </div>
+              <div class="dash-card" style="border-bottom: 3px solid var(--frio)">
+                  <h3>Frios (Afastados)</h3>
+                  <div class="value" id="valFrio">R$ 0,00</div>
+              </div>
+              <div class="dash-card" style="border-bottom: 3px solid var(--morno)">
+                  <h3>Mornos (Analisando)</h3>
+                  <div class="value" id="valMorno">R$ 0,00</div>
+              </div>
+              <div class="dash-card" style="border-bottom: 3px solid var(--quente)">
+                  <h3>Quentes (Quase Fechados)</h3>
+                  <div class="value" id="valQuente">R$ 0,00</div>
+              </div>
+              <div class="dash-card" style="border-bottom: 3px solid var(--success)">
+                  <h3>Pipeline Total (Aberto)</h3>
+                  <div class="value" id="valTotal" style="color:var(--success)">R$ 0,00</div>
+              </div>
+          </div>
+
+          <div class="kanban-board">
+              <div class="kanban-col col-pendente">
+                  <div class="kanban-header">📋 Pendentes <span id="countPendente">0</span></div>
+                  <div id="colPendenteContent"></div>
+              </div>
+              <div class="kanban-col col-frio">
+                  <div class="kanban-header">🧊 Frios <span id="countFrio">0</span></div>
+                  <div id="colFrioContent"></div>
+              </div>
+              <div class="kanban-col col-morno">
+                  <div class="kanban-header">🔥 Mornos <span id="countMorno">0</span></div>
+                  <div id="colMornoContent"></div>
+              </div>
+              <div class="kanban-col col-quente">
+                  <div class="kanban-header">🧨 Quentes <span id="countQuente">0</span></div>
+                  <div id="colQuenteContent"></div>
+              </div>
+              <div class="kanban-col col-perdido">
+                  <div class="kanban-header">❌ Perdidos <span id="countPerdido">0</span></div>
+                  <div id="colPerdidoContent"></div>
+              </div>
+          </div>
+          
+          <div style="background:var(--card-bg); padding:25px; border-radius:12px; margin-top:20px; border:1px solid var(--border);">
+              <h3 style="color:var(--primary); margin-top:0; font-size:16px;">Mapa de Perdas (Por que não fechamos?)</h3>
+              <p style="font-size:13px; color:var(--text-muted); margin-bottom:20px;">Visão inteligente dos motivos pelas quais os clientes recusaram orçamentos.</p>
+              <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:15px;" id="dashPerdas"></div>
+          </div>
+
+      </div>
+  </main>
 </div>
 
 <!-- Modal Aprovar (Ganhar) -->
 <div id="modalGanho" class="modal-overlay">
     <div class="modal-content">
-        <h3 class="modal-title">🎉 Negócio Fechado!</h3>
-        <p style="font-size:13px; color:var(--text-muted);">Excelente! O orçamento virou um Pedido. Defina os prazos para enviar para a Produção.</p>
+        <h3 class="modal-title" style="color:var(--success)">🎉 Negócio Fechado!</h3>
+        <p style="font-size:13px; color:var(--text-muted); margin-bottom:25px;">Excelente! O orçamento virou um Pedido. Defina os prazos para enviar para a Produção.</p>
         
         <label>Data de Início na Fábrica</label>
         <input type="date" id="ganhoEntrada">
@@ -244,9 +334,9 @@
         <label>Prazo Limite de Entrega</label>
         <input type="date" id="ganhoLimite">
         
-        <div style="display:flex; gap:10px; margin-top:10px;">
-            <button class="btn" style="background:var(--bg-color); color:var(--dark);" onclick="document.getElementById('modalGanho').style.display='none'">CANCELAR</button>
-            <button class="btn" style="background:var(--success);" onclick="confirmarGanho()">ENVIAR P/ PRODUÇÃO</button>
+        <div style="display:flex; gap:15px; margin-top:20px;">
+            <button class="btn" style="background:#e2e8f0; color:var(--primary); flex:1;" onclick="document.getElementById('modalGanho').style.display='none'">CANCELAR</button>
+            <button class="btn" style="background:var(--success); flex:1;" onclick="confirmarGanho()">ENVIAR P/ PRODUÇÃO</button>
         </div>
     </div>
 </div>
@@ -255,7 +345,7 @@
 <div id="modalPerdido" class="modal-overlay">
     <div class="modal-content">
         <h3 class="modal-title" style="color:var(--danger)">Registrar Perda</h3>
-        <p style="font-size:13px; color:var(--text-muted);">Qual foi o motivo principal da recusa do cliente?</p>
+        <p style="font-size:13px; color:var(--text-muted); margin-bottom:25px;">Qual foi o motivo principal da recusa do cliente?</p>
         
         <label>Motivo da Perda</label>
         <select id="motivoPerda">
@@ -269,14 +359,15 @@
         <label>Observação (Opcional)</label>
         <textarea id="obsPerda" rows="2" placeholder="Ex: Achou caro o PU..."></textarea>
         
-        <div style="display:flex; gap:10px; margin-top:10px;">
-            <button class="btn" style="background:var(--bg-color); color:var(--dark);" onclick="document.getElementById('modalPerdido').style.display='none'">CANCELAR</button>
-            <button class="btn" style="background:var(--danger);" onclick="confirmarPerda()">ARQUIVAR</button>
+        <div style="display:flex; gap:15px; margin-top:20px;">
+            <button class="btn" style="background:#e2e8f0; color:var(--primary); flex:1;" onclick="document.getElementById('modalPerdido').style.display='none'">CANCELAR</button>
+            <button class="btn" style="background:var(--danger); flex:1;" onclick="confirmarPerda()">ARQUIVAR</button>
         </div>
     </div>
 </div>
 
 <script>
+    lucide.createIcons();
     let idxAcao = null;
 
     window.limparFiltrosCRM = function() {
@@ -291,37 +382,29 @@
 
         let pendentes = '', frios = '', mornos = '', quentes = '', perdidos = '';
         let vPend = 0, vFrio = 0, vMorno = 0, vQuente = 0, cPend = 0, cFrio = 0, cMorno = 0, cQuente = 0, cPerd = 0;
-        let vGlobal = 0, cGlobal = 0; // Novas variaveis para o Volume Global
+        let vGlobal = 0, cGlobal = 0; 
 
         let dataIniStr = document.getElementById('filtroDataIni') ? document.getElementById('filtroDataIni').value : '';
         let dataFimStr = document.getElementById('filtroDataFim') ? document.getElementById('filtroDataFim').value : '';
         let numOsBusca = document.getElementById('filtroOS') ? document.getElementById('filtroOS').value : '';
 
-        // Função interna para aplicar os filtros de forma uniforme
         const verificaFiltro = (item) => {
             let exibir = true;
             if (dataIniStr || dataFimStr) {
-                if (!item.data_criacao) {
-                    exibir = false;
-                } else {
+                if (!item.data_criacao) { exibir = false; } 
+                else {
                     let dItem = item.data_criacao.substring(0, 10);
                     if (dataIniStr && dItem < dataIniStr) exibir = false;
                     if (dataFimStr && dItem > dataFimStr) exibir = false;
                 }
             }
-            if (numOsBusca && item.os.toString() !== numOsBusca.toString()) {
-                exibir = false;
-            }
+            if (numOsBusca && item.os.toString() !== numOsBusca.toString()) exibir = false;
             return exibir;
         };
 
-        // 1. Analisa a aba de Orçamentos (Kanban + Perdidos)
         (window.marbeDB.orçamentos || []).forEach((orc, index) => {
             if (!verificaFiltro(orc)) return;
-
-            // Adiciona ao Volume Global
-            vGlobal += (orc.total || 0);
-            cGlobal++;
+            vGlobal += (orc.total || 0); cGlobal++;
 
             let status = orc.crm_status || 'pendente';
             let dtStr = orc.data_criacao ? new Date(orc.data_criacao).toLocaleDateString('pt-BR') : 'N/D';
@@ -329,48 +412,27 @@
             let cardHtml = `
             <div class="k-card">
                 <div class="c-title">OS ${orc.os} - ${orc.cliente.substring(0, 20)}</div>
-                <div class="c-subtitle">Gerado em: ${dtStr} | Contato: ${orc.contato || 'Não info.'}</div>
+                <div class="c-subtitle">Gerado: ${dtStr} | Contato: ${orc.contato || 'N/D'}</div>
                 <div class="c-value">${window.fmtMoney(orc.total)}</div>
                 ${status === 'perdido' ? `<div class="motivo-tag">Motivo: ${orc.crm_motivo || 'N/D'}</div>` : ''}
-                
                 <div class="c-actions">`;
 
             if (status === 'pendente') {
                 vPend += orc.total; cPend++;
-                cardHtml += `
-                    <button class="btn-sm btn-frio" onclick="mudarStatus(${index}, 'frio')">Frio</button>
-                    <button class="btn-sm btn-morno" onclick="mudarStatus(${index}, 'morno')">Morno</button>
-                    <button class="btn-sm btn-quente" onclick="mudarStatus(${index}, 'quente')">Quente</button>
-                    <button class="btn-sm btn-perder" onclick="abrirModalPerda(${index})">Perder</button>
-                `;
+                cardHtml += `<button class="btn-sm btn-frio" onclick="mudarStatus(${index}, 'frio')">Frio</button><button class="btn-sm btn-morno" onclick="mudarStatus(${index}, 'morno')">Morno</button><button class="btn-sm btn-quente" onclick="mudarStatus(${index}, 'quente')">Quente</button><button class="btn-sm btn-perder" onclick="abrirModalPerda(${index})">Perder</button>`;
             } else if (status === 'frio') {
                 vFrio += orc.total; cFrio++;
-                cardHtml += `
-                    <button class="btn-sm" style="background:#cbd5e1" onclick="mudarStatus(${index}, 'pendente')">Voltar</button>
-                    <button class="btn-sm btn-morno" onclick="mudarStatus(${index}, 'morno')">Morno</button>
-                    <button class="btn-sm btn-perder" onclick="abrirModalPerda(${index})">Perder</button>
-                `;
+                cardHtml += `<button class="btn-sm" style="background:#cbd5e1" onclick="mudarStatus(${index}, 'pendente')">Voltar</button><button class="btn-sm btn-morno" onclick="mudarStatus(${index}, 'morno')">Morno</button><button class="btn-sm btn-perder" onclick="abrirModalPerda(${index})">Perder</button>`;
             } else if (status === 'morno') {
                 vMorno += orc.total; cMorno++;
-                cardHtml += `
-                    <button class="btn-sm btn-frio" onclick="mudarStatus(${index}, 'frio')">Frio</button>
-                    <button class="btn-sm btn-quente" onclick="mudarStatus(${index}, 'quente')">Quente</button>
-                    <button class="btn-sm btn-perder" onclick="abrirModalPerda(${index})">Perder</button>
-                `;
+                cardHtml += `<button class="btn-sm btn-frio" onclick="mudarStatus(${index}, 'frio')">Frio</button><button class="btn-sm btn-quente" onclick="mudarStatus(${index}, 'quente')">Quente</button><button class="btn-sm btn-perder" onclick="abrirModalPerda(${index})">Perder</button>`;
             } else if (status === 'quente') {
                 vQuente += orc.total; cQuente++;
-                cardHtml += `
-                    <button class="btn-sm btn-morno" onclick="mudarStatus(${index}, 'morno')">Morno</button>
-                    <button class="btn-sm btn-ganho" onclick="abrirModalGanho(${index})">✅ GANHAMOS</button>
-                    <button class="btn-sm btn-perder" onclick="abrirModalPerda(${index})">Perder</button>
-                `;
+                cardHtml += `<button class="btn-sm btn-morno" onclick="mudarStatus(${index}, 'morno')">Morno</button><button class="btn-sm btn-ganho" onclick="abrirModalGanho(${index})">✅ GANHAMOS</button><button class="btn-sm btn-perder" onclick="abrirModalPerda(${index})">Perder</button>`;
             } else if (status === 'perdido') {
                 cPerd++;
-                cardHtml += `
-                    <button class="btn-sm" style="background:#cbd5e1; width:100%" onclick="mudarStatus(${index}, 'pendente')">↻ Reabrir Orçamento</button>
-                `;
+                cardHtml += `<button class="btn-sm" style="background:#cbd5e1; width:100%" onclick="mudarStatus(${index}, 'pendente')">↻ Reabrir Orçamento</button>`;
             }
-
             cardHtml += `</div></div>`;
 
             if (status === 'pendente') pendentes += cardHtml;
@@ -380,25 +442,12 @@
             else if (status === 'perdido') perdidos += cardHtml;
         });
 
-        // 2. Analisa os Pedidos (Ganhos que estão na Produção)
-        (window.marbeDB.pedidos || []).forEach(p => {
-            if (!verificaFiltro(p)) return;
-            vGlobal += (p.total || 0);
-            cGlobal++;
-        });
+        (window.marbeDB.pedidos || []).forEach(p => { if (!verificaFiltro(p)) return; vGlobal += (p.total || 0); cGlobal++; });
+        (window.marbeDB.expedidos || []).forEach(e => { if (!verificaFiltro(e)) return; vGlobal += (e.total || 0); cGlobal++; });
 
-        // 3. Analisa os Expedidos (Ganhos que já foram entregues/faturados)
-        (window.marbeDB.expedidos || []).forEach(e => {
-            if (!verificaFiltro(e)) return;
-            vGlobal += (e.total || 0);
-            cGlobal++;
-        });
-
-        // Atualizando o Painel Global
         document.getElementById('valGlobal').innerText = window.fmtMoney(vGlobal);
         document.getElementById('qtdGlobal').innerText = cGlobal;
 
-        // Atualizando as Colunas
         document.getElementById('colPendenteContent').innerHTML = pendentes || '<div style="font-size:12px; color:var(--text-muted); text-align:center;">Vazio</div>';
         document.getElementById('colFrioContent').innerHTML = frios || '<div style="font-size:12px; color:var(--text-muted); text-align:center;">Vazio</div>';
         document.getElementById('colMornoContent').innerHTML = mornos || '<div style="font-size:12px; color:var(--text-muted); text-align:center;">Vazio</div>';
@@ -422,14 +471,12 @@
 
     window.mudarStatus = function(index, novoStatus) {
         window.marbeDB.orçamentos[index].crm_status = novoStatus;
-        window.salvarNuvem(true);
-        renderKanban();
+        window.salvarNuvem(true); renderKanban();
     };
 
     window.abrirModalGanho = function(index) {
         idxAcao = index;
-        let hoje = new Date().toISOString().split('T')[0];
-        document.getElementById('ganhoEntrada').value = hoje;
+        document.getElementById('ganhoEntrada').value = new Date().toISOString().split('T')[0];
         document.getElementById('ganhoLimite').value = '';
         document.getElementById('modalGanho').style.display = 'flex';
     };
@@ -441,41 +488,29 @@
         let orc = window.marbeDB.orçamentos.splice(idxAcao, 1)[0];
         orc.data_entrada = document.getElementById('ganhoEntrada').value;
         orc.data_limite = lim;
-        // Limpa lixo do CRM
-        delete orc.crm_status;
-        delete orc.crm_motivo;
+        delete orc.crm_status; delete orc.crm_motivo;
 
         window.marbeDB.pedidos.push(orc);
         window.salvarNuvem(false);
-        
-        document.getElementById('modalGanho').style.display = 'none';
-        renderKanban();
+        document.getElementById('modalGanho').style.display = 'none'; renderKanban();
     };
 
     window.abrirModalPerda = function(index) {
-        idxAcao = index;
-        document.getElementById('motivoPerda').value = 'Preço';
-        document.getElementById('obsPerda').value = '';
-        document.getElementById('modalPerdido').style.display = 'flex';
+        idxAcao = index; document.getElementById('motivoPerda').value = 'Preço';
+        document.getElementById('obsPerda').value = ''; document.getElementById('modalPerdido').style.display = 'flex';
     };
 
     window.confirmarPerda = function() {
-        let motivo = document.getElementById('motivoPerda').value;
-        let obs = document.getElementById('obsPerda').value;
-        
         window.marbeDB.orçamentos[idxAcao].crm_status = 'perdido';
-        window.marbeDB.orçamentos[idxAcao].crm_motivo = motivo;
-        window.marbeDB.orçamentos[idxAcao].crm_obs_perda = obs;
+        window.marbeDB.orçamentos[idxAcao].crm_motivo = document.getElementById('motivoPerda').value;
+        window.marbeDB.orçamentos[idxAcao].crm_obs_perda = document.getElementById('obsPerda').value;
         
-        window.salvarNuvem(true);
-        document.getElementById('modalPerdido').style.display = 'none';
-        renderKanban();
+        window.salvarNuvem(true); document.getElementById('modalPerdido').style.display = 'none'; renderKanban();
     };
 
     function renderDashboardPerdas() {
         let perdas = { "Preço": 0, "Prazo": 0, "Frete": 0, "Cancelado": 0, "Outro": 0 };
         let valores = { "Preço": 0, "Prazo": 0, "Frete": 0, "Cancelado": 0, "Outro": 0 };
-        
         let dataIniStr = document.getElementById('filtroDataIni') ? document.getElementById('filtroDataIni').value : '';
         let dataFimStr = document.getElementById('filtroDataFim') ? document.getElementById('filtroDataFim').value : '';
         let numOsBusca = document.getElementById('filtroOS') ? document.getElementById('filtroOS').value : '';
@@ -483,31 +518,21 @@
         (window.marbeDB.orçamentos || []).forEach(orc => {
             let exibir = true;
             if (dataIniStr || dataFimStr) {
-                if (!orc.data_criacao) {
-                    exibir = false;
-                } else {
+                if (!orc.data_criacao) exibir = false; else {
                     let dOrc = orc.data_criacao.substring(0, 10);
                     if (dataIniStr && dOrc < dataIniStr) exibir = false;
                     if (dataFimStr && dOrc > dataFimStr) exibir = false;
                 }
             }
-            if (numOsBusca && orc.os.toString() !== numOsBusca.toString()) {
-                exibir = false;
-            }
-
+            if (numOsBusca && orc.os.toString() !== numOsBusca.toString()) exibir = false;
             if (!exibir) return;
 
             if (orc.crm_status === 'perdido' && orc.crm_motivo) {
-                if (perdas[orc.crm_motivo] !== undefined) {
-                    perdas[orc.crm_motivo]++;
-                    valores[orc.crm_motivo] += orc.total;
-                }
+                if (perdas[orc.crm_motivo] !== undefined) { perdas[orc.crm_motivo]++; valores[orc.crm_motivo] += orc.total; }
             }
         });
 
-        let html = '';
-        let icones = { "Preço": "💰", "Prazo": "⏳", "Frete": "🚚", "Cancelado": "🚫", "Outro": "❓" };
-
+        let html = ''; let icones = { "Preço": "💰", "Prazo": "⏳", "Frete": "🚚", "Cancelado": "🚫", "Outro": "❓" };
         Object.keys(perdas).forEach(motivo => {
             if (perdas[motivo] > 0) {
                 html += `
@@ -518,7 +543,6 @@
                 </div>`;
             }
         });
-
         document.getElementById('dashPerdas').innerHTML = html || '<p style="color:var(--text-muted); grid-column: 1 / -1;">Nenhuma perda registrada neste período.</p>';
     }
 </script>
