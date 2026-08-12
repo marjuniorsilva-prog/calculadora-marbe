@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Dashboard Diretoria - Grupo Marbe</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Importando o Chart.js para os gráficos bonitos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyATu_V6e1shKRpgBOkX1lw2beyzUEZUCo0",
+      authDomain: "marbeapp-e2db8.firebaseapp.com",
+      projectId: "marbeapp-e2db8",
+      storageBucket: "marbeapp-e2db8.firebasestorage.app",
+      messagingSenderId: "435226749841",
+      appId: "1:435226749841:web:c2b5f5dee676412b228830"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    window.marbeDB = null;
+
+    // Inicializando datas para pegar o mês atual
+    let hoje = new Date();
+    let primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    
+    document.addEventListener("DOMContentLoaded", () => {
+        document.getElementById('filtroDataIni').value = primeiroDia.toISOString().split('T')[0];
+        document.getElementById('filtroDataFim').value = hoje.toISOString().split('T')[0];
+    });
+
+    onValue(ref(db, 'sistema/'), (snapshot) => {
+      const data = snapshot.val();
+      if (data) { 
+          window.marbeDB = data; 
+          renderDashboard();
+      }
+    });
+
+    window.fmtMoney = (v) => {
+        return parseFloat(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+  </script>
+
+  <style>
+    :root { 
+      --primary: #2563eb; --success: #16a34a; --warning: #d97706; --danger: #dc2626;
+      --dark: #1e293b; --bg-color: #f1f5f9; --card-bg: #ffffff; --border: #e2e8f0; 
+      --text-main: #334155; --text-muted: #64748b;
+      --pu-color: #8b5cf6; --borracha-color: #f97316;
+    }
+    
+    body { font-family: 'Inter', sans-serif; background: var(--bg-color); margin: 0; padding: 20px; color: var(--text-main); }
+    .container { max-width: 1200px; margin: auto; }
+    
+    .header { display: flex; justify-content: space-between; align-items: center; background: var(--dark); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .header h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+    
+    .btn { padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+    .btn:hover { filter: brightness(1.1); }
+
+    .dash-grid-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; }
+    .dash-card { background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative; overflow: hidden; }
+    .dash-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--primary); }
+    .dash-card h3 { margin: 0 0 8px 0; font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
+    .dash-card .value { font-size: 28px; font-weight: 800; color: var(--dark); }
+    .dash-card .sub-value { font-size: 12px; color: var(--text-muted); margin-top: 5px; font-weight: 500; }
+
+    .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+    @media (max-width: 768px) { .chart-grid { grid-template-columns: 1fr; } }
+    
+    .chart-container { background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .chart-container h3 { margin-top: 0; margin-bottom: 15px; color: var(--dark); font-size: 15px; font-weight: 700; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+
+    .ranking-list { list-style: none; padding: 0; margin: 0; }
+    .ranking-list li { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px dashed var(--border); font-size: 13px; }
+    .ranking-list li:last-child { border-bottom: none; }
+    .rank-name { font-weight: 600; color: var(--dark); }
+    .rank-val { font-weight: 700; color: var(--success); }
+    
+    .badge { padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; background: var(--bg-color); color: var(--text-muted); }
+  </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>Painel de Diretoria - Grupo Marbe</h1>
+        <a href="index.html" style="color:white; text-decoration:none; font-size:13px; font-weight:600; background:rgba(255,255,255,0.2); padding:8px 15px; border-radius:6px;">Voltar ao ERP</a>
+    </div>
+
+    <!-- Filtros de Período -->
+    <div style="background:var(--card-bg); padding:15px 20px; border-radius:12px; border:1px solid var(--border); margin-bottom:20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;">
+        <div>
+            <label style="display:block; font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:5px;">Data Início (Criação da OS)</label>
+            <input type="date" id="filtroDataIni" style="padding:10px; border:1px solid var(--border); border-radius:6px; font-family:'Inter';">
+        </div>
+        <div>
+            <label style="display:block; font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:5px;">Data Fim (Criação da OS)</label>
+            <input type="date" id="filtroDataFim" style="padding:10px; border:1px solid var(--border); border-radius:6px; font-family:'Inter';">
+        </div>
+        <button class="btn" onclick="renderDashboard()">ATUALIZAR PAINEL</button>
+    </div>
+
+    <!-- KPIs Principais -->
+    <div class="dash-grid-top">
+        <div class="dash-card" style="--primary: var(--success);">
+            <h3>Vendas Fechadas (Pedidos)</h3>
+            <div class="value" id="kpiFaturamento">R$ 0,00</div>
+            <div class="sub-value" id="kpiQtdPedidos">0 OSs aprovadas na fábrica</div>
+        </div>
+        
+        <div class="dash-card" style="--primary: var(--info);">
+            <h3>Ticket Médio</h3>
+            <div class="value" id="kpiTicket">R$ 0,00</div>
+            <div class="sub-value">Valor médio por Ordem de Serviço</div>
+        </div>
+
+        <div class="dash-card" style="--primary: var(--morno);">
+            <h3>Funil Ativo (CRM)</h3>
+            <div class="value" id="kpiFunil">R$ 0,00</div>
+            <div class="sub-value" id="kpiQtdFunil">0 orçamentos quentes/mornos em aberto</div>
+        </div>
+
+        <div class="dash-card" style="--primary: var(--pu-color);">
+            <h3>Taxa de Conversão (Win Rate)</h3>
+            <div class="value" id="kpiConversao">0%</div>
+            <div class="sub-value">Taxa de sucesso nas negociações do mês</div>
+        </div>
+    </div>
+
+    <!-- Seção de Gráficos e Rankings -->
+    <div class="chart-grid">
+        
+        <!-- Faturamento por Empresa / Setor -->
+        <div class="chart-container">
+            <h3>Faturamento: Marbe (PU) vs SB Borrachas</h3>
+            <canvas id="chartSetor" height="200"></canvas>
+        </div>
+
+        <!-- Ranking de Clientes -->
+        <div class="chart-container">
+            <h3>Top 5 Clientes (Curva A)</h3>
+            <ul class="ranking-list" id="listaTopClientes">
+                <!-- Gerado via JS -->
+            </ul>
+        </div>
+
+        <!-- Mapa de Perdas CRM -->
+        <div class="chart-container">
+            <h3>Análise de Perdas (Motivos de Recusa)</h3>
+            <canvas id="chartPerdas" height="200"></canvas>
+        </div>
+
+        <!-- Resumo Financeiro (DRE Rápida) -->
+        <div class="chart-container">
+            <h3>Saúde Financeira do Período</h3>
+            <div style="margin-top: 15px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <span style="color:var(--text-muted); font-weight:600;">(+) Dinheiro Recebido Real:</span>
+                    <span style="color:var(--success); font-weight:700;" id="dreEntradas">R$ 0,00</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--border);">
+                    <span style="color:var(--text-muted); font-weight:600;">(-) Despesas Pagas Reais:</span>
+                    <span style="color:var(--danger); font-weight:700;" id="dreSaidas">R$ 0,00</span>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                    <span style="color:var(--dark); font-weight:800; font-size:16px;">(=) Saldo de Caixa:</span>
+                    <span style="font-weight:800; font-size:18px;" id="dreSaldo">R$ 0,00</span>
+                </div>
+                <p style="font-size:11px; color:var(--text-muted); margin-top:15px; font-style:italic;">*Baseado nas baixas e contas pagas da aba Financeiro no período selecionado.</p>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    let chartInstSetor = null;
+    let chartInstPerdas = null;
+
+    window.renderDashboard = function() {
+        if (!window.marbeDB) return;
+
+        let dataIniStr = document.getElementById('filtroDataIni').value;
+        let dataFimStr = document.getElementById('filtroDataFim').value;
+
+        // Variaveis Analíticas
+        let totalFaturamento = 0;
+        let qtdPedidos = 0;
+        let fatMarbePU = 0;
+        let fatSBBorrachas = 0;
+        let clientesMap = {};
+
+        let totalFunilAtivo = 0;
+        let qtdFunil = 0;
+        let orcamentosPerdidos = 0;
+        let motivosPerda = { "Preço": 0, "Prazo": 0, "Frete": 0, "Cancelado": 0, "Outro": 0 };
+
+        let dreEntradas = 0;
+        let dreSaidas = 0;
+
+        // 1. Analisando PEDIDOS (Vendas Fechadas)
+        (window.marbeDB.pedidos || []).concat(window.marbeDB.expedidos || []).forEach(p => {
+            let exibir = true;
+            if (dataIniStr && dataFimStr) {
+                let d = p.data_criacao ? p.data_criacao.substring(0, 10) : '';
+                if (d && (d < dataIniStr || d > dataFimStr)) exibir = false;
+            }
+
+            if (exibir) {
+                let valorOS = p.total || 0;
+                totalFaturamento += valorOS;
+                qtdPedidos++;
+
+                // Separando Marbe vs SB Borrachas
+                let isPU = false;
+                (p.itens || []).forEach(it => {
+                    let textCheck = ((it.n || '') + (it.mat || '')).toUpperCase();
+                    if (textCheck.includes('PU') || textCheck.includes('POLIURETANO')) {
+                        isPU = true;
+                    }
+                });
+
+                if (isPU) { fatMarbePU += valorOS; } 
+                else { fatSBBorrachas += valorOS; }
+
+                // Mapeando Clientes
+                let nomeCli = p.cliente ? p.cliente.toUpperCase() : 'NÃO INFORMADO';
+                if (!clientesMap[nomeCli]) clientesMap[nomeCli] = { valor: 0, qtd: 0 };
+                clientesMap[nomeCli].valor += valorOS;
+                clientesMap[nomeCli].qtd++;
+            }
+        });
+
+        // 2. Analisando ORÇAMENTOS / CRM (Funil e Perdas)
+        (window.marbeDB.orçamentos || []).forEach(orc => {
+            let exibir = true;
+            if (dataIniStr && dataFimStr) {
+                let d = orc.data_criacao ? orc.data_criacao.substring(0, 10) : '';
+                if (d && (d < dataIniStr || d > dataFimStr)) exibir = false;
+            }
+
+            if (exibir) {
+                let st = orc.crm_status || 'pendente';
+                if (st === 'perdido') {
+                    orcamentosPerdidos++;
+                    let mot = orc.crm_motivo || 'Outro';
+                    if (motivosPerda[mot] !== undefined) motivosPerda[mot]++;
+                    else motivosPerda['Outro']++;
+                } else {
+                    totalFunilAtivo += (orc.total || 0);
+                    qtdFunil++;
+                }
+            }
+        });
+
+        // 3. Analisando Financeiro Real (DRE)
+        (window.marbeDB.financeiro || []).forEach(f => {
+            if (f.pago && f.dataRecebimento >= dataIniStr && f.dataRecebimento <= dataFimStr) {
+                dreEntradas += f.valor;
+            }
+        });
+        (window.marbeDB.fin_despesas || []).forEach(d => {
+            if (d.pago && d.dataPagamento >= dataIniStr && d.dataPagamento <= dataFimStr) {
+                dreSaidas += d.valor;
+            }
+        });
+
+        // Atualizando Tela (KPIs)
+        document.getElementById('kpiFaturamento').innerText = window.fmtMoney(totalFaturamento);
+        document.getElementById('kpiQtdPedidos').innerText = `${qtdPedidos} OSs geradas`;
+
+        let ticket = qtdPedidos > 0 ? (totalFaturamento / qtdPedidos) : 0;
+        document.getElementById('kpiTicket').innerText = window.fmtMoney(ticket);
+
+        document.getElementById('kpiFunil').innerText = window.fmtMoney(totalFunilAtivo);
+        document.getElementById('kpiQtdFunil').innerText = `${qtdFunil} orçamentos na mesa`;
+
+        let totalNegociacoes = qtdPedidos + orcamentosPerdidos;
+        let winRate = totalNegociacoes > 0 ? ((qtdPedidos / totalNegociacoes) * 100).toFixed(1) : 0;
+        document.getElementById('kpiConversao').innerText = `${winRate}%`;
+
+        document.getElementById('dreEntradas').innerText = `+ ${window.fmtMoney(dreEntradas)}`;
+        document.getElementById('dreSaidas').innerText = `- ${window.fmtMoney(dreSaidas)}`;
+        let saldo = dreEntradas - dreSaidas;
+        document.getElementById('dreSaldo').innerText = window.fmtMoney(saldo);
+        document.getElementById('dreSaldo').style.color = saldo >= 0 ? "var(--primary)" : "var(--danger)";
+
+        // Atualizando Lista Top Clientes
+        let arrClientes = Object.keys(clientesMap).map(k => ({ nome: k, valor: clientesMap[k].valor, qtd: clientesMap[k].qtd }));
+        arrClientes.sort((a, b) => b.valor - a.valor);
+        
+        let htmlCli = '';
+        let top5 = arrClientes.slice(0, 5);
+        if (top5.length === 0) htmlCli = '<li style="color:var(--text-muted); justify-content:center;">Nenhum fechamento no período.</li>';
+        top5.forEach((c, idx) => {
+            let medalha = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : `${idx+1}º`));
+            htmlCli += `
+            <li>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:16px;">${medalha}</span>
+                    <div style="display:flex; flex-direction:column;">
+                        <span class="rank-name">${c.nome.substring(0, 25)}</span>
+                        <span style="font-size:10px; color:var(--text-muted);">${c.qtd} pedido(s)</span>
+                    </div>
+                </div>
+                <span class="rank-val">${window.fmtMoney(c.valor)}</span>
+            </li>`;
+        });
+        document.getElementById('listaTopClientes').innerHTML = htmlCli;
+
+        // GRÁFICOS (Chart.js)
+        atualizarGraficoSetor(fatMarbePU, fatSBBorrachas);
+        atualizarGraficoPerdas(motivosPerda);
+    };
+
+    function atualizarGraficoSetor(pu, borracha) {
+        const ctx = document.getElementById('chartSetor').getContext('2d');
+        if (chartInstSetor) chartInstSetor.destroy();
+
+        if (pu === 0 && borracha === 0) {
+            // Placeholder se não tiver dados
+            pu = 1; borracha = 1; 
+        }
+
+        chartInstSetor = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Marbe (PU Alta Performance)', 'SB (Borrachas)'],
+                datasets: [{
+                    data: [pu, borracha],
+                    backgroundColor: ['#8b5cf6', '#f97316'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { font: { family: 'Inter' } } }
+                }
+            }
+        });
+    }
+
+    function atualizarGraficoPerdas(motivos) {
+        const ctx = document.getElementById('chartPerdas').getContext('2d');
+        if (chartInstPerdas) chartInstPerdas.destroy();
+
+        let labels = Object.keys(motivos);
+        let dados = Object.values(motivos);
+
+        chartInstPerdas = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Orçamentos Perdidos',
+                    data: dados,
+                    backgroundColor: '#dc2626',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    }
+
+</script>
+</body>
+</html>
