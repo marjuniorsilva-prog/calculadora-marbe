@@ -36,7 +36,7 @@
           if (!window.marbeDB.orçamentos) window.marbeDB.orçamentos = [];
           if (!window.marbeDB.pedidos) window.marbeDB.pedidos = [];
           if (!window.marbeDB.expedidos) window.marbeDB.expedidos = [];
-          if (!window.marbeDB.leads) window.marbeDB.leads = []; // Nova base de contatos iniciais
+          if (!window.marbeDB.leads) window.marbeDB.leads = []; 
           renderKanban();
       }
     });
@@ -60,7 +60,7 @@
       --success: #10b981; --danger: #ef4444; --info: #0ea5e9; --warning: #f59e0b;
       --bg-color: #f8fafc; --card-bg: #ffffff; --border: #e2e8f0; 
       --text-main: #334155; --text-muted: #64748b;
-      --frio: #0ea5e9; --morno: #f59e0b; --quente: #ef4444; --pendente: #3b82f6; --perdido: #64748b;
+      --frio: #0ea5e9; --morno: #f59e0b; --quente: #ef4444; --pendente: #3b82f6; --perdido: #64748b; --lead: #8b5cf6;
       --sidebar-width: 260px; --sidebar-collapsed: 70px; --header-height: 70px; --border-radius: 10px;
     }
     
@@ -125,7 +125,7 @@
     .global-panel .qtd-label { font-size: 12px; color: #cbd5e1; }
 
     .kanban-board { display: flex; gap: 15px; overflow-x: auto; padding-bottom: 10px; align-items: flex-start; }
-    .kanban-col { flex: 1; min-width: 300px; background: #e2e8f0; padding: 12px; border-radius: 10px; display: flex; flex-direction: column; gap: 12px; }
+    .kanban-col { flex: 1; min-width: 300px; background: #e2e8f0; padding: 12px; border-radius: 10px; display: flex; flex-direction: column; gap: 12px; transition: all 0.3s ease; }
     .kanban-header { font-weight: 700; font-size: 14px; text-transform: uppercase; padding-bottom: 10px; border-bottom: 2px solid rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
     
     .col-pendente .kanban-header { color: var(--pendente); }
@@ -197,6 +197,11 @@
           </button>
           <button class="tab-btn active" onclick="window.location.href='crm.html'">
               <i data-lucide="pie-chart"></i> <span>CRM Vendas</span>
+          </button>
+
+          <div class="nav-label">Consultas e Dados</div>
+          <button class="tab-btn" onclick="window.location.href='pesquisa_descricao.html'">
+              <i data-lucide="search"></i> <span>Pesquisa Avançada</span>
           </button>
 
           <div class="nav-label">Operação & Fábrica</div>
@@ -292,11 +297,35 @@
               </div>
           </div>
 
+          <!-- PAINEL DE VISÃO (Toggles de Colunas) -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:15px;">
+              <h3 style="color:var(--primary); margin:0; font-size:16px;">Controle de Visão (Funil)</h3>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                  <button class="btn btn-outline" id="btnTogLead" onclick="toggleCol('colunaLead', 'btnTogLead')" style="padding:8px 12px; font-size:11px; background:white; color:var(--primary);">
+                      <i data-lucide="eye" style="width:14px;"></i> <span>ENTRADA</span>
+                  </button>
+                  <button class="btn btn-outline" id="btnTogPendente" onclick="toggleCol('colunaPendente', 'btnTogPendente')" style="padding:8px 12px; font-size:11px; background:white; color:var(--pendente);">
+                      <i data-lucide="eye" style="width:14px;"></i> <span>PENDENTES</span>
+                  </button>
+                  <button class="btn btn-outline" id="btnTogFrio" onclick="toggleCol('colunaFrio', 'btnTogFrio')" style="padding:8px 12px; font-size:11px; background:white; color:var(--frio);">
+                      <i data-lucide="eye" style="width:14px;"></i> <span>FRIOS</span>
+                  </button>
+                  <button class="btn btn-outline" id="btnTogMorno" onclick="toggleCol('colunaMorno', 'btnTogMorno')" style="padding:8px 12px; font-size:11px; background:white; color:var(--morno);">
+                      <i data-lucide="eye" style="width:14px;"></i> <span>MORNOS</span>
+                  </button>
+                  <button class="btn btn-outline" id="btnTogQuente" onclick="toggleCol('colunaQuente', 'btnTogQuente')" style="padding:8px 12px; font-size:11px; background:white; color:var(--quente);">
+                      <i data-lucide="eye" style="width:14px;"></i> <span>QUENTES</span>
+                  </button>
+                  <button class="btn btn-outline" id="btnTogPerdidos" onclick="toggleCol('colunaPerdidos', 'btnTogPerdidos')" style="padding:8px 12px; font-size:11px; background:white; color:var(--text-muted); opacity:0.6;">
+                      <i data-lucide="eye-off" style="width:14px;"></i> <span>PERDIDOS</span>
+                  </button>
+              </div>
+          </div>
+
           <!-- KANBAN BOARD -->
           <div class="kanban-board">
               
-              <!-- NOVA COLUNA: Caixa de Entrada (Leads / WhatsApp) -->
-              <div class="kanban-col col-lead" style="background: #f1f5f9; border: 1px dashed #cbd5e1;">
+              <div class="kanban-col col-lead" id="colunaLead" style="background: #f1f5f9; border: 1px dashed #cbd5e1; display:flex;">
                   <div class="kanban-header" style="color: var(--primary);">
                       📥 Entrada (Whats) <span id="countLead">0</span>
                   </div>
@@ -306,24 +335,25 @@
                   <div id="colLeadContent"></div>
               </div>
 
-              <!-- COLUNAS NORMAIS -->
-              <div class="kanban-col col-pendente">
+              <div class="kanban-col col-pendente" id="colunaPendente" style="display:flex;">
                   <div class="kanban-header">📋 Pendentes <span id="countPendente">0</span></div>
                   <div id="colPendenteContent"></div>
               </div>
-              <div class="kanban-col col-frio">
+              <div class="kanban-col col-frio" id="colunaFrio" style="display:flex;">
                   <div class="kanban-header">🧊 Frios <span id="countFrio">0</span></div>
                   <div id="colFrioContent"></div>
               </div>
-              <div class="kanban-col col-morno">
+              <div class="kanban-col col-morno" id="colunaMorno" style="display:flex;">
                   <div class="kanban-header">🔥 Mornos <span id="countMorno">0</span></div>
                   <div id="colMornoContent"></div>
               </div>
-              <div class="kanban-col col-quente">
+              <div class="kanban-col col-quente" id="colunaQuente" style="display:flex;">
                   <div class="kanban-header">🧨 Quentes <span id="countQuente">0</span></div>
                   <div id="colQuenteContent"></div>
               </div>
-              <div class="kanban-col col-perdido">
+              
+              <!-- Coluna Perdidos inicia oculta (display:none) por padrão -->
+              <div class="kanban-col col-perdido" id="colunaPerdidos" style="display: none;">
                   <div class="kanban-header">❌ Perdidos <span id="countPerdido">0</span></div>
                   <div id="colPerdidoContent"></div>
               </div>
@@ -410,6 +440,24 @@
     lucide.createIcons();
     let idxAcao = null;
 
+    // ----- FUNÇÃO NOVA: TOGGLE INTELIGENTE (Painel de Visão Flexbox) -----
+    window.toggleCol = function(colId, btnId) {
+        let col = document.getElementById(colId);
+        let btn = document.getElementById(btnId);
+        let icon = btn.querySelector('i');
+
+        if(col.style.display === 'none') {
+            col.style.display = 'flex';
+            btn.style.opacity = '1';
+            icon.setAttribute('data-lucide', 'eye');
+        } else {
+            col.style.display = 'none';
+            btn.style.opacity = '0.6';
+            icon.setAttribute('data-lucide', 'eye-off');
+        }
+        lucide.createIcons();
+    };
+
     // ----- NOVAS FUNÇÕES PARA LEADS (WhatsApp) -----
     window.abrirModalLead = function() {
         document.getElementById('leadNome').value = '';
@@ -442,9 +490,8 @@
         if(motivo) {
             let lead = window.marbeDB.leads[index];
             
-            // Converte o Lead em um "Orçamento Perdido" para ir pro Mapa de Perdas
             let orcPerdido = {
-                os: "CONTATO", // Não consome numeração oficial
+                os: "CONTATO", 
                 cliente: lead.nome,
                 contato: lead.nome,
                 telefone: lead.telefone,
@@ -468,14 +515,14 @@
         if(!confirm("Gerar uma Ordem de Serviço oficial para este contato? (Isso consumirá um número de OS sequencial).")) return;
         
         let lead = window.marbeDB.leads[index];
-        let novaOS = window.marbeDB.os++; // Consome a sequência oficial da fábrica
+        let novaOS = window.marbeDB.os++; 
         
         let orcOficial = {
             os: novaOS,
             cliente: lead.nome,
             contato: lead.nome,
             telefone: lead.telefone,
-            itens: [], // Fica vazio pro usuário preencher no ERP Principal
+            itens: [], 
             total: 0,
             frete: "POR CONTA DO CLIENTE",
             prazo: "10 DIAS ÚTEIS",
@@ -493,8 +540,6 @@
         renderKanban();
         alert(`Sucesso! Contato virou a OS Oficial Nº ${novaOS}.\nAcesse o ERP Principal e busque por essa OS para incluir as medidas e valores.`);
     };
-    // ------------------------------------------------
-
 
     window.limparFiltrosCRM = function() {
         document.getElementById('filtroDataIni').value = '';
@@ -528,7 +573,6 @@
             return exibir;
         };
 
-        // Renderiza Caixa de Entrada (Leads)
         let leadsHtml = ''; let cLead = 0;
         (window.marbeDB.leads || []).forEach((lead, index) => {
             cLead++;
@@ -548,7 +592,6 @@
         document.getElementById('colLeadContent').innerHTML = leadsHtml || '<div style="font-size:12px; color:var(--text-muted); text-align:center;">Nenhum contato</div>';
         document.getElementById('countLead').innerText = cLead;
 
-        // Renderiza Orçamentos e Restante
         (window.marbeDB.orçamentos || []).forEach((orc, index) => {
             if (!verificaFiltro(orc)) return;
             if (orc.os !== "CONTATO") { vGlobal += (orc.total || 0); cGlobal++; }
