@@ -135,6 +135,8 @@
           <div class="nav-label">Comercial</div>
           <button class="tab-btn" onclick="window.location.href='index.html'"><i data-lucide="calculator"></i> <span>Calculadora</span></button>
           <button class="tab-btn" onclick="window.location.href='crm.html'"><i data-lucide="pie-chart"></i> <span>CRM Vendas</span></button>
+          <div class="nav-label">Consultas e Dados</div>
+          <button class="tab-btn" onclick="window.location.href='pesquisa_descricao.html'"><i data-lucide="search"></i> <span>Pesquisa Avançada</span></button>
           <div class="nav-label">Operação & Fábrica</div>
           <button class="tab-btn" onclick="window.location.href='pedido_entregue.html'"><i data-lucide="package-check"></i> <span>Expedição</span></button>
           <div class="nav-label">Administração</div>
@@ -163,14 +165,37 @@
               <button class="btn" onclick="renderDashboard()"><i data-lucide="refresh-cw" style="width:16px; display:inline-block; vertical-align:middle; margin-right:5px;"></i> ATUALIZAR DADOS</button>
           </div>
 
+          <!-- DADOS TOTAIS DO PERÍODO -->
           <div class="dash-grid-top">
               <div class="dash-card" style="--primary: var(--success);"><h3>Vendas Fechadas (Pedidos)</h3><div class="value" id="kpiFaturamento">R$ 0,00</div><div class="sub-value" id="kpiQtdPedidos">0 OSs aprovadas na fábrica</div></div>
               <div class="dash-card" style="--primary: var(--info);"><h3>Ticket Médio</h3><div class="value" id="kpiTicket">R$ 0,00</div><div class="sub-value">Valor médio por Ordem de Serviço</div></div>
               <div class="dash-card" style="--primary: var(--warning);"><h3>Funil Ativo (CRM)</h3><div class="value" id="kpiFunil">R$ 0,00</div><div class="sub-value" id="kpiQtdFunil">0 orçamentos em aberto</div></div>
-              <div class="dash-card" style="--primary: #8b5cf6;"><h3>Taxa de Conversão</h3><div class="value" id="kpiConversao">0%</div><div class="sub-value">Sucesso nas negociações do mês</div></div>
+              <div class="dash-card" style="--primary: #ef4444;"><h3>Taxa de Conversão</h3><div class="value" id="kpiConversao">0%</div><div class="sub-value">Sucesso nas negociações do mês</div></div>
           </div>
 
-          <div class="chart-grid">
+          <!-- NOVA SESSÃO: VALOR EM PRODUÇÃO (MARBE VS SB) -->
+          <h3 style="color:var(--primary); margin: 30px 0 15px; font-size:16px; display: flex; align-items: center; gap: 8px;">
+              <i data-lucide="factory" style="width:20px; color:var(--text-muted)"></i> Status do Chão de Fábrica (Carteira Atual em Produção)
+          </h3>
+          <div class="dash-grid-top" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
+              <div class="dash-card" style="--primary: #8b5cf6; border-left-width: 4px; border-left-style: solid; border-left-color: #8b5cf6;">
+                  <h3>Marbe (PU)</h3>
+                  <div class="value" id="kpiProdMarbe" style="color:#8b5cf6;">R$ 0,00</div>
+                  <div class="sub-value" id="kpiQtdMarbe">0 OS(s) na fábrica</div>
+              </div>
+              <div class="dash-card" style="--primary: #f97316; border-left-width: 4px; border-left-style: solid; border-left-color: #f97316;">
+                  <h3>SB (Borrachas)</h3>
+                  <div class="value" id="kpiProdSB" style="color:#f97316;">R$ 0,00</div>
+                  <div class="sub-value" id="kpiQtdSB">0 OS(s) na fábrica</div>
+              </div>
+              <div class="dash-card" style="--primary: var(--dark); border-left-width: 4px; border-left-style: solid; border-left-color: var(--dark);">
+                  <h3>Total da Carteira em Máquina</h3>
+                  <div class="value" id="kpiProdTotal" style="color:var(--dark);">R$ 0,00</div>
+                  <div class="sub-value">Soma geral de tudo que está no PCP</div>
+              </div>
+          </div>
+
+          <div class="chart-grid" style="margin-top: 30px;">
               <div class="chart-container"><h3>Faturamento: Marbe (PU) vs SB Borrachas</h3><div class="chart-wrapper"><canvas id="chartSetor"></canvas></div></div>
               <div class="chart-container"><h3>Top 5 Clientes (Curva A)</h3><ul class="ranking-list" id="listaTopClientes"></ul></div>
               <div class="chart-container"><h3>Análise de Perdas (Recusas)</h3><div class="chart-wrapper"><canvas id="chartPerdas"></canvas></div></div>
@@ -199,9 +224,37 @@
 
         let dataIniStr = inputIni.value; let dataFimStr = inputFim.value;
         let totalFaturamento = 0; let qtdPedidos = 0; let fatMarbePU = 0; let fatSBBorrachas = 0; let clientesMap = {};
-        let totalFunilAtivo = 0; let qtdFunil = 0; let orcamentosPerdidos = 0; let motivosPerda = { "Preço": 0, "Prazo": 0, "Frete": 0, "Cancelado": 0, "Outro": 0 };
+        let totalFunilAtivo = 0; let qtdFunil = 0; let orcamentosPerdidos = 0; let motivosPerda = { "Preço": 0, "Prazo": 0, "Frete": 0, "Fora de Linha": 0, "Cancelado": 0, "Outro": 0 };
         let dreEntradas = 0; let dreSaidas = 0;
 
+        // ----- CÁLCULO DA PRODUÇÃO ATUAL (SEM FILTRO DE DATA) -----
+        let prodMarbePU = 0; let qtdMarbePU = 0;
+        let prodSBBorrachas = 0; let qtdSBBorrachas = 0;
+
+        (window.marbeDB.pedidos || []).forEach(p => {
+            let valorOS = p.total || 0;
+            let isPU = false;
+            (p.itens || []).forEach(it => { 
+                let tCheck = ((it.n || '') + (it.mat || '')).toUpperCase(); 
+                if (tCheck.includes('PU') || tCheck.includes('POLIURETANO')) isPU = true; 
+            });
+            if (isPU) { 
+                prodMarbePU += valorOS; 
+                qtdMarbePU++; 
+            } else { 
+                prodSBBorrachas += valorOS; 
+                qtdSBBorrachas++; 
+            }
+        });
+
+        document.getElementById('kpiProdMarbe').innerText = window.fmtMoney(prodMarbePU);
+        document.getElementById('kpiQtdMarbe').innerText = `${qtdMarbePU} OS(s) na fábrica`;
+        document.getElementById('kpiProdSB').innerText = window.fmtMoney(prodSBBorrachas);
+        document.getElementById('kpiQtdSB').innerText = `${qtdSBBorrachas} OS(s) na fábrica`;
+        document.getElementById('kpiProdTotal').innerText = window.fmtMoney(prodMarbePU + prodSBBorrachas);
+        // --------------------------------------------------------
+
+        // CÁLCULO DE FATURAMENTO (COM FILTRO DE DATA)
         let basePedidos = (window.marbeDB.pedidos || []).concat(window.marbeDB.expedidos || []);
         basePedidos.forEach(p => {
             let exibir = true;
@@ -220,12 +273,23 @@
             }
         });
 
+        // CÁLCULO DO CRM
         (window.marbeDB.orçamentos || []).forEach(orc => {
             let exibir = true;
             if (dataIniStr && dataFimStr) {
                 let d = orc.data_criacao ? orc.data_criacao.substring(0, 10) : '';
                 if (d && (d < dataIniStr || d > dataFimStr)) exibir = false;
             }
+            // Pula os leads (os="CONTATO")
+            if(orc.os === "CONTATO" && orc.crm_status === 'perdido') {
+                if(exibir) {
+                    orcamentosPerdidos++;
+                    let mot = orc.crm_motivo || 'Outro';
+                    if (motivosPerda[mot] !== undefined) motivosPerda[mot]++; else motivosPerda['Outro']++;
+                }
+                return;
+            }
+
             if (exibir) {
                 let st = orc.crm_status || 'pendente';
                 if (st === 'perdido') {
@@ -235,9 +299,11 @@
             }
         });
 
+        // CÁLCULO FINANCEIRO DRE
         (window.marbeDB.financeiro || []).forEach(f => { if (f.pago && f.dataRecebimento >= dataIniStr && f.dataRecebimento <= dataFimStr) dreEntradas += f.valor; });
         (window.marbeDB.fin_despesas || []).forEach(d => { if (d.pago && d.dataPagamento >= dataIniStr && d.dataPagamento <= dataFimStr) dreSaidas += d.valor; });
 
+        // ATUALIZA DOM
         document.getElementById('kpiFaturamento').innerText = window.fmtMoney(totalFaturamento);
         document.getElementById('kpiQtdPedidos').innerText = `${qtdPedidos} OSs aprovadas na fábrica`;
         let ticket = qtdPedidos > 0 ? (totalFaturamento / qtdPedidos) : 0;
