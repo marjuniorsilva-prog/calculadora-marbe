@@ -31,6 +31,10 @@
 
     let hoje = new Date(); let primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
     
+    // Configura o motor de gráficos para o Dark Mode
+    Chart.defaults.color = '#94a3b8';
+    Chart.defaults.borderColor = '#334155';
+
     document.addEventListener("DOMContentLoaded", () => {
         document.getElementById('filtroDataIni').value = primeiroDia.toISOString().split('T')[0];
         document.getElementById('filtroDataFim').value = hoje.toISOString().split('T')[0];
@@ -50,11 +54,17 @@
 
   <style>
     :root { 
-      --primary: #0f172a; --primary-hover: #1e293b; --accent: #2563eb;
+      --bg-color: #0f172a;        
+      --card-bg: #1e293b;         
+      --border: #334155;          
+      --text-main: #f8fafc;       
+      --text-muted: #94a3b8;      
+      --sidebar-bg: #020617;      
+      
+      --primary: #3b82f6; --primary-hover: #2563eb; --accent: #3b82f6; --accent-hover: #2563eb;
       --success: #10b981; --danger: #ef4444; --info: #0ea5e9; --warning: #f59e0b;
-      --bg-color: #f8fafc; --card-bg: #ffffff; --border: #e2e8f0; 
-      --text-main: #334155; --text-muted: #64748b;
-      --sidebar-width: 260px; --sidebar-collapsed: 70px; --header-height: 70px;
+      
+      --sidebar-width: 280px; --sidebar-collapsed: 80px; --header-height: 70px; --border-radius: 12px;
     }
     
     * { box-sizing: border-box; }
@@ -62,65 +72,74 @@
     
     .app-layout { display: flex; height: 100vh; overflow: hidden; }
     
-    /* Sidebar */
-    .sidebar { width: var(--sidebar-width); background: var(--primary); color: #fff; display: flex; flex-direction: column; transition: width 0.3s ease; flex-shrink: 0; z-index: 50; }
+    /* SIDEBAR UNIFICADA */
+    .sidebar { width: var(--sidebar-width); background: var(--sidebar-bg); color: #fff; display: flex; flex-direction: column; transition: width 0.3s ease; flex-shrink: 0; z-index: 50; border-right: 1px solid var(--border); }
     .sidebar.collapsed { width: var(--sidebar-collapsed); }
-    .sidebar-brand { height: var(--header-height); display: flex; align-items: center; padding: 0 20px; font-size: 18px; font-weight: 800; border-bottom: 1px solid rgba(255,255,255,0.1); white-space: nowrap; overflow: hidden; }
-    .sidebar-brand i { margin-right: 12px; color: var(--accent); }
-    .sidebar-nav { flex: 1; overflow-y: auto; padding: 15px 10px; display: flex; flex-direction: column; gap: 4px; }
-    .nav-label { font-size: 11px; color: #94a3b8; font-weight: 600; text-transform: uppercase; padding: 10px; margin-top: 10px; }
+    .sidebar-brand { height: var(--header-height); display: flex; align-items: center; padding: 0 25px; font-size: 20px; font-weight: 800; border-bottom: 1px solid var(--border); letter-spacing: -0.5px; white-space: nowrap; overflow: hidden; flex-shrink: 0;}
+    .sidebar-brand i { margin-right: 15px; color: var(--accent); width: 24px; height: 24px; }
+    
+    .sidebar-nav { flex: 1; overflow-y: auto; padding: 20px 15px; display: flex; flex-direction: column; }
+    .sidebar-nav::-webkit-scrollbar { width: 4px; }
+    .sidebar-nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    
+    .nav-label { font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; margin: 15px 0 8px 10px; letter-spacing: 1px; white-space: nowrap; overflow: hidden; }
     .sidebar.collapsed .nav-label { display: none; }
-    .tab-btn { display: flex; align-items: center; padding: 12px 10px; color: #cbd5e1; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 14px; transition: all 0.2s; white-space: nowrap; border: none; background: transparent; width: 100%; cursor: pointer; text-align: left; }
-    .tab-btn i { width: 20px; height: 20px; margin-right: 15px; flex-shrink: 0; }
-    .tab-btn:hover { background: rgba(255,255,255,0.05); color: #fff; }
-    .tab-btn.active { background: var(--accent); color: #fff; font-weight: 600; }
+    
+    .tab-btn { display: flex; align-items: center; padding: 12px 15px; color: #94a3b8; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 14px; transition: all 0.2s; white-space: nowrap; border: none; background: transparent; width: 100%; cursor: pointer; text-align: left; margin-bottom: 4px; }
+    .tab-btn i { width: 20px; height: 20px; margin-right: 15px; flex-shrink: 0; color: #64748b; transition: 0.2s; }
+    .tab-btn:hover { background: rgba(255,255,255,0.05); color: #f8fafc; }
+    .tab-btn:hover i { color: #f8fafc; }
+    .tab-btn.active { background: var(--accent); color: #fff; font-weight: 600; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2); }
+    .tab-btn.active i { color: #fff; }
+    .tab-btn span { transition: opacity 0.2s; }
     .sidebar.collapsed .tab-btn span { display: none; }
-    .sidebar.collapsed .tab-btn { justify-content: center; padding: 12px 0; }
+    .sidebar.collapsed .tab-btn { justify-content: center; padding: 15px 0; }
     .sidebar.collapsed .tab-btn i { margin-right: 0; }
 
-    /* Main Content */
+    /* HEADER */
     .main-wrapper { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-    .topbar { height: var(--header-height); background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 25px; flex-shrink: 0; }
+    .topbar { height: var(--header-height); background: var(--card-bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; flex-shrink: 0; }
     .topbar-left { display: flex; align-items: center; gap: 20px; }
-    .btn-toggle { background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 6px; }
-    .view-title { font-size: 18px; font-weight: 700; color: var(--primary); margin: 0; }
+    .btn-toggle { background: transparent; border: none; color: var(--text-main); cursor: pointer; padding: 8px; border-radius: 8px; }
+    .btn-toggle:hover { background: var(--bg-color); }
+    .view-title { font-size: 24px; font-weight: 700; color: var(--text-main); margin: 0; }
     
     .topbar-right { display: flex; align-items: center; gap: 20px; }
-    .user-profile { display: flex; align-items: center; gap: 10px; padding: 6px 12px; background: var(--bg-color); border-radius: 20px; border: 1px solid var(--border); }
-    .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
+    .user-profile { display: flex; align-items: center; gap: 12px; padding: 6px 16px; background: var(--bg-color); border-radius: 20px; border: 1px solid var(--border); }
+    .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
     .user-info { display: flex; flex-direction: column; }
-    .user-name { font-size: 13px; font-weight: 600; color: var(--primary); }
-    .user-role { font-size: 11px; color: var(--text-muted); }
+    .user-name { font-size: 14px; font-weight: 600; color: var(--text-main); }
+    .user-role { font-size: 12px; color: var(--text-muted); }
 
-    .content-area { flex: 1; overflow-y: auto; padding: 30px; background: var(--bg-color); }
+    .content-area { flex: 1; overflow-y: auto; padding: 35px; background: var(--bg-color); }
     
-    .btn { padding: 12px 20px; background: var(--accent); color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; }
-    .btn:hover { filter: brightness(1.1); }
+    .btn { padding: 14px 20px; background: var(--accent); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap:8px;}
+    .btn:hover { filter: brightness(1.1); transform:translateY(-1px); }
 
-    .dash-grid-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; }
-    .dash-card { background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative; overflow: hidden; }
-    .dash-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--primary); }
-    .dash-card h3 { margin: 0 0 8px 0; font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
-    .dash-card .value { font-size: 28px; font-weight: 800; color: var(--dark); }
-    .dash-card .sub-value { font-size: 12px; color: var(--text-muted); margin-top: 5px; font-weight: 500; }
+    .dash-grid-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 25px; }
+    .dash-card { background: var(--card-bg); padding: 25px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); position: relative; overflow: hidden; }
+    .dash-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--primary); }
+    .dash-card h3 { margin: 0 0 10px 0; font-size: 13px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
+    .dash-card .value { font-size: 32px; font-weight: 800; color: var(--text-main); }
+    .dash-card .sub-value { font-size: 13px; color: var(--text-muted); margin-top: 8px; font-weight: 500; }
 
-    .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+    .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 25px; }
     @media (max-width: 768px) { .chart-grid { grid-template-columns: 1fr; } }
     
-    .chart-container { background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    .chart-container h3 { margin-top: 0; margin-bottom: 15px; color: var(--dark); font-size: 15px; font-weight: 700; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+    .chart-container { background: var(--card-bg); padding: 25px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .chart-container h3 { margin-top: 0; margin-bottom: 20px; color: var(--text-main); font-size: 16px; font-weight: 700; border-bottom: 1px solid var(--border); padding-bottom: 15px; }
 
-    .chart-wrapper { position: relative; height: 250px; max-height: 250px; width: 100%; overflow: hidden; }
-    canvas { max-height: 250px !important; }
+    .chart-wrapper { position: relative; height: 280px; max-height: 280px; width: 100%; overflow: hidden; }
+    canvas { max-height: 280px !important; }
 
     .ranking-list { list-style: none; padding: 0; margin: 0; }
-    .ranking-list li { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px dashed var(--border); font-size: 13px; }
+    .ranking-list li { display: flex; justify-content: space-between; padding: 15px 0; border-bottom: 1px dashed var(--border); font-size: 14px; }
     .ranking-list li:last-child { border-bottom: none; }
-    .rank-name { font-weight: 600; color: var(--dark); }
-    .rank-val { font-weight: 700; color: var(--success); }
+    .rank-name { font-weight: 600; color: var(--text-main); }
+    .rank-val { font-weight: 800; color: var(--success); }
 
-    input[type="date"] { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-family: 'Inter'; outline: none; }
-    input[type="date"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    input[type="date"] { padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-family: 'Inter'; outline: none; background: var(--bg-color); color: var(--text-main); }
+    input[type="date"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
   </style>
 </head>
 <body>
@@ -159,53 +178,53 @@
       </header>
 
       <div class="content-area">
-          <div style="background:var(--card-bg); padding:15px 20px; border-radius:12px; border:1px solid var(--border); margin-bottom:20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;">
-              <div><label style="display:block; font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:5px;">Data Início (OS)</label><input type="date" id="filtroDataIni"></div>
-              <div><label style="display:block; font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:5px;">Data Fim (OS)</label><input type="date" id="filtroDataFim"></div>
-              <button class="btn" onclick="renderDashboard()"><i data-lucide="refresh-cw" style="width:16px; display:inline-block; vertical-align:middle; margin-right:5px;"></i> ATUALIZAR DADOS</button>
+          <div style="background:var(--card-bg); padding:20px 25px; border-radius:12px; border:1px solid var(--border); margin-bottom:25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-end;">
+              <div><label style="display:block; font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:8px;">Data Início (OS)</label><input type="date" id="filtroDataIni"></div>
+              <div><label style="display:block; font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:8px;">Data Fim (OS)</label><input type="date" id="filtroDataFim"></div>
+              <button class="btn" onclick="renderDashboard()"><i data-lucide="refresh-cw" style="width:18px;"></i> ATUALIZAR DADOS</button>
           </div>
 
           <!-- DADOS TOTAIS DO PERÍODO -->
           <div class="dash-grid-top">
-              <div class="dash-card" style="--primary: var(--success);"><h3>Vendas Fechadas (Pedidos)</h3><div class="value" id="kpiFaturamento">R$ 0,00</div><div class="sub-value" id="kpiQtdPedidos">0 OSs aprovadas na fábrica</div></div>
-              <div class="dash-card" style="--primary: var(--info);"><h3>Ticket Médio</h3><div class="value" id="kpiTicket">R$ 0,00</div><div class="sub-value">Valor médio por Ordem de Serviço</div></div>
-              <div class="dash-card" style="--primary: var(--warning);"><h3>Funil Ativo (CRM)</h3><div class="value" id="kpiFunil">R$ 0,00</div><div class="sub-value" id="kpiQtdFunil">0 orçamentos em aberto</div></div>
-              <div class="dash-card" style="--primary: #ef4444;"><h3>Taxa de Conversão</h3><div class="value" id="kpiConversao">0%</div><div class="sub-value">Sucesso nas negociações do mês</div></div>
+              <div class="dash-card" style="--primary: var(--success);"><h3>Vendas Fechadas (Pedidos)</h3><div class="value" id="kpiFaturamento" style="color:var(--success)">R$ 0,00</div><div class="sub-value" id="kpiQtdPedidos">0 OSs aprovadas na fábrica</div></div>
+              <div class="dash-card" style="--primary: var(--info);"><h3>Ticket Médio</h3><div class="value" id="kpiTicket" style="color:var(--info)">R$ 0,00</div><div class="sub-value">Valor médio por Ordem de Serviço</div></div>
+              <div class="dash-card" style="--primary: var(--warning);"><h3>Funil Ativo (CRM)</h3><div class="value" id="kpiFunil" style="color:var(--warning)">R$ 0,00</div><div class="sub-value" id="kpiQtdFunil">0 orçamentos em aberto</div></div>
+              <div class="dash-card" style="--primary: var(--danger);"><h3>Taxa de Conversão</h3><div class="value" id="kpiConversao" style="color:var(--danger)">0%</div><div class="sub-value">Sucesso nas negociações do mês</div></div>
           </div>
 
-          <!-- NOVA SESSÃO: VALOR EM PRODUÇÃO (MARBE VS SB) -->
-          <h3 style="color:var(--primary); margin: 30px 0 15px; font-size:16px; display: flex; align-items: center; gap: 8px;">
-              <i data-lucide="factory" style="width:20px; color:var(--text-muted)"></i> Status do Chão de Fábrica (Carteira Atual em Produção)
+          <!-- STATUS DO CHÃO DE FÁBRICA -->
+          <h3 style="color:var(--text-main); margin: 35px 0 20px; font-size:18px; display: flex; align-items: center; gap: 10px;">
+              <i data-lucide="factory" style="width:24px; color:var(--text-muted)"></i> Status do Chão de Fábrica (Carteira Atual)
           </h3>
           <div class="dash-grid-top" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
-              <div class="dash-card" style="--primary: #8b5cf6; border-left-width: 4px; border-left-style: solid; border-left-color: #8b5cf6;">
-                  <h3>Marbe (PU)</h3>
+              <div class="dash-card" style="--primary: #8b5cf6;">
+                  <h3>Marbe (PU Alta Performance)</h3>
                   <div class="value" id="kpiProdMarbe" style="color:#8b5cf6;">R$ 0,00</div>
                   <div class="sub-value" id="kpiQtdMarbe">0 OS(s) na fábrica</div>
               </div>
-              <div class="dash-card" style="--primary: #f97316; border-left-width: 4px; border-left-style: solid; border-left-color: #f97316;">
+              <div class="dash-card" style="--primary: #f97316;">
                   <h3>SB (Borrachas)</h3>
                   <div class="value" id="kpiProdSB" style="color:#f97316;">R$ 0,00</div>
                   <div class="sub-value" id="kpiQtdSB">0 OS(s) na fábrica</div>
               </div>
-              <div class="dash-card" style="--primary: var(--dark); border-left-width: 4px; border-left-style: solid; border-left-color: var(--dark);">
+              <div class="dash-card" style="--primary: #94a3b8;">
                   <h3>Total da Carteira em Máquina</h3>
-                  <div class="value" id="kpiProdTotal" style="color:var(--dark);">R$ 0,00</div>
-                  <div class="sub-value">Soma geral de tudo que está no PCP</div>
+                  <div class="value" id="kpiProdTotal" style="color:#f8fafc;">R$ 0,00</div>
+                  <div class="sub-value">Soma geral no PCP</div>
               </div>
           </div>
 
-          <div class="chart-grid" style="margin-top: 30px;">
+          <div class="chart-grid" style="margin-top: 35px;">
               <div class="chart-container"><h3>Faturamento: Marbe (PU) vs SB Borrachas</h3><div class="chart-wrapper"><canvas id="chartSetor"></canvas></div></div>
               <div class="chart-container"><h3>Top 5 Clientes (Curva A)</h3><ul class="ranking-list" id="listaTopClientes"></ul></div>
               <div class="chart-container"><h3>Análise de Perdas (Recusas)</h3><div class="chart-wrapper"><canvas id="chartPerdas"></canvas></div></div>
-              <div class="chart-container">
-                  <h3>Saúde Financeira do Período</h3>
-                  <div style="margin-top: 15px;">
-                      <div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span style="color:var(--text-muted); font-weight:600;">(+) Dinheiro Recebido Real:</span><span style="color:var(--success); font-weight:700;" id="dreEntradas">R$ 0,00</span></div>
-                      <div style="display:flex; justify-content:space-between; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--border);"><span style="color:var(--text-muted); font-weight:600;">(-) Despesas Pagas Reais:</span><span style="color:var(--danger); font-weight:700;" id="dreSaidas">R$ 0,00</span></div>
-                      <div style="display:flex; justify-content:space-between;"><span style="color:var(--dark); font-weight:800; font-size:16px;">(=) Saldo de Caixa:</span><span style="font-weight:800; font-size:18px;" id="dreSaldo">R$ 0,00</span></div>
-                      <p style="font-size:11px; color:var(--text-muted); margin-top:15px; font-style:italic;">*Baseado nas contas da aba Financeiro no período.</p>
+              <div class="chart-container" style="border: 1px solid var(--accent); box-shadow: 0 10px 25px rgba(59, 130, 246, 0.1);">
+                  <h3 style="color:var(--accent);">Saúde Financeira do Período</h3>
+                  <div style="margin-top: 20px;">
+                      <div style="display:flex; justify-content:space-between; margin-bottom:15px; font-size:15px;"><span style="color:var(--text-muted); font-weight:600;">(+) Dinheiro Recebido Real:</span><span style="color:var(--success); font-weight:700;" id="dreEntradas">R$ 0,00</span></div>
+                      <div style="display:flex; justify-content:space-between; margin-bottom:15px; padding-bottom:15px; border-bottom:1px solid var(--border); font-size:15px;"><span style="color:var(--text-muted); font-weight:600;">(-) Despesas Pagas Reais:</span><span style="color:var(--danger); font-weight:700;" id="dreSaidas">R$ 0,00</span></div>
+                      <div style="display:flex; justify-content:space-between; align-items:center;"><span style="color:var(--text-main); font-weight:800; font-size:18px;">(=) Saldo de Caixa:</span><span style="font-weight:800; font-size:24px;" id="dreSaldo">R$ 0,00</span></div>
+                      <p style="font-size:12px; color:var(--text-muted); margin-top:20px; font-style:italic;">*Baseado nas contas da aba Financeiro com status "PAGO".</p>
                   </div>
               </div>
           </div>
@@ -227,7 +246,6 @@
         let totalFunilAtivo = 0; let qtdFunil = 0; let orcamentosPerdidos = 0; let motivosPerda = { "Preço": 0, "Prazo": 0, "Frete": 0, "Fora de Linha": 0, "Cancelado": 0, "Outro": 0 };
         let dreEntradas = 0; let dreSaidas = 0;
 
-        // ----- CÁLCULO DA PRODUÇÃO ATUAL (SEM FILTRO DE DATA) -----
         let prodMarbePU = 0; let qtdMarbePU = 0;
         let prodSBBorrachas = 0; let qtdSBBorrachas = 0;
 
@@ -238,13 +256,8 @@
                 let tCheck = ((it.n || '') + (it.mat || '')).toUpperCase(); 
                 if (tCheck.includes('PU') || tCheck.includes('POLIURETANO')) isPU = true; 
             });
-            if (isPU) { 
-                prodMarbePU += valorOS; 
-                qtdMarbePU++; 
-            } else { 
-                prodSBBorrachas += valorOS; 
-                qtdSBBorrachas++; 
-            }
+            if (isPU) { prodMarbePU += valorOS; qtdMarbePU++; } 
+            else { prodSBBorrachas += valorOS; qtdSBBorrachas++; }
         });
 
         document.getElementById('kpiProdMarbe').innerText = window.fmtMoney(prodMarbePU);
@@ -252,9 +265,7 @@
         document.getElementById('kpiProdSB').innerText = window.fmtMoney(prodSBBorrachas);
         document.getElementById('kpiQtdSB').innerText = `${qtdSBBorrachas} OS(s) na fábrica`;
         document.getElementById('kpiProdTotal').innerText = window.fmtMoney(prodMarbePU + prodSBBorrachas);
-        // --------------------------------------------------------
 
-        // CÁLCULO DE FATURAMENTO (COM FILTRO DE DATA)
         let basePedidos = (window.marbeDB.pedidos || []).concat(window.marbeDB.expedidos || []);
         basePedidos.forEach(p => {
             let exibir = true;
@@ -273,14 +284,12 @@
             }
         });
 
-        // CÁLCULO DO CRM
         (window.marbeDB.orçamentos || []).forEach(orc => {
             let exibir = true;
             if (dataIniStr && dataFimStr) {
                 let d = orc.data_criacao ? orc.data_criacao.substring(0, 10) : '';
                 if (d && (d < dataIniStr || d > dataFimStr)) exibir = false;
             }
-            // Pula os leads (os="CONTATO")
             if(orc.os === "CONTATO" && orc.crm_status === 'perdido') {
                 if(exibir) {
                     orcamentosPerdidos++;
@@ -299,11 +308,9 @@
             }
         });
 
-        // CÁLCULO FINANCEIRO DRE
         (window.marbeDB.financeiro || []).forEach(f => { if (f.pago && f.dataRecebimento >= dataIniStr && f.dataRecebimento <= dataFimStr) dreEntradas += f.valor; });
         (window.marbeDB.fin_despesas || []).forEach(d => { if (d.pago && d.dataPagamento >= dataIniStr && d.dataPagamento <= dataFimStr) dreSaidas += d.valor; });
 
-        // ATUALIZA DOM
         document.getElementById('kpiFaturamento').innerText = window.fmtMoney(totalFaturamento);
         document.getElementById('kpiQtdPedidos').innerText = `${qtdPedidos} OSs aprovadas na fábrica`;
         let ticket = qtdPedidos > 0 ? (totalFaturamento / qtdPedidos) : 0;
@@ -327,7 +334,7 @@
         if (top5.length === 0) htmlCli = '<li style="color:var(--text-muted); justify-content:center;">Nenhum fechamento no período.</li>';
         top5.forEach((c, idx) => {
             let medalha = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : `${idx+1}º`));
-            htmlCli += `<li><div style="display:flex; align-items:center; gap:10px;"><span style="font-size:16px;">${medalha}</span><div style="display:flex; flex-direction:column;"><span class="rank-name">${c.nome.substring(0, 25)}</span><span style="font-size:10px; color:var(--text-muted);">${c.qtd} pedido(s)</span></div></div><span class="rank-val">${window.fmtMoney(c.valor)}</span></li>`;
+            htmlCli += `<li><div style="display:flex; align-items:center; gap:12px;"><span style="font-size:18px;">${medalha}</span><div style="display:flex; flex-direction:column;"><span class="rank-name">${c.nome.substring(0, 25)}</span><span style="font-size:11px; color:var(--text-muted); margin-top:3px;">${c.qtd} pedido(s)</span></div></div><span class="rank-val">${window.fmtMoney(c.valor)}</span></li>`;
         });
         document.getElementById('listaTopClientes').innerHTML = htmlCli;
 
@@ -345,7 +352,7 @@
         const ctx = document.getElementById('chartPerdas').getContext('2d');
         if (chartInstPerdas) chartInstPerdas.destroy();
         let labels = Object.keys(motivos); let dados = Object.values(motivos);
-        chartInstPerdas = new Chart(ctx, { type: 'bar', data: { labels: labels, datasets: [{ label: 'Orçamentos Perdidos', data: dados, backgroundColor: '#ef4444', borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, plugins: { legend: { display: false } } } });
+        chartInstPerdas = new Chart(ctx, { type: 'bar', data: { labels: labels, datasets: [{ label: 'Orçamentos Perdidos', data: dados, backgroundColor: '#ef4444', borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#334155' } }, x: { grid: { display: false } } }, plugins: { legend: { display: false } } } });
     }
 </script>
 </body>
