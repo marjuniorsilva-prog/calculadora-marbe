@@ -3,16 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Módulo Financeiro Oficial - ERP Marbe</title>
+  <title>Financeiro Oficial - ERP Marbe</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
-  <!-- Ícones -->
   <script src="https://unpkg.com/lucide@latest"></script>
   
-  <!-- Lógica Original (INTOCÁVEL) -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
@@ -72,7 +70,7 @@
     window.salvarNuvem = function(silencioso = false) { 
         set(ref(db, 'sistema/'), window.marbeDB)
             .then(() => { 
-                if(!silencioso) alert("Alterações financeiras salvas na nuvem com sucesso!");
+                if(!silencioso) alert("Alterações financeiras salvas com sucesso!");
             })
             .catch((error) => { alert("Erro ao salvar: " + error.message); });
     };
@@ -85,15 +83,20 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 
-  <!-- Design System / Enterprise UI -->
   <style>
     :root { 
-      --primary: #0f172a; --primary-hover: #1e293b; --accent: #2563eb; 
+      --bg-color: #0f172a;        
+      --card-bg: #1e293b;         
+      --border: #334155;          
+      --text-main: #f8fafc;       
+      --text-muted: #94a3b8;      
+      --sidebar-bg: #020617;      
+      
+      --primary: #3b82f6; --primary-hover: #2563eb; --accent: #3b82f6; --accent-hover: #2563eb;
       --success: #10b981; --danger: #ef4444; --info: #0ea5e9; --warning: #f59e0b;
       --comissao: #ea580c; --prod: #8b5cf6;
-      --bg-color: #f8fafc; --card-bg: #ffffff; --border: #e2e8f0; 
-      --text-main: #334155; --text-muted: #64748b;
-      --sidebar-width: 260px; --sidebar-collapsed: 70px; --header-height: 70px; --border-radius: 10px;
+      
+      --sidebar-width: 280px; --sidebar-collapsed: 80px; --header-height: 70px; --border-radius: 12px;
     }
     
     * { box-sizing: border-box; }
@@ -101,108 +104,135 @@
     
     .app-layout { display: flex; height: 100vh; overflow: hidden; }
     
-    /* Sidebar */
-    .sidebar { width: var(--sidebar-width); background: var(--primary); color: #fff; display: flex; flex-direction: column; transition: width 0.3s ease; flex-shrink: 0; z-index: 50; }
+    /* SIDEBAR */
+    .sidebar { width: var(--sidebar-width); background: var(--sidebar-bg); color: #fff; display: flex; flex-direction: column; transition: width 0.3s ease; flex-shrink: 0; z-index: 50; border-right: 1px solid var(--border); }
     .sidebar.collapsed { width: var(--sidebar-collapsed); }
-    .sidebar-brand { height: var(--header-height); display: flex; align-items: center; padding: 0 20px; font-size: 18px; font-weight: 800; border-bottom: 1px solid rgba(255,255,255,0.1); white-space: nowrap; overflow: hidden; }
-    .sidebar-brand i { margin-right: 12px; color: var(--accent); }
-    .sidebar-nav { flex: 1; overflow-y: auto; padding: 15px 10px; display: flex; flex-direction: column; gap: 4px; }
-    .nav-label { font-size: 11px; color: #94a3b8; font-weight: 600; text-transform: uppercase; padding: 10px; margin-top: 10px; }
+    .sidebar-brand { height: var(--header-height); display: flex; align-items: center; padding: 0 25px; font-size: 20px; font-weight: 800; border-bottom: 1px solid var(--border); letter-spacing: -0.5px; white-space: nowrap; overflow: hidden; flex-shrink: 0;}
+    .sidebar-brand i { margin-right: 15px; color: var(--accent); width: 24px; height: 24px; }
+    
+    .sidebar-nav { flex: 1; overflow-y: auto; padding: 20px 15px; display: flex; flex-direction: column; }
+    .sidebar-nav::-webkit-scrollbar { width: 4px; }
+    .sidebar-nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    
+    .nav-label { font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; margin: 15px 0 8px 10px; letter-spacing: 1px; white-space: nowrap; overflow: hidden; }
     .sidebar.collapsed .nav-label { display: none; }
-    .sidebar-btn { display: flex; align-items: center; padding: 12px 10px; color: #cbd5e1; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 14px; transition: all 0.2s; white-space: nowrap; border: none; background: transparent; width: 100%; cursor: pointer; text-align: left; }
-    .sidebar-btn i { width: 20px; height: 20px; margin-right: 15px; flex-shrink: 0; }
-    .sidebar-btn:hover { background: rgba(255,255,255,0.05); color: #fff; }
-    .sidebar-btn.active { background: var(--accent); color: #fff; font-weight: 600; }
-    .sidebar.collapsed .sidebar-btn span { display: none; }
-    .sidebar.collapsed .sidebar-btn { justify-content: center; padding: 12px 0; }
-    .sidebar.collapsed .sidebar-btn i { margin-right: 0; }
+    
+    .tab-btn { display: flex; align-items: center; padding: 12px 15px; color: #94a3b8; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 14px; transition: all 0.2s; white-space: nowrap; border: none; background: transparent; width: 100%; cursor: pointer; text-align: left; margin-bottom: 4px; }
+    .tab-btn i { width: 20px; height: 20px; margin-right: 15px; flex-shrink: 0; color: #64748b; transition: 0.2s; }
+    .tab-btn:hover { background: rgba(255,255,255,0.05); color: #f8fafc; }
+    .tab-btn:hover i { color: #f8fafc; }
+    .tab-btn.active { background: var(--accent); color: #fff; font-weight: 600; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2); }
+    .tab-btn.active i { color: #fff; }
+    .tab-btn span { transition: opacity 0.2s; }
+    .sidebar.collapsed .tab-btn span { display: none; }
+    .sidebar.collapsed .tab-btn { justify-content: center; padding: 15px 0; }
+    .sidebar.collapsed .tab-btn i { margin-right: 0; }
+    
+    .sidebar-footer { padding: 15px; border-top: 1px solid var(--border); flex-shrink: 0; }
 
-    /* Main Content */
     .main-wrapper { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-    .topbar { height: var(--header-height); background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 25px; flex-shrink: 0; }
+    
+    /* HEADER */
+    .topbar { height: var(--header-height); background: var(--card-bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; z-index: 40; flex-shrink: 0; }
     .topbar-left { display: flex; align-items: center; gap: 20px; }
-    .btn-toggle { background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 6px; }
-    .view-title { font-size: 18px; font-weight: 700; color: var(--primary); margin: 0; }
+    .btn-toggle { background: transparent; border: none; color: var(--text-main); cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 8px; padding: 8px; transition: 0.2s; }
+    .btn-toggle:hover { background: var(--bg-color); }
+    .view-title { font-size: 24px; font-weight: 700; color: var(--text-main); margin: 0; }
     
     .topbar-right { display: flex; align-items: center; gap: 20px; }
-    .user-profile { display: flex; align-items: center; gap: 10px; padding: 6px 12px; background: var(--bg-color); border-radius: 20px; border: 1px solid var(--border); }
-    .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
+    .user-profile { display: flex; align-items: center; gap: 12px; padding: 6px 16px; background: var(--bg-color); border-radius: 20px; border: 1px solid var(--border); cursor: pointer; }
+    .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
     .user-info { display: flex; flex-direction: column; }
-    .user-name { font-size: 13px; font-weight: 600; color: var(--primary); }
-    .user-role { font-size: 11px; color: var(--text-muted); }
+    .user-name { font-size: 14px; font-weight: 600; color: var(--text-main); }
+    .user-role { font-size: 12px; color: var(--text-muted); }
 
-    .content-area { flex: 1; overflow-y: auto; padding: 30px; background: var(--bg-color); }
+    .content-area { flex: 1; overflow-y: auto; padding: 35px; background: var(--bg-color); }
     
-    /* Sub-Tabs do Financeiro */
-    .sub-tabs { display: flex; gap: 10px; margin-bottom: 25px; flex-wrap: wrap; background: #fff; padding: 10px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid var(--border); }
+    /* SUB-TABS */
+    .sub-tabs { display: flex; gap: 10px; margin-bottom: 25px; flex-wrap: wrap; background: var(--card-bg); padding: 10px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
     .sub-tab-btn { flex: 1; padding: 12px 10px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; font-weight: 600; border-radius: 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s ease; min-width: 130px; }
     .sub-tab-btn:hover { background: var(--bg-color); color: var(--text-main); }
-    .sub-tab-btn.active { background: var(--success); color: white; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2); }
-    .sub-tab-btn.tab-comissao { border: 1px solid #fed7aa; color: var(--comissao); }
-    .sub-tab-btn.tab-comissao.active { background: var(--comissao); color: white; box-shadow: 0 4px 6px -1px rgba(234, 88, 12, 0.2); }
+    .sub-tab-btn.active { background: var(--success); color: white; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2); }
+    .sub-tab-btn.tab-comissao { border: 1px solid #7c2d12; color: var(--comissao); }
+    .sub-tab-btn.tab-comissao.active { background: var(--comissao); color: white; border-color: var(--comissao); }
     
-    .section { display: none; }
-    .section.active { display: block; animation: fadeIn 0.3s ease-out; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    .section { display: none; animation: fadeIn 0.3s ease-out; }
+    .section.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-    /* Cards e UI */
+    /* CARDS */
     .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
-    .dash-card { background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    .dash-card h3 { margin: 0 0 10px 0; font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-    .dash-card .value { font-size: 28px; font-weight: 800; color: var(--primary); }
+    .dash-card { background: var(--card-bg); padding: 25px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.1); position: relative; overflow: hidden; }
+    .dash-card h3 { margin: 0 0 10px 0; font-size: 13px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
+    .dash-card .value { font-size: 28px; font-weight: 800; color: var(--text-main); }
     
-    .card-list { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 15px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-left: 5px solid transparent; transition: transform 0.2s; }
+    .card-panel { background: var(--card-bg); padding: 30px; border-radius: var(--border-radius); border: 1px solid var(--border); margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .card-header { font-size: 15px; font-weight: 700; color: var(--accent); margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--border); text-transform: uppercase; display: flex; align-items: center; gap: 10px; }
+    .card-list { background: var(--bg-color); border: 1px solid var(--border); padding: 25px; border-radius: 12px; margin-bottom: 15px; border-left: 5px solid transparent; transition: transform 0.2s; }
+    .card-list:hover { transform: translateY(-2px); }
+    
     .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; align-items: end; }
     
-    label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
-    input, select { width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; box-sizing: border-box; font-family: 'Inter', sans-serif; background: #f8fafc; transition: all 0.2s; outline: none; }
-    input:focus, select:focus { border-color: var(--accent); background: #fff; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
-    input:disabled, select:disabled { cursor: not-allowed; background: #e2e8f0; }
+    label { display: block; margin-top: 0; font-weight: 600; font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+    input, select { width: 100%; padding: 14px 16px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; color: var(--text-main); font-family: 'Inter', sans-serif; transition: all 0.2s; background: var(--bg-color); margin-bottom: 15px; outline: none; }
+    input:focus, select:focus { border-color: var(--accent); background: var(--card-bg); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+    input:disabled, select:disabled { background: var(--border); color: var(--text-muted); opacity: 0.7; cursor: not-allowed; }
     
-    .btn { padding: 12px 20px; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; text-align: center; display: inline-flex; align-items: center; justify-content: center; gap: 8px; outline: none; }
+    .row { display: flex; gap: 20px; }
+    .col { flex: 1; min-width: 0; }
+    
+    .btn { padding: 14px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; outline: none; }
     .btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
-    
-    .badge { padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; text-transform: uppercase; }
-    .badge-alert { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
-    .badge-ok { background: #ecfdf5; color: #10b981; border: 1px solid #a7f3d0; }
+    .btn-outline { background: var(--card-bg); border: 1px solid var(--border); color: var(--text-main); }
+    .btn-outline:hover { background: var(--border); }
 
-    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 15px; background: white; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
-    table th { background: #f8fafc; border-bottom: 1px solid var(--border); padding: 14px; text-align: left; color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 11px; }
-    table td { padding: 14px; border-bottom: 1px solid var(--border); color: var(--text-main); }
-    table tr:last-child td { border-bottom: none; }
-    table tr:hover td { background-color: #f8fafc; }
+    .badge { padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; text-transform: uppercase; }
+    .badge-alert { background: #451a03; color: #fde68a; border: 1px solid #b45309; }
+    .badge-ok { background: #064e3b; color: #a7f3d0; border: 1px solid #047857; }
+
+    .table-container { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    table th { background: var(--bg-color); border-bottom: 1px solid var(--border); padding: 16px; text-align: left; font-weight: 600; color: var(--text-muted); text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; }
+    table td { border-bottom: 1px solid var(--border); padding: 16px; color: var(--text-main); vertical-align: middle; }
+    table tr:hover td { background-color: var(--bg-color); }
+
+    .status-badge { padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; display: inline-flex; align-items: center; gap: 4px; }
+    .status-pago { background: #064e3b; color: #6ee7b7; border: 1px solid #047857; }
+    .status-pendente { background: #451a03; color: #fcd34d; border: 1px solid #b45309; }
+    .status-atrasado { background: #7f1d1d; color: #fca5a5; border: 1px solid #b91c1c; }
 
     @media (max-width: 1024px) {
       .sidebar { position: fixed; height: 100%; transform: translateX(-100%); }
       .sidebar.open { transform: translateX(0); }
+      .row { flex-direction: column; gap: 0; }
     }
   </style>
 </head>
 <body>
 
 <div class="app-layout" id="appContainer">
-  <!-- SIDEBAR PADRÃO ERP -->
   <aside class="sidebar" id="sidebar">
       <div class="sidebar-brand"><i data-lucide="layers"></i><span>Marbe OS</span></div>
       <div class="sidebar-nav">
           <div class="nav-label">Visão Geral</div>
-          <button class="sidebar-btn" onclick="window.location.href='dashboard.html'"><i data-lucide="layout-dashboard"></i> <span>Dashboard</span></button>
+          <button class="tab-btn" onclick="window.location.href='dashboard.html'"><i data-lucide="layout-dashboard"></i> <span>Dashboard</span></button>
           <div class="nav-label">Comercial</div>
-          <button class="sidebar-btn" onclick="window.location.href='index.html'"><i data-lucide="calculator"></i> <span>Calculadora</span></button>
-          <button class="sidebar-btn" onclick="window.location.href='crm.html'"><i data-lucide="pie-chart"></i> <span>CRM Vendas</span></button>
+          <button class="tab-btn" onclick="window.location.href='index.html'"><i data-lucide="calculator"></i> <span>Calculadora</span></button>
+          <button class="tab-btn" onclick="window.location.href='crm.html'"><i data-lucide="pie-chart"></i> <span>CRM Vendas</span></button>
+          <div class="nav-label">Consultas e Dados</div>
+          <button class="tab-btn" onclick="window.location.href='pesquisa_descricao.html'"><i data-lucide="search"></i> <span>Pesquisa Avançada</span></button>
           <div class="nav-label">Operação & Fábrica</div>
-          <button class="sidebar-btn" onclick="window.location.href='pedido_entregue.html'"><i data-lucide="package-check"></i> <span>Expedição</span></button>
+          <button class="tab-btn" onclick="window.location.href='pedido_entregue.html'"><i data-lucide="package-check"></i> <span>Expedição</span></button>
           <div class="nav-label">Administração</div>
-          <button class="sidebar-btn active" onclick="window.location.href='financeiro.html'"><i data-lucide="circle-dollar-sign"></i> <span>Financeiro</span></button>
+          <button class="tab-btn active" onclick="window.location.href='financeiro.html'"><i data-lucide="circle-dollar-sign"></i> <span>Financeiro</span></button>
       </div>
   </aside>
 
   <main class="main-wrapper">
-      <!-- HEADER PADRÃO ERP -->
       <header class="topbar">
           <div class="topbar-left">
               <button class="btn-toggle" onclick="document.getElementById('sidebar').classList.toggle('collapsed')"><i data-lucide="menu"></i></button>
-              <h2 class="view-title">Módulo Financeiro - Caixa Oficial</h2>
+              <h2 class="view-title">Módulo Financeiro Oficial</h2>
           </div>
           <div class="topbar-right">
               <div class="user-profile">
@@ -213,7 +243,7 @@
       </header>
 
       <div class="content-area">
-          <!-- SUB-TABS DO FINANCEIRO -->
+          
           <div class="sub-tabs">
               <button class="sub-tab-btn active" onclick="tab('projecao')">1. Projeção (Fábrica)</button>
               <button class="sub-tab-btn" onclick="tab('pagar')">2. Contas a Pagar</button>
@@ -223,11 +253,11 @@
               <button class="sub-tab-btn tab-comissao" onclick="tab('comissoes')">6. Comissões</button>
           </div>
 
-          <!-- 1. PROJEÇÃO (OS NA FÁBRICA) -->
+          <!-- 1. PROJEÇÃO -->
           <div id="projecao" class="section active">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px; flex-wrap:wrap; gap:10px;">
-                  <div style="font-size:14px; color:var(--text-muted); flex:1; padding:15px; background:white; border-radius:8px; border:1px solid var(--border);">
-                      <i data-lucide="info" style="width:16px; display:inline-block; vertical-align:middle; color:var(--info);"></i> Defina e Confirme as condições de pagamento (Sinal / Prazo / Imposto) das OSs que estão na produção.
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 25px; flex-wrap:wrap; gap:15px;">
+                  <div style="font-size:14px; color:var(--text-main); flex:1; padding:20px; background:var(--card-bg); border-radius:12px; border:1px solid var(--border);">
+                      <i data-lucide="info" style="width:18px; display:inline-block; vertical-align:middle; color:var(--info);"></i> Defina e Confirme as condições de pagamento (Sinal / Prazo / Imposto) das OSs que estão na produção.
                   </div>
                   <div style="display:flex; gap:10px;">
                       <button class="btn" style="background:var(--prod);" onclick="gerarPDFImpostos()"><i data-lucide="file-text"></i> IMPOSTOS PREVISTOS</button>
@@ -239,23 +269,13 @@
 
           <!-- 2. CONTAS A PAGAR -->
           <div id="pagar" class="section">
-              <div class="card-list" style="background:#eff6ff; border-color:var(--info);">
-                  <h3 style="margin-top:0; color:var(--info); font-size:16px; display:flex; align-items:center; gap:8px;"><i data-lucide="arrow-up-from-line"></i> Lançar Nova Despesa (Dívida / Gasto)</h3>
+              <div class="card-list" style="background:rgba(14, 165, 233, 0.1); border-color:var(--info);">
+                  <h3 style="margin-top:0; color:var(--info); font-size:18px; display:flex; align-items:center; gap:10px;"><i data-lucide="arrow-up-from-line"></i> Lançar Nova Despesa (Dívida / Gasto)</h3>
                   <div class="form-grid">
-                      <div>
-                          <label>Descrição do Gasto</label>
-                          <input type="text" id="despesaDesc" placeholder="Ex: Lixa, Aluguel, CPFL">
-                      </div>
-                      <div>
-                          <label>Valor Previsto/Real (R$)</label>
-                          <input type="number" id="despesaValor" placeholder="Ex: 150.00">
-                      </div>
-                      <div>
-                          <label>Vencimento Original</label>
-                          <input type="date" id="despesaData">
-                      </div>
-                      <div>
-                          <label>Categoria (Plano de Contas)</label>
+                      <div><label>Descrição do Gasto</label><input type="text" id="despesaDesc" placeholder="Ex: Lixa, Aluguel, CPFL"></div>
+                      <div><label>Valor (R$)</label><input type="number" id="despesaValor" placeholder="Ex: 150.00"></div>
+                      <div><label>Vencimento Original</label><input type="date" id="despesaData"></div>
+                      <div><label>Categoria (Plano de Contas)</label>
                           <select id="despesaCategoria">
                               <option value="Insumo Produção">Insumo de Produção (Lixas, Discos)</option>
                               <option value="Despesa Fixa">Despesa Fixa (Aluguel, Prolabore, Internet)</option>
@@ -267,97 +287,95 @@
                   <button class="btn" style="margin-top:15px; width:100%; background:var(--info);" onclick="lancarDespesa()"><i data-lucide="save"></i> CADASTRAR CONTA A PAGAR</button>
               </div>
 
-              <div style="background:var(--card-bg); padding:20px; border-radius:12px; border:1px solid var(--border); margin-bottom:20px; margin-top:30px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-                  <div style="font-weight:700; font-size:12px; margin-bottom:15px; color:var(--primary); text-transform:uppercase;">Filtro de Contas a Pagar</div>
+              <div style="background:var(--card-bg); padding:25px; border-radius:12px; border:1px solid var(--border); margin-bottom:20px; margin-top:30px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+                  <div style="font-weight:700; font-size:13px; margin-bottom:15px; color:var(--primary); text-transform:uppercase;">Filtro de Contas a Pagar</div>
                   <div style="display:flex; gap:15px; flex-wrap:wrap; align-items:flex-end;">
                       <div style="flex:1"><label>Data Inicial</label><input type="date" id="filtroPagarInicio" style="margin-bottom:0;"></div>
                       <div style="flex:1"><label>Data Final</label><input type="date" id="filtroPagarFim" style="margin-bottom:0;"></div>
                       <div style="display:flex; gap:10px;">
                           <button class="btn" style="background:var(--primary); margin:0;" onclick="renderContasPagar()"><i data-lucide="search"></i> FILTRAR</button>
-                          <button class="btn" style="background:#f1f5f9; color:var(--text-main); border:1px solid var(--border); margin:0;" onclick="gerarPDFContasPagar()"><i data-lucide="printer"></i> IMPRIMIR PENDÊNCIAS</button>
+                          <button class="btn btn-outline" style="margin:0;" onclick="gerarPDFContasPagar()"><i data-lucide="printer"></i> IMPRIMIR PENDÊNCIAS</button>
                       </div>
                   </div>
               </div>
-              
               <div id="listaContasPagar"></div>
           </div>
 
           <!-- 3. EXPEDIÇÃO E FATURAMENTO -->
           <div id="faturamento" class="section">
-              <div style="margin-bottom: 20px; font-size:14px; color:var(--text-muted); background:white; padding:15px; border-radius:8px; border:1px solid var(--border);">
-                  <i data-lucide="check-circle" style="width:16px; color:var(--success); vertical-align:middle;"></i> Estas OS já foram concluídas pela fábrica. Emita a Nota Fiscal e gere os boletos para que constem no seu caixa futuro.<br>
-                  <span style="font-size:12px; display:block; margin-top:5px;">*Dica: Se a negociação tiver valores desiguais (Ex: Entrada + 2 parcelas diferentes), gere as parcelas aqui e depois altere o valor exato na aba "A Receber".</span>
+              <div style="margin-bottom: 25px; font-size:14px; color:var(--text-main); background:var(--card-bg); padding:20px; border-radius:12px; border:1px solid var(--border);">
+                  <i data-lucide="check-circle" style="width:18px; color:var(--success); vertical-align:middle;"></i> Estas OS já foram concluídas pela fábrica. Emita a Nota Fiscal e gere os boletos para que constem no seu caixa futuro.<br>
+                  <span style="font-size:12px; color:var(--text-muted); display:block; margin-top:8px;">*Dica: Se a negociação tiver valores desiguais (Ex: Entrada + 2 parcelas diferentes), gere as parcelas aqui e depois altere o valor exato na aba "A Receber".</span>
               </div>
               <div id="listaExpedidos"></div>
           </div>
 
           <!-- 4. CONTAS A RECEBER (BOLETOS) -->
           <div id="boletos" class="section">
-              <div style="background:var(--card-bg); padding:20px; border-radius:12px; border:1px solid var(--border); margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-                  <div style="font-weight:700; font-size:12px; margin-bottom:15px; color:var(--primary); text-transform:uppercase;">Filtro de Boletos A Receber</div>
+              <div style="background:var(--card-bg); padding:25px; border-radius:12px; border:1px solid var(--border); margin-bottom:25px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+                  <div style="font-weight:700; font-size:13px; margin-bottom:15px; color:var(--success); text-transform:uppercase;">Filtro de Boletos A Receber</div>
                   <div style="display:flex; gap:15px; flex-wrap:wrap; align-items:flex-end;">
                       <div style="flex:1"><label>Vencimento Inicial</label><input type="date" id="filtroBoletoInicio" style="margin-bottom:0;"></div>
                       <div style="flex:1"><label>Vencimento Final</label><input type="date" id="filtroBoletoFim" style="margin-bottom:0;"></div>
                       <div style="display:flex; gap:10px;">
                           <button class="btn" style="background:var(--success); margin:0;" onclick="renderBoletos()"><i data-lucide="search"></i> FILTRAR BOLETOS</button>
-                          <button class="btn" style="background:#f1f5f9; color:var(--text-main); border:1px solid var(--border); margin:0;" onclick="gerarPDFBoletos()"><i data-lucide="printer"></i> IMPRIMIR RELATÓRIO</button>
+                          <button class="btn btn-outline" style="margin:0;" onclick="gerarPDFBoletos()"><i data-lucide="printer"></i> IMPRIMIR RELATÓRIO</button>
                       </div>
                   </div>
               </div>
-              
               <div id="listaBoletos"></div>
           </div>
 
-          <!-- 5. RELATÓRIOS (FLUXO DE CAIXA / DRE) -->
+          <!-- 5. RELATÓRIOS (DRE) -->
           <div id="relatorios" class="section">
-              <div class="card-list" style="border-left-color:var(--primary);">
-                  <h3 style="margin-top:0; font-size:16px; color:var(--primary);"><i data-lucide="pie-chart"></i> Gerador de DRE (Por Período)</h3>
-                  <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
+              <div class="card-panel" style="border-left: 5px solid var(--primary);">
+                  <h3 style="margin-top:0; font-size:18px; color:var(--text-main); display:flex; align-items:center; gap:10px;"><i data-lucide="pie-chart" style="color:var(--primary);"></i> Gerador de DRE (Por Período)</h3>
+                  <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr 1fr; margin-top:20px;">
                       <div><label>Data Início (Pagas)</label><input type="date" id="relInicio"></div>
                       <div><label>Data Fim (Pagas)</label><input type="date" id="relFim"></div>
                       <div>
-                          <label>Tipo de Movimentação</label>
+                          <label>Tipo de Lançamento</label>
                           <select id="relTipo">
                               <option value="todos">Tudo (Entradas e Saídas)</option>
                               <option value="entradas">Apenas Receitas (Entradas)</option>
                               <option value="saidas">Apenas Despesas (Saídas)</option>
                           </select>
                       </div>
-                      <div><button class="btn" style="width:100%; height:44px; margin-top:21px; background:var(--primary);" onclick="gerarRelatorio()"><i data-lucide="bar-chart-2"></i> GERAR DRE</button></div>
+                      <div><button class="btn" style="width:100%; height:50px; margin-top:21px; background:var(--primary);" onclick="gerarRelatorio()"><i data-lucide="bar-chart-2"></i> GERAR DRE</button></div>
                   </div>
               </div>
 
-              <div class="dash-grid" id="painelRelatorio" style="display:none; margin-top:20px;">
+              <div class="dash-grid" id="painelRelatorio" style="display:none; margin-top:25px;">
                   <div class="dash-card">
-                      <h3>(+) Receitas (Dinheiro que Entrou)</h3>
+                      <h3>(+) Receitas (Entrou)</h3>
                       <div class="value" id="relFaturado" style="color:var(--success)">R$ 0,00</div>
                   </div>
                   <div class="dash-card">
-                      <h3>(-) Despesas (Dinheiro que Saiu)</h3>
+                      <h3>(-) Despesas (Saiu)</h3>
                       <div class="value" id="relGasto" style="color:var(--danger)">R$ 0,00</div>
                   </div>
-                  <div class="dash-card" style="border: 2px solid var(--primary); background:var(--primary);">
-                      <h3 style="color:#cbd5e1;">(=) Lucro Líquido Real</h3>
-                      <div class="value" id="relLiquido" style="color:#10b981;">R$ 0,00</div>
+                  <div class="dash-card" style="border: 2px solid var(--accent); background:var(--sidebar-bg);">
+                      <h3 style="color:var(--text-main);">(=) Lucro Líquido Real</h3>
+                      <div class="value" id="relLiquido" style="color:var(--accent);">R$ 0,00</div>
                   </div>
               </div>
               
-              <div id="botoesDRE" style="display:none; margin-top:15px;">
-                  <button class="btn" style="background:#fff; color:var(--primary); border:1px solid var(--border);" onclick="gerarPDFDRE()"><i data-lucide="printer"></i> IMPRIMIR RELATÓRIO FILTRADO (PDF)</button>
+              <div id="botoesDRE" style="display:none; margin-top:20px;">
+                  <button class="btn btn-outline" style="width:100%; padding:20px; font-size:16px;" onclick="gerarPDFDRE()"><i data-lucide="printer"></i> IMPRIMIR RELATÓRIO FILTRADO (PDF)</button>
               </div>
 
-              <div id="listaExtratoDetalhados" style="margin-top:20px;" class="table-container"></div>
+              <div id="listaExtratoDetalhados" style="margin-top:25px;" class="table-container"></div>
           </div>
 
           <!-- 6. COMISSÕES -->
           <div id="comissoes" class="section">
-              <div style="margin-bottom: 20px; font-size:14px; color:var(--comissao); background:#fff7ed; padding:15px; border-radius:8px; border:1px solid #fed7aa;">
-                  <i data-lucide="calculator" style="vertical-align:middle; width:16px;"></i> Gestão de Comissões. Geradas automaticamente ao dar baixa em Boletos/Sinal.<br>
-                  <span style="font-size:12px; display:block; margin-top:5px; color:#c2410c;">Regra Integrada: 12.5% para PU (25% da metade) e 2% para demais materiais. O valor pode ser editado no ato da baixa.</span>
+              <div style="margin-bottom: 25px; font-size:14px; color:var(--text-main); background:rgba(234, 88, 12, 0.1); padding:20px; border-radius:12px; border:1px solid #7c2d12;">
+                  <i data-lucide="calculator" style="vertical-align:middle; width:18px; color:var(--comissao);"></i> Gestão de Comissões. Geradas automaticamente ao dar baixa em Boletos/Sinal.<br>
+                  <span style="font-size:13px; display:block; margin-top:8px; color:var(--warning); font-weight:600;">Regra Integrada: 12.5% para PU (25% da metade) e 2% para demais materiais.</span>
               </div>
               
-              <div style="background:white; padding:20px; border-radius:12px; border:1px solid var(--border); margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-                  <div style="font-weight:700; font-size:12px; margin-bottom:15px; color:var(--comissao); text-transform:uppercase;">Filtro de Comissões</div>
+              <div style="background:var(--card-bg); padding:25px; border-radius:12px; border:1px solid var(--border); margin-bottom:25px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+                  <div style="font-weight:700; font-size:13px; margin-bottom:15px; color:var(--comissao); text-transform:uppercase;">Filtro de Comissões</div>
                   <div style="display:flex; gap:15px; flex-wrap:wrap; align-items:flex-end;">
                       <div style="flex:1;">
                           <label>Status da Comissão</label>
@@ -366,21 +384,14 @@
                               <option value="pagas">Já Pagas (Histórico)</option>
                           </select>
                       </div>
-                      <div style="flex:1;">
-                          <label>Data Inicial</label>
-                          <input type="date" id="filtroComissaoInicio" style="margin-bottom:0;">
-                      </div>
-                      <div style="flex:1;">
-                          <label>Data Final</label>
-                          <input type="date" id="filtroComissaoFim" style="margin-bottom:0;">
-                      </div>
+                      <div style="flex:1;"><label>Data Inicial</label><input type="date" id="filtroComissaoInicio" style="margin-bottom:0;"></div>
+                      <div style="flex:1;"><label>Data Final</label><input type="date" id="filtroComissaoFim" style="margin-bottom:0;"></div>
                       <div style="display:flex; gap:10px;">
                           <button class="btn" style="background:var(--comissao); margin:0;" onclick="renderComissoes()"><i data-lucide="search"></i> FILTRAR</button>
-                          <button class="btn" style="background:#fff; color:var(--comissao); border:1px solid #fed7aa; margin:0;" onclick="gerarPDFComissoes()"><i data-lucide="printer"></i> IMPRIMIR PDF</button>
+                          <button class="btn btn-outline" style="color:var(--comissao); border-color:#7c2d12; margin:0;" onclick="gerarPDFComissoes()"><i data-lucide="printer"></i> IMPRIMIR PDF</button>
                       </div>
                   </div>
               </div>
-              
               <div id="listaComissoes"></div>
           </div>
 
@@ -388,7 +399,7 @@
   </main>
 </div>
 
-<!-- LÓGICA JAVASCRIPT (Intocável) -->
+<!-- Lógica JS Original (Mantida intacta) -->
 <script>
     lucide.createIcons();
 
@@ -410,7 +421,6 @@
         if(document.getElementById('comissoes').classList.contains('active')) renderComissoes();
     }
 
-    // --- FUNÇÃO AUXILIAR DE COMISSÃO ---
     function calcularComissaoBase(osNum, valorRecebidoFinal) {
         let osData = null;
         ['pedidos', 'orçamentos', 'expedidos'].forEach(base => {
@@ -430,11 +440,8 @@
             let isPU = (matUpper.includes('PU') || matUpper.includes('POLIURETANO'));
             let valItemTotal = (it.v * it.q);
             
-            if(isPU) {
-                comissaoTotalPrevista += valItemTotal * 0.125; 
-            } else {
-                comissaoTotalPrevista += valItemTotal * 0.02; 
-            }
+            if(isPU) { comissaoTotalPrevista += valItemTotal * 0.125; } 
+            else { comissaoTotalPrevista += valItemTotal * 0.02; }
         });
 
         return comissaoTotalPrevista * proporcaoPaga;
@@ -442,25 +449,18 @@
 
     function lancarComissao(osNum, valorRecebidoFinal, clienteNome) {
         let baseCalc = calcularComissaoBase(osNum, valorRecebidoFinal);
-        
         let comissaoEditada = prompt(`Dinheiro recebido com sucesso!\n\nA comissão gerada para o Marcelo sobre este recebimento (Baseada na regra PU/Normal) é de:\n${window.fmtMoney(baseCalc)}\n\nVocê pode editar este valor abaixo caso tenha havido negociação de margem:`, baseCalc.toFixed(2));
         
         if(comissaoEditada !== null && comissaoEditada !== "") {
             let vFinal = parseFloat(comissaoEditada.replace(',', '.'));
             window.marbeDB.fin_despesas.push({ 
-                id: Date.now() + Math.random(), 
-                desc: `Comissão OS ${osNum} - ${clienteNome}`, 
-                valor: vFinal, 
-                venc: new Date().toISOString().split('T')[0], 
-                categoria: "Comissão - Marcelo", 
-                pago: false 
+                id: Date.now() + Math.random(), desc: `Comissão OS ${osNum} - ${clienteNome}`, valor: vFinal, 
+                venc: new Date().toISOString().split('T')[0], categoria: "Comissão - Marcelo", pago: false 
             });
             alert("Comissão lançada na aba 'Comissões' (como Conta a Pagar) com sucesso!");
         }
     }
 
-
-    /* --- ABA 1: PROJEÇÃO --- */
     function renderProjecaoFinanceira() {
         let html = '';
         let comboPagamentos = window.marbeDB.cfg_pagamentos.map(c => `<option value="${c}">${c}</option>`).join('');
@@ -478,56 +478,37 @@
 
             html += `
             <div class="card-list" style="border-left-color:${isConfirmado ? 'var(--success)' : 'var(--warning)'};">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <strong style="color:var(--dark); font-size:16px;">OS ${p.os} - ${p.cliente.substring(0, 30)}</strong>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <strong style="color:var(--text-main); font-size:18px;">OS ${p.os} - ${p.cliente.substring(0, 30)}</strong>
                     ${badgeStatus}
                 </div>
-                <div style="font-size:13px; color:var(--text-muted); margin-bottom:20px; display:flex; justify-content:space-between; background:var(--bg-color); padding:10px; border-radius:8px;">
-                    <span>Valor Total: <strong style="color:var(--dark); font-size:14px;">${window.fmtMoney(p.total)}</strong></span>
+                <div style="font-size:14px; color:var(--text-muted); margin-bottom:20px; display:flex; justify-content:space-between; background:var(--bg-color); padding:15px; border-radius:8px; border:1px solid var(--border);">
+                    <span>Valor Total: <strong style="color:var(--text-main); font-size:15px;">${window.fmtMoney(p.total)}</strong></span>
                     <span>Prazo (Fábrica): <strong style="color:var(--primary);">${p.data_limite ? p.data_limite.split('-').reverse().join('/') : 'N/D'}</strong></span>
                 </div>
                 
                 <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;">
-                    <div>
-                        <label>Sinal / Entrada (R$)</label>
-                        <input type="number" id="entrada_${index}" value="${valorEntrada}" ${isConfirmado ? 'disabled' : ''}>
-                    </div>
-                    <div>
-                        <label>Condição de Pagto (Saldo)</label>
-                        <select id="condicao_${index}" ${isConfirmado ? 'disabled' : ''} onchange="verificarNovaCondicao(this)">
-                            ${comboPagamentos.replace(`value="${p.projecao.condicao}"`, `value="${p.projecao.condicao}" selected`)}
-                        </select>
-                    </div>
-                    <div>
-                        <label>Tipo Fiscal (Imposto)</label>
-                        <select id="imposto_${index}" ${isConfirmado ? 'disabled' : ''}>
-                            <option value="5.20" ${p.projecao.imposto === '5.20' ? 'selected' : ''}>Venda (5.20%)</option>
-                            <option value="7.70" ${p.projecao.imposto === '7.70' ? 'selected' : ''}>Serviço (7.70%)</option>
-                        </select>
-                    </div>
+                    <div><label>Sinal / Entrada (R$)</label><input type="number" id="entrada_${index}" value="${valorEntrada}" ${isConfirmado ? 'disabled' : ''}></div>
+                    <div><label>Condição de Pagto (Saldo)</label><select id="condicao_${index}" ${isConfirmado ? 'disabled' : ''} onchange="verificarNovaCondicao(this)">${comboPagamentos.replace(`value="${p.projecao.condicao}"`, `value="${p.projecao.condicao}" selected`)}</select></div>
+                    <div><label>Tipo Fiscal (Imposto)</label><select id="imposto_${index}" ${isConfirmado ? 'disabled' : ''}><option value="5.20" ${p.projecao.imposto === '5.20' ? 'selected' : ''}>Venda (5.20%)</option><option value="7.70" ${p.projecao.imposto === '7.70' ? 'selected' : ''}>Serviço (7.70%)</option></select></div>
                 </div>
-                <div style="margin-top:15px; display:flex; gap:10px; justify-content:flex-end;">
+                <div style="margin-top:20px; display:flex; gap:15px; justify-content:flex-end;">
                     ${isConfirmado
-                        ? `<button class="btn" style="background:#e2e8f0; color:var(--dark); font-size:12px; padding:10px 15px;" onclick="editarProjecao(${index})"><i data-lucide="edit-3" style="width:14px;"></i> EDITAR / REABRIR</button>`
-                        : `<button class="btn" style="background:var(--success); font-size:12px; padding:10px 15px;" onclick="confirmarProjecao(${index}, ${p.total})"><i data-lucide="check-circle" style="width:14px;"></i> CONFIRMAR LANÇAMENTO</button>`
+                        ? `<button class="btn btn-outline" style="padding:12px 20px;" onclick="editarProjecao(${index})"><i data-lucide="edit-3"></i> EDITAR / REABRIR</button>`
+                        : `<button class="btn btn-success" style="padding:12px 20px;" onclick="confirmarProjecao(${index}, ${p.total})"><i data-lucide="check-circle"></i> CONFIRMAR LANÇAMENTO</button>`
                     }
                 </div>
             </div>`;
         });
-        document.getElementById('listaProjecao').innerHTML = html || "<div style='text-align:center; padding:40px; background:white; border-radius:12px; border:1px dashed var(--border); color:var(--text-muted);'><i data-lucide='hammer' style='width:32px; height:32px; opacity:0.5;'></i><p>Nenhum pedido em fase de produção na fábrica.</p></div>";
+        document.getElementById('listaProjecao').innerHTML = html || "<div style='text-align:center; padding:50px; background:var(--card-bg); border-radius:12px; border:1px dashed var(--border); color:var(--text-muted);'><i data-lucide='hammer' style='width:40px; height:40px; opacity:0.5; margin-bottom:15px;'></i><p>Nenhum pedido em fase de produção na fábrica.</p></div>";
         lucide.createIcons();
     }
 
     window.verificarNovaCondicao = function(selectElement) {
         if(selectElement.value === 'NOVA_CONDICAO') {
             let novaForma = prompt("Digite o nome da nova forma de pagamento (Ex: 'Boleto 45 dias' ou 'À Vista'):");
-            if(novaForma) {
-                window.marbeDB.cfg_pagamentos.push(novaForma);
-                window.salvarNuvem(true);
-                renderProjecaoFinanceira(); 
-            } else {
-                renderProjecaoFinanceira(); 
-            }
+            if(novaForma) { window.marbeDB.cfg_pagamentos.push(novaForma); window.salvarNuvem(true); renderProjecaoFinanceira(); } 
+            else { renderProjecaoFinanceira(); }
         }
     }
 
@@ -537,42 +518,21 @@
         let condicao = document.getElementById(`condicao_${index}`).value;
         let imposto = document.getElementById(`imposto_${index}`).value;
 
-        if (novaEntrada > valorTotal) { 
-            return alert("Erro: O valor da entrada não pode ser maior que o valor total do pedido!"); 
-        }
+        if (novaEntrada > valorTotal) return alert("Erro: O valor da entrada não pode ser maior que o valor total do pedido!");
 
-        p.projecao.entrada = novaEntrada;
-        p.projecao.condicao = condicao;
-        p.projecao.imposto = imposto;
-        p.projecao.confirmado = true;
+        p.projecao.entrada = novaEntrada; p.projecao.condicao = condicao; p.projecao.imposto = imposto; p.projecao.confirmado = true;
 
         if (novaEntrada > 0 && !p.projecao.sinal_lancado) {
             if(confirm(`O pedido possui um SINAL de ${window.fmtMoney(novaEntrada)}.\nDeseja lançar este valor agora na aba "A Receber (Boletos)" para dar baixa?`)) {
                 if(!window.marbeDB.financeiro) window.marbeDB.financeiro = [];
-                window.marbeDB.financeiro.push({ 
-                    id_titulo: Date.now(), 
-                    os: p.os, 
-                    nf: "SINAL / ANTECIPADO", 
-                    cliente: p.cliente, 
-                    valor: novaEntrada, 
-                    venc: new Date().toISOString().split('T')[0], 
-                    parcela: "Sinal", 
-                    pago: false 
-                });
-                p.projecao.sinal_lancado = true;
-                alert("Sinal lançado com sucesso na aba 'A Receber'!");
+                window.marbeDB.financeiro.push({ id_titulo: Date.now(), os: p.os, nf: "SINAL / ANTECIPADO", cliente: p.cliente, valor: novaEntrada, venc: new Date().toISOString().split('T')[0], parcela: "Sinal", pago: false });
+                p.projecao.sinal_lancado = true; alert("Sinal lançado com sucesso na aba 'A Receber'!");
             }
         }
-
-        window.salvarNuvem(true);
-        renderProjecaoFinanceira();
+        window.salvarNuvem(true); renderProjecaoFinanceira();
     }
 
-    window.editarProjecao = function(index) {
-        window.marbeDB.pedidos[index].projecao.confirmado = false;
-        window.salvarNuvem(true);
-        renderProjecaoFinanceira();
-    }
+    window.editarProjecao = function(index) { window.marbeDB.pedidos[index].projecao.confirmado = false; window.salvarNuvem(true); renderProjecaoFinanceira(); }
 
     window.extrairDiasDaCondicao = function(condicaoTexto) {
         let matches = condicaoTexto.match(/\d+/g);
@@ -593,46 +553,23 @@
         
         (window.marbeDB.pedidos || []).forEach(p => {
             if(p.projecao && p.projecao.confirmado) {
-                let sinal = parseFloat(p.projecao.entrada) || 0;
-                let saldo = (p.total || 0) - sinal;
+                let sinal = parseFloat(p.projecao.entrada) || 0; let saldo = (p.total || 0) - sinal;
                 totalGeral += (p.total || 0); totalSinal += sinal; totalSaldo += saldo;
                 
                 let dtEntregaBase = p.data_limite ? new Date(p.data_limite + "T12:00:00") : new Date();
                 let diasArray = extrairDiasDaCondicao(p.projecao.condicao);
-                let vencimentosPrevistos = diasArray.map(dias => {
-                    let calcDt = new Date(dtEntregaBase);
-                    calcDt.setDate(calcDt.getDate() + dias);
-                    return calcDt.toLocaleDateString('pt-BR');
-                }).join(' e ');
+                let vencimentosPrevistos = diasArray.map(dias => { let calcDt = new Date(dtEntregaBase); calcDt.setDate(calcDt.getDate() + dias); return calcDt.toLocaleDateString('pt-BR'); }).join(' e ');
 
-                bodyData.push([
-                    `OS ${p.os}\n${p.cliente.substring(0, 20)}`, 
-                    p.projecao.condicao,
-                    vencimentosPrevistos,
-                    window.fmtMoney(sinal), 
-                    window.fmtMoney(saldo)
-                ]);
+                bodyData.push([`OS ${p.os}\n${p.cliente.substring(0, 20)}`, p.projecao.condicao, vencimentosPrevistos, window.fmtMoney(sinal), window.fmtMoney(saldo)]);
             }
         });
         
         if(bodyData.length === 0) return alert("Não há pedidos com negociação CONFIRMADA para imprimir.");
         
-        doc.autoTable({ 
-            startY: 30, 
-            head: [['OS / CLIENTE', 'CONDIÇÃO', 'VENCIMENTOS (CALCULADOS)', 'SINAL (R$)', 'SALDO A FATURAR']], 
-            body: bodyData, 
-            theme: 'grid', 
-            headStyles: { fillColor: [15, 23, 42] },
-            columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } }
-        });
+        doc.autoTable({ startY: 30, head: [['OS / CLIENTE', 'CONDIÇÃO', 'VENCIMENTOS (CALCULADOS)', 'SINAL (R$)', 'SALDO A FATURAR']], body: bodyData, theme: 'grid', headStyles: { fillColor: [15, 23, 42] }, columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } } });
         
         let finalY = doc.lastAutoTable.finalY + 10;
-        doc.setFontSize(11); doc.setFont("helvetica", "bold");
-        doc.text(`TOTAL EM PEDIDOS CONFIRMADOS: ${window.fmtMoney(totalGeral)}`, 20, finalY);
-        doc.text(`SINAIS LANÇADOS/CAIXA REAL: ${window.fmtMoney(totalSinal)}`, 20, finalY + 6);
-        doc.setTextColor(16, 185, 129);
-        doc.text(`PREVISÃO DE BOLETOS FUTUROS: ${window.fmtMoney(totalSaldo)}`, 20, finalY + 14);
-        
+        doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.text(`TOTAL EM PEDIDOS CONFIRMADOS: ${window.fmtMoney(totalGeral)}`, 20, finalY); doc.text(`SINAIS LANÇADOS/CAIXA REAL: ${window.fmtMoney(totalSinal)}`, 20, finalY + 6); doc.setTextColor(16, 185, 129); doc.text(`PREVISÃO DE BOLETOS FUTUROS: ${window.fmtMoney(totalSaldo)}`, 20, finalY + 14);
         window.open(URL.createObjectURL(doc.output('blob')), '_blank');
     }
 
@@ -640,18 +577,13 @@
         if(!window.jspdf) return alert("Aguarde a biblioteca PDF carregar.");
         const { jsPDF } = window.jspdf; const doc = new jsPDF();
         
-        doc.setFontSize(14); doc.setFont("helvetica", "bold"); 
-        doc.text("PREVISÃO TRIBUTÁRIA - MÊS / FÁBRICA", 105, 15, {align: "center"});
-        
+        doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("PREVISÃO TRIBUTÁRIA - MÊS / FÁBRICA", 105, 15, {align: "center"});
         let bodyData = []; let totalImposto = 0; let baseTotal = 0;
         
         (window.marbeDB.pedidos || []).forEach(p => {
             if(p.projecao && p.projecao.confirmado) {
-                let taxa = parseFloat(p.projecao.imposto) || 0;
-                let valorImposto = (p.total || 0) * (taxa / 100);
-                
+                let taxa = parseFloat(p.projecao.imposto) || 0; let valorImposto = (p.total || 0) * (taxa / 100);
                 baseTotal += (p.total || 0); totalImposto += valorImposto;
-                
                 let tipoNome = taxa === 5.20 ? "Venda (5.2%)" : "Serviço (7.7%)";
                 bodyData.push([`OS ${p.os}`, p.cliente.substring(0, 30), window.fmtMoney(p.total), tipoNome, window.fmtMoney(valorImposto)]);
             }
@@ -659,51 +591,25 @@
         
         if(bodyData.length === 0) return alert("Nenhuma OS confirmada para gerar impostos.");
         
-        doc.autoTable({ 
-            startY: 25, 
-            head: [['OS', 'CLIENTE', 'BASE CÁLCULO', 'TIPO / ALÍQUOTA', 'IMPOSTO (R$)']], 
-            body: bodyData, 
-            theme: 'striped', 
-            headStyles: { fillColor: [139, 92, 246] },
-            columnStyles: { 2: { halign: 'right' }, 4: { halign: 'right' } }
-        });
+        doc.autoTable({ startY: 25, head: [['OS', 'CLIENTE', 'BASE CÁLCULO', 'TIPO / ALÍQUOTA', 'IMPOSTO (R$)']], body: bodyData, theme: 'striped', headStyles: { fillColor: [139, 92, 246] }, columnStyles: { 2: { halign: 'right' }, 4: { halign: 'right' } } });
         
         let finalY = doc.lastAutoTable.finalY + 10;
-        doc.setFontSize(12); doc.setFont("helvetica", "bold");
-        doc.text(`BASE DE CÁLCULO TOTAL: ${window.fmtMoney(baseTotal)}`, 20, finalY);
-        doc.setTextColor(239, 68, 68);
-        doc.text(`CARGA TRIBUTÁRIA PREVISTA: ${window.fmtMoney(totalImposto)}`, 20, finalY + 8);
-        
+        doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.text(`BASE DE CÁLCULO TOTAL: ${window.fmtMoney(baseTotal)}`, 20, finalY); doc.setTextColor(239, 68, 68); doc.text(`CARGA TRIBUTÁRIA PREVISTA: ${window.fmtMoney(totalImposto)}`, 20, finalY + 8);
         window.open(URL.createObjectURL(doc.output('blob')), '_blank');
     }
 
     /* --- ABA 2: CONTAS A PAGAR --- */
     window.lancarDespesa = function() {
-        const desc = document.getElementById('despesaDesc').value;
-        const valor = parseFloat(document.getElementById('despesaValor').value);
-        const venc = document.getElementById('despesaData').value;
-        const categoria = document.getElementById('despesaCategoria').value;
+        const desc = document.getElementById('despesaDesc').value; const valor = parseFloat(document.getElementById('despesaValor').value); const venc = document.getElementById('despesaData').value; const categoria = document.getElementById('despesaCategoria').value;
 
         if(!desc || !valor || !venc) return alert("Por favor, preencha todos os campos obrigatórios!");
         
-        window.marbeDB.fin_despesas.push({ 
-            id: Date.now(), 
-            desc: desc, 
-            valor: valor, 
-            venc: venc, 
-            categoria: categoria, 
-            pago: false 
-        });
-        
-        window.salvarNuvem(true);
-        document.getElementById('despesaDesc').value = ""; 
-        document.getElementById('despesaValor').value = "";
-        renderContasPagar();
+        window.marbeDB.fin_despesas.push({ id: Date.now(), desc: desc, valor: valor, venc: venc, categoria: categoria, pago: false });
+        window.salvarNuvem(true); document.getElementById('despesaDesc').value = ""; document.getElementById('despesaValor').value = ""; renderContasPagar();
     }
 
     window.renderContasPagar = function() {
-        let dtIni = document.getElementById('filtroPagarInicio').value;
-        let dtFim = document.getElementById('filtroPagarFim').value;
+        let dtIni = document.getElementById('filtroPagarInicio').value; let dtFim = document.getElementById('filtroPagarFim').value;
         let html = ''; let hojeStr = new Date().toISOString().split('T')[0];
         
         let despesasOrdenadas = (window.marbeDB.fin_despesas || []).map((d, index) => ({...d, indexOriginal: index}));
@@ -712,43 +618,36 @@
         despesasOrdenadas.forEach((d) => {
             if(!d.pago && d.categoria !== "Comissão - Marcelo") {
                 let exibir = false;
-                if (!dtIni || !dtFim) { exibir = true; } 
-                else if (d.venc >= dtIni && d.venc <= dtFim) { exibir = true; }
+                if (!dtIni || !dtFim) { exibir = true; } else if (d.venc >= dtIni && d.venc <= dtFim) { exibir = true; }
 
                 if (exibir) {
-                    let isAtrasado = d.venc < hojeStr;
-                    let dataBr = d.venc.split('-').reverse().join('/');
+                    let isAtrasado = d.venc < hojeStr; let dataBr = d.venc.split('-').reverse().join('/');
                     html += `
-                    <div class="card-list" style="border-left-color:${isAtrasado ? 'var(--danger)' : 'var(--primary)'};">
+                    <div class="card-list" style="border-left-color:${isAtrasado ? 'var(--danger)' : 'var(--info)'};">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <strong style="color:var(--dark); font-size:16px;">${d.desc}</strong>
+                            <strong style="color:var(--text-main); font-size:18px;">${d.desc}</strong>
                             <span class="badge" style="background:var(--bg-color); color:var(--text-muted); border:1px solid var(--border);">${d.categoria}</span>
                         </div>
-                        <div style="font-size:24px; font-weight:800; margin:12px 0; color:var(--danger)">- ${window.fmtMoney(d.valor)}</div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px; padding-top:15px; border-top:1px dashed var(--border); flex-wrap:wrap; gap:10px;">
-                            <span style="font-size:13px; color:${isAtrasado ? 'var(--danger)' : 'var(--text-muted)'}">Venc: <b>${dataBr}</b> ${isAtrasado ? '<strong style="color:red">(ATRASADO)</strong>' : ''}</span>
-                            <div style="display:flex; gap:10px;">
-                                <button class="btn btn-outline" style="padding:10px 15px;" onclick="editarDespesa(${d.indexOriginal})"><i data-lucide="edit-3"></i> EDITAR</button>
-                                <button class="btn btn-primary" style="padding:10px 15px;" onclick="pagarDespesa(${d.indexOriginal})"><i data-lucide="check"></i> MARCAR COMO PAGO</button>
+                        <div style="font-size:28px; font-weight:800; margin:15px 0; color:var(--danger)">- ${window.fmtMoney(d.valor)}</div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; padding-top:20px; border-top:1px dashed var(--border); flex-wrap:wrap; gap:10px;">
+                            <span style="font-size:14px; color:${isAtrasado ? 'var(--danger)' : 'var(--text-muted)'}">Venc: <b>${dataBr}</b> ${isAtrasado ? '<strong style="color:red">(ATRASADO)</strong>' : ''}</span>
+                            <div style="display:flex; gap:12px;">
+                                <button class="btn btn-outline" onclick="editarDespesa(${d.indexOriginal})"><i data-lucide="edit-3"></i> EDITAR</button>
+                                <button class="btn btn-primary" onclick="pagarDespesa(${d.indexOriginal})"><i data-lucide="check"></i> MARCAR COMO PAGO</button>
                             </div>
                         </div>
                     </div>`;
                 }
             }
         });
-        document.getElementById('listaContasPagar').innerHTML = html || "<div style='text-align:center; padding:40px; background:white; border-radius:12px; border:1px dashed var(--border); color:var(--text-muted);'><i data-lucide='receipt' style='width:32px; height:32px; opacity:0.5;'></i><p>Nenhuma conta a pagar neste período.</p></div>";
+        document.getElementById('listaContasPagar').innerHTML = html || "<div style='text-align:center; padding:50px; background:var(--card-bg); border-radius:12px; border:1px dashed var(--border); color:var(--text-muted);'><i data-lucide='receipt' style='width:40px; height:40px; opacity:0.5; margin-bottom:15px;'></i><p>Nenhuma conta a pagar neste período.</p></div>";
         lucide.createIcons();
     }
 
     window.editarDespesa = function(i) {
         let d = window.marbeDB.fin_despesas[i];
-        document.getElementById('despesaDesc').value = d.desc;
-        document.getElementById('despesaValor').value = d.valor;
-        document.getElementById('despesaData').value = d.venc;
-        document.getElementById('despesaCategoria').value = d.categoria;
-        
-        window.marbeDB.fin_despesas.splice(i, 1);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        document.getElementById('despesaDesc').value = d.desc; document.getElementById('despesaValor').value = d.valor; document.getElementById('despesaData').value = d.venc; document.getElementById('despesaCategoria').value = d.categoria;
+        window.marbeDB.fin_despesas.splice(i, 1); window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     window.pagarDespesa = function(i) {
@@ -756,42 +655,25 @@
         let dataDigitada = prompt("Data em que o pagamento foi realizado (AAAA-MM-DD):", hojeStr);
         if(!dataDigitada) return; 
         
-        let desp = window.marbeDB.fin_despesas[i];
-        desp.pago = true;
-        desp.dataPagamento = dataDigitada;
+        let desp = window.marbeDB.fin_despesas[i]; desp.pago = true; desp.dataPagamento = dataDigitada;
         
         if(desp.categoria === "Despesa Fixa" || desp.categoria === "Despesa Variável") {
             if(confirm(`Essa conta é uma [${desp.categoria}].\nDeseja projetar/lançar essa mesma conta para o próximo mês para não esquecer?`)) {
-                let dataAntiga = new Date(desp.venc + "T12:00:00");
-                dataAntiga.setMonth(dataAntiga.getMonth() + 1); 
-                
-                window.marbeDB.fin_despesas.push({ 
-                    id: Date.now(), 
-                    desc: desp.desc, 
-                    valor: desp.valor, 
-                    venc: dataAntiga.toISOString().split('T')[0], 
-                    categoria: desp.categoria, 
-                    pago: false 
-                });
+                let dataAntiga = new Date(desp.venc + "T12:00:00"); dataAntiga.setMonth(dataAntiga.getMonth() + 1); 
+                window.marbeDB.fin_despesas.push({ id: Date.now(), desc: desp.desc, valor: desp.valor, venc: dataAntiga.toISOString().split('T')[0], categoria: desp.categoria, pago: false });
                 alert("Previsão gerada com sucesso!");
             }
         }
-        
-        window.salvarNuvem(true); 
-        renderContasPagar();
+        window.salvarNuvem(true); renderContasPagar();
     }
 
     window.gerarPDFContasPagar = function() {
-        let dtIni = document.getElementById('filtroPagarInicio').value;
-        let dtFim = document.getElementById('filtroPagarFim').value;
-        
+        let dtIni = document.getElementById('filtroPagarInicio').value; let dtFim = document.getElementById('filtroPagarFim').value;
         if(!window.jspdf) return alert("Aguarde a biblioteca PDF carregar completamente.");
         const { jsPDF } = window.jspdf; const doc = new jsPDF();
         
-        doc.setFontSize(14); doc.setFont("helvetica", "bold"); 
-        doc.text("RELATÓRIO DE PENDÊNCIAS - CONTAS A PAGAR", 105, 15, {align: "center"});
-        doc.setFontSize(10); doc.setFont("helvetica", "normal");
-        doc.text(`FILTRO: ${dtIni.split('-').reverse().join('/')} até ${dtFim.split('-').reverse().join('/')}`, 105, 22, {align: "center"});
+        doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("RELATÓRIO DE PENDÊNCIAS - CONTAS A PAGAR", 105, 15, {align: "center"});
+        doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`FILTRO: ${dtIni.split('-').reverse().join('/')} até ${dtFim.split('-').reverse().join('/')}`, 105, 22, {align: "center"});
         
         let bodyData = []; let totalPendente = 0;
         let despesasPDF = (window.marbeDB.fin_despesas || []).filter(d => !d.pago && d.categoria !== "Comissão - Marcelo");
@@ -799,26 +681,16 @@
 
         despesasPDF.forEach(d => {
             if (!dtIni || !dtFim || (d.venc >= dtIni && d.venc <= dtFim)) {
-                totalPendente += d.valor;
-                let dtBr = d.venc.split('-').reverse().join('/');
+                totalPendente += d.valor; let dtBr = d.venc.split('-').reverse().join('/');
                 bodyData.push([d.desc, d.categoria, dtBr, window.fmtMoney(d.valor)]);
             }
         });
         
         if(bodyData.length === 0) return alert("Não há contas no filtro atual.");
 
-        doc.autoTable({
-            startY: 30,
-            head: [['DESCRIÇÃO', 'CATEGORIA', 'VENCIMENTO', 'VALOR (R$)']],
-            body: bodyData,
-            theme: 'striped',
-            headStyles: { fillColor: [15, 23, 42] },
-            columnStyles: { 3: { halign: 'right' } }
-        });
-        
+        doc.autoTable({ startY: 30, head: [['DESCRIÇÃO', 'CATEGORIA', 'VENCIMENTO', 'VALOR (R$)']], body: bodyData, theme: 'striped', headStyles: { fillColor: [15, 23, 42] }, columnStyles: { 3: { halign: 'right' } } });
         let finalY = doc.lastAutoTable.finalY + 10;
-        doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(239, 68, 68);
-        doc.text(`TOTAL PENDENTE NO PERÍODO: ${window.fmtMoney(totalPendente)}`, 195, finalY, {align: 'right'});
+        doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(239, 68, 68); doc.text(`TOTAL PENDENTE NO PERÍODO: ${window.fmtMoney(totalPendente)}`, 195, finalY, {align: 'right'});
         window.open(URL.createObjectURL(doc.output('blob')), '_blank');
     }
 
@@ -833,269 +705,159 @@
             <div class="card-list" style="border-left-color:var(--info);">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                     <div>
-                        <strong style="color:var(--dark); font-size:16px;">OS ${p.os} - ${p.cliente}</strong><br>
-                        <div style="margin-top:8px; font-size:13px; color:var(--text-muted);">
+                        <strong style="color:var(--text-main); font-size:18px;">OS ${p.os} - ${p.cliente}</strong><br>
+                        <div style="margin-top:10px; font-size:14px; color:var(--text-muted);">
                             Total do Pedido: ${window.fmtMoney(p.total)} | Sinal Já Recebido: <strong style="color:var(--success);">${window.fmtMoney(entradaPrevia)}</strong>
                         </div>
                     </div>
                     <div style="text-align:right;">
-                        <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Saldo Restante</span><br>
-                        <strong style="font-size:20px; color:var(--info);">${window.fmtMoney(saldoFaturar)}</strong>
+                        <span style="font-size:12px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Saldo Restante</span><br>
+                        <strong style="font-size:24px; color:var(--info);">${window.fmtMoney(saldoFaturar)}</strong>
                     </div>
                 </div>
                 
-                <div class="form-grid" style="margin-top:20px; padding:20px; background:var(--bg-color); border-radius:8px;">
-                    <div>
-                        <label>Nota Fiscal Emitida Nº</label>
-                        <input type="text" id="nf_${i}" placeholder="Deixe branco p/ promissória">
-                    </div>
-                    <div>
-                        <label>Parcelas (Boletos)</label>
-                        <input type="number" id="parc_${i}" value="1">
-                    </div>
-                    <div>
-                        <label>Data 1º Vencimento</label>
-                        <input type="date" id="data_${i}">
-                    </div>
+                <div class="form-grid" style="margin-top:25px; padding:25px; background:var(--bg-color); border-radius:12px; border: 1px solid var(--border);">
+                    <div><label>Nota Fiscal Emitida Nº</label><input type="text" id="nf_${i}" placeholder="Deixe branco p/ promissória"></div>
+                    <div><label>Parcelas (Boletos)</label><input type="number" id="parc_${i}" value="1"></div>
+                    <div><label>Data 1º Vencimento</label><input type="date" id="data_${i}"></div>
                 </div>
-                <div style="display:flex; gap:10px; margin-top:20px;">
+                <div style="display:flex; gap:15px; margin-top:25px;">
                     <button class="btn btn-outline" style="color:var(--danger); border-color:var(--danger); width:auto;" onclick="devolverParaProducao(${i})"><i data-lucide="corner-down-left"></i> Devolver p/ Fábrica</button>
                     <button class="btn btn-primary" style="flex:1;" onclick="faturar(${i}, ${saldoFaturar})"><i data-lucide="file-check-2"></i> CONCLUIR FATURAMENTO</button>
                 </div>
             </div>`;
         });
-        document.getElementById('listaExpedidos').innerHTML = html || "<div style='text-align:center; padding:40px; background:white; border-radius:12px; border:1px dashed var(--border); color:var(--text-muted);'><i data-lucide='package-check' style='width:32px; height:32px; opacity:0.5;'></i><p>Nenhuma OS aguardando faturamento.</p></div>";
+        document.getElementById('listaExpedidos').innerHTML = html || "<div style='text-align:center; padding:50px; background:var(--card-bg); border-radius:12px; border:1px dashed var(--border); color:var(--text-muted);'><i data-lucide='package-check' style='width:40px; height:40px; opacity:0.5; margin-bottom:15px;'></i><p>Nenhuma OS aguardando faturamento.</p></div>";
         lucide.createIcons();
     }
 
     window.devolverParaProducao = function(i) {
         if(!confirm("A OS apresentou problema ou faltou peça? Ela voltará para a tela da fábrica.")) return;
         let p = window.marbeDB.expedidos.splice(i, 1)[0];
-        if(!window.marbeDB.pedidos) window.marbeDB.pedidos = [];
-        window.marbeDB.pedidos.push(p);
-        window.salvarNuvem(true);
-        updateUI();
+        if(!window.marbeDB.pedidos) window.marbeDB.pedidos = []; window.marbeDB.pedidos.push(p);
+        window.salvarNuvem(true); updateUI();
     }
 
     window.faturar = function(i, saldoFaturar) {
-        if(saldoFaturar <= 0) { 
-            alert("Esta OS foi paga integralmente de forma antecipada. Ela será arquivada."); 
-            window.marbeDB.expedidos.splice(i, 1); 
-            window.salvarNuvem(true); 
-            updateUI(); 
-            return; 
-        }
-        
-        const nf = document.getElementById(`nf_${i}`).value || "S/N"; 
-        const qtd = parseInt(document.getElementById(`parc_${i}`).value); 
-        const dt = document.getElementById(`data_${i}`).value;
-        
+        if(saldoFaturar <= 0) { alert("Esta OS foi paga integralmente de forma antecipada. Ela será arquivada."); window.marbeDB.expedidos.splice(i, 1); window.salvarNuvem(true); updateUI(); return; }
+        const nf = document.getElementById(`nf_${i}`).value || "S/N"; const qtd = parseInt(document.getElementById(`parc_${i}`).value); const dt = document.getElementById(`data_${i}`).value;
         if(!qtd || !dt) return alert("Preencha a quantidade de parcelas e a data do vencimento!");
         
-        const p = window.marbeDB.expedidos[i]; 
-        const dataBase = new Date(dt + "T12:00:00"); 
-        const valorPorParcela = saldoFaturar / qtd;
-        
+        const p = window.marbeDB.expedidos[i]; const dataBase = new Date(dt + "T12:00:00"); const valorPorParcela = saldoFaturar / qtd;
         if(!window.marbeDB.financeiro) window.marbeDB.financeiro = [];
         
         for(let j=0; j<qtd; j++) {
-            let v = new Date(dataBase); 
-            v.setMonth(v.getMonth() + j);
-            window.marbeDB.financeiro.push({ 
-                id_titulo: Date.now() + j, 
-                os: p.os, 
-                nf: nf, 
-                cliente: p.cliente, 
-                valor: valorPorParcela, 
-                venc: v.toISOString().split('T')[0], 
-                parcela: `${j+1}/${qtd}`, 
-                pago: false 
-            });
+            let v = new Date(dataBase); v.setMonth(v.getMonth() + j);
+            window.marbeDB.financeiro.push({ id_titulo: Date.now() + j, os: p.os, nf: nf, cliente: p.cliente, valor: valorPorParcela, venc: v.toISOString().split('T')[0], parcela: `${j+1}/${qtd}`, pago: false });
         }
-        
-        window.marbeDB.expedidos.splice(i, 1); 
-        window.salvarNuvem(true); 
-        tab('boletos');
+        window.marbeDB.expedidos.splice(i, 1); window.salvarNuvem(true); tab('boletos');
     }
 
     /* --- ABA 4: BOLETOS A RECEBER --- */
     window.renderBoletos = function() {
-        let dataInicioStr = document.getElementById('filtroBoletoInicio').value;
-        let dataFimStr = document.getElementById('filtroBoletoFim').value;
-        let html = ''; 
-        let hojeStr = new Date().toISOString().split('T')[0];
+        let dataInicioStr = document.getElementById('filtroBoletoInicio').value; let dataFimStr = document.getElementById('filtroBoletoFim').value;
+        let html = ''; let hojeStr = new Date().toISOString().split('T')[0];
         
         (window.marbeDB.financeiro || []).forEach((f, i) => {
             if(!f.pago) {
-                let exibir = false;
-                let passaInicio = !dataInicioStr || f.venc >= dataInicioStr;
-                let passaFim = !dataFimStr || f.venc <= dataFimStr;
-
+                let exibir = false; let passaInicio = !dataInicioStr || f.venc >= dataInicioStr; let passaFim = !dataFimStr || f.venc <= dataFimStr;
                 if (passaInicio && passaFim) exibir = true;
 
                 if (exibir) {
-                    let isAtrasado = f.venc < hojeStr; 
-                    let dataBr = f.venc.split('-').reverse().join('/');
-                    
+                    let isAtrasado = f.venc < hojeStr; let dataBr = f.venc.split('-').reverse().join('/');
                     html += `
                     <div class="card-list" style="border-left-color:${isAtrasado ? 'var(--danger)' : 'var(--success)'};">
                         <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                             <div>
-                                <strong style="color:var(--dark); font-size:16px;">${f.cliente}</strong><br>
-                                <span style="font-size:12px; color:var(--text-muted); display:inline-block; margin-top:5px;">OS: <b>${f.os}</b> | NF: <b>${f.nf}</b> | Parc: <b>${f.parcela}</b></span>
+                                <strong style="color:var(--text-main); font-size:18px;">${f.cliente}</strong><br>
+                                <span style="font-size:13px; color:var(--text-muted); display:inline-block; margin-top:8px;">OS: <b style="color:var(--text-main)">${f.os}</b> | NF: <b style="color:var(--text-main)">${f.nf}</b> | Parc: <b style="color:var(--text-main)">${f.parcela}</b></span>
                             </div>
                             <div style="text-align:right;">
-                                <div style="font-size:24px; font-weight:800; color:var(--success);">+ ${window.fmtMoney(f.valor)}</div>
+                                <div style="font-size:26px; font-weight:800; color:var(--success);">+ ${window.fmtMoney(f.valor)}</div>
                             </div>
                         </div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; padding-top:15px; border-top:1px dashed var(--border); flex-wrap:wrap; gap:10px;">
-                            <span style="font-size:13px; color:${isAtrasado ? 'var(--danger)' : 'var(--text-muted)'}">Vencimento: <b>${dataBr}</b> ${isAtrasado ? '<strong style="color:red">(ATRASADO)</strong>' : ''}</span>
-                            <div style="display:flex; gap:10px;">
-                                <button class="btn btn-outline" style="padding:10px 15px;" onclick="editarBoleto(${i})"><i data-lucide="edit-3"></i></button>
-                                <button class="btn btn-outline" style="color:var(--danger); border-color:var(--danger); padding:10px 15px;" onclick="excluirBoleto(${i})"><i data-lucide="trash-2"></i></button>
-                                <button class="btn btn-success" style="padding:10px 20px;" onclick="darBaixaBoleto(${i})"><i data-lucide="check"></i> DINHEIRO RECEBIDO</button>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:25px; padding-top:20px; border-top:1px dashed var(--border); flex-wrap:wrap; gap:10px;">
+                            <span style="font-size:14px; color:${isAtrasado ? 'var(--danger)' : 'var(--text-muted)'}">Vencimento: <b>${dataBr}</b> ${isAtrasado ? '<strong style="color:red">(ATRASADO)</strong>' : ''}</span>
+                            <div style="display:flex; gap:12px;">
+                                <button class="btn btn-outline" style="padding:12px 18px;" onclick="editarBoleto(${i})"><i data-lucide="edit-3"></i></button>
+                                <button class="btn btn-outline" style="color:var(--danger); border-color:var(--danger); padding:12px 18px;" onclick="excluirBoleto(${i})"><i data-lucide="trash-2"></i></button>
+                                <button class="btn btn-success" style="padding:12px 25px;" onclick="darBaixaBoleto(${i})"><i data-lucide="check"></i> DINHEIRO RECEBIDO</button>
                             </div>
                         </div>
                     </div>`;
                 }
             }
         });
-        document.getElementById('listaBoletos').innerHTML = html || "<div style='text-align:center; padding:40px; background:white; border-radius:12px; border:1px dashed var(--border); color:var(--text-muted);'><i data-lucide='banknote' style='width:32px; height:32px; opacity:0.5;'></i><p>Nenhum boleto pendente neste período.</p></div>";
+        document.getElementById('listaBoletos').innerHTML = html || "<div style='text-align:center; padding:50px; background:var(--card-bg); border-radius:12px; border:1px dashed var(--border); color:var(--text-muted);'><i data-lucide='banknote' style='width:40px; height:40px; opacity:0.5; margin-bottom:15px;'></i><p>Nenhum boleto pendente neste período.</p></div>";
         lucide.createIcons();
     }
 
     window.editarBoleto = function(i) {
-        let f = window.marbeDB.financeiro[i];
-        let novoValor = prompt(`Editar Valor do Boleto (R$):\n(Valor Atual: ${f.valor})`, f.valor);
+        let f = window.marbeDB.financeiro[i]; let novoValor = prompt(`Editar Valor do Boleto (R$):\n(Valor Atual: ${f.valor})`, f.valor);
         if(novoValor !== null && novoValor !== "") {
             let novaData = prompt(`Editar Data de Vencimento (AAAA-MM-DD):\n(Data Atual: ${f.venc})`, f.venc);
-            if(novaData !== null && novaData !== "") {
-                window.marbeDB.financeiro[i].valor = parseFloat(novoValor.replace(',','.'));
-                window.marbeDB.financeiro[i].venc = novaData;
-                window.salvarNuvem(true);
-                renderBoletos();
-            }
+            if(novaData !== null && novaData !== "") { window.marbeDB.financeiro[i].valor = parseFloat(novoValor.replace(',','.')); window.marbeDB.financeiro[i].venc = novaData; window.salvarNuvem(true); renderBoletos(); }
         }
     }
 
     window.excluirBoleto = function(i) {
-        if(confirm("Tem certeza que deseja APAGAR este lançamento incorreto? (Isso não pode ser desfeito)")) {
-            window.marbeDB.financeiro.splice(i, 1);
-            window.salvarNuvem(true); 
-            renderBoletos();
-        }
+        if(confirm("Tem certeza que deseja APAGAR este lançamento incorreto? (Isso não pode ser desfeito)")) { window.marbeDB.financeiro.splice(i, 1); window.salvarNuvem(true); renderBoletos(); }
     }
 
     window.darBaixaBoleto = function(i) {
-        let hojeStr = new Date().toISOString().split('T')[0];
-        let f = window.marbeDB.financeiro[i];
-
+        let hojeStr = new Date().toISOString().split('T')[0]; let f = window.marbeDB.financeiro[i];
         let dataDigitada = prompt(`Data em que o dinheiro entrou na conta para ${f.cliente} (OS ${f.os}) [AAAA-MM-DD]:`, hojeStr);
         if(!dataDigitada) return;
 
         let ajusteStr = prompt(`O valor original do boleto é ${window.fmtMoney(f.valor)}.\nHouve Juros ou Desconto?\n\n- Digite um valor POSITIVO para Juros (Ex: 15.50)\n- Digite um valor NEGATIVO para Desconto (Ex: -10.00)\n- Deixe 0 se o cliente pagou o valor exato.`, "0");
         if(ajusteStr === null) return;
-
-        let ajuste = parseFloat(ajusteStr.replace(',', '.')) || 0;
-        let valorFinal = f.valor + ajuste;
+        let ajuste = parseFloat(ajusteStr.replace(',', '.')) || 0; let valorFinal = f.valor + ajuste;
 
         if(confirm(`Confirmar o recebimento de ${window.fmtMoney(valorFinal)} na data ${dataDigitada.split('-').reverse().join('/')}?`)) {
-            window.marbeDB.financeiro[i].pago = true;
-            window.marbeDB.financeiro[i].dataRecebimento = dataDigitada;
-            window.marbeDB.financeiro[i].valor = valorFinal;
-            
-            // Lançar Comissão do Marcelo
+            window.marbeDB.financeiro[i].pago = true; window.marbeDB.financeiro[i].dataRecebimento = dataDigitada; window.marbeDB.financeiro[i].valor = valorFinal;
             lancarComissao(f.os, valorFinal, f.cliente);
-            
-            window.salvarNuvem(true); 
-            renderBoletos();
+            window.salvarNuvem(true); renderBoletos();
         }
     }
 
     window.gerarPDFBoletos = function() {
-        let dataInicioStr = document.getElementById('filtroBoletoInicio').value;
-        let dataFimStr = document.getElementById('filtroBoletoFim').value;
-        let hojeStr = new Date().toISOString().split('T')[0];
-        
+        let dataInicioStr = document.getElementById('filtroBoletoInicio').value; let dataFimStr = document.getElementById('filtroBoletoFim').value; let hojeStr = new Date().toISOString().split('T')[0];
         if(!window.jspdf) return alert("Aguarde a biblioteca PDF carregar.");
         const { jsPDF } = window.jspdf; const doc = new jsPDF();
         
-        doc.setFontSize(14); doc.setFont("helvetica", "bold"); 
-        doc.text("RELATÓRIO DE BOLETOS A RECEBER", 105, 15, {align: "center"});
-        doc.setFontSize(10); doc.setFont("helvetica", "normal");
-        doc.text(`PERÍODO: ${dataInicioStr.split('-').reverse().join('/')} até ${dataFimStr.split('-').reverse().join('/')}`, 105, 22, {align: "center"});
+        doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("RELATÓRIO DE BOLETOS A RECEBER", 105, 15, {align: "center"});
+        doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`PERÍODO: ${dataInicioStr.split('-').reverse().join('/')} até ${dataFimStr.split('-').reverse().join('/')}`, 105, 22, {align: "center"});
         
         let bodyData = []; let total = 0;
-        
         (window.marbeDB.financeiro || []).forEach(f => {
             if(!f.pago) {
-                let passaInicio = !dataInicioStr || f.venc >= dataInicioStr;
-                let passaFim = !dataFimStr || f.venc <= dataFimStr;
-                if (passaInicio && passaFim) {
-                    let status = f.venc < hojeStr ? "ATRASADO" : "Pendente";
-                    total += f.valor;
-                    bodyData.push([f.venc.split('-').reverse().join('/'), `${f.cliente.substring(0,25)} (OS ${f.os})`, f.parcela, window.fmtMoney(f.valor), status]);
-                }
+                let passaInicio = !dataInicioStr || f.venc >= dataInicioStr; let passaFim = !dataFimStr || f.venc <= dataFimStr;
+                if (passaInicio && passaFim) { let status = f.venc < hojeStr ? "ATRASADO" : "Pendente"; total += f.valor; bodyData.push([f.venc.split('-').reverse().join('/'), `${f.cliente.substring(0,25)} (OS ${f.os})`, f.parcela, window.fmtMoney(f.valor), status]); }
             }
         });
         
         if(bodyData.length === 0) return alert("Nenhum boleto encontrado no filtro atual para imprimir.");
-        
-        bodyData.sort((a,b) => {
-            let dA = a[0].split('/').reverse().join('');
-            let dB = b[0].split('/').reverse().join('');
-            return dA.localeCompare(dB);
-        });
+        bodyData.sort((a,b) => { let dA = a[0].split('/').reverse().join(''); let dB = b[0].split('/').reverse().join(''); return dA.localeCompare(dB); });
 
-        doc.autoTable({ 
-            startY: 30, 
-            head: [['VENCIMENTO', 'CLIENTE / OS', 'PARC.', 'VALOR (R$)', 'STATUS']], 
-            body: bodyData, 
-            theme: 'striped', 
-            headStyles: { fillColor: [16, 185, 129] },
-            columnStyles: { 3: { halign: 'right' } }
-        });
-        
+        doc.autoTable({ startY: 30, head: [['VENCIMENTO', 'CLIENTE / OS', 'PARC.', 'VALOR (R$)', 'STATUS']], body: bodyData, theme: 'striped', headStyles: { fillColor: [16, 185, 129] }, columnStyles: { 3: { halign: 'right' } } });
         let finalY = doc.lastAutoTable.finalY + 10;
-        doc.setFontSize(12); doc.setFont("helvetica", "bold");
-        doc.text(`TOTAL A RECEBER (NO FILTRO): ${window.fmtMoney(total)}`, 195, finalY, {align: 'right'});
-        
+        doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.text(`TOTAL A RECEBER (NO FILTRO): ${window.fmtMoney(total)}`, 195, finalY, {align: 'right'});
         window.open(URL.createObjectURL(doc.output('blob')), '_blank');
     }
 
     /* --- ABA 5: RELATÓRIOS (DRE) --- */
     window.gerarRelatorio = function() {
-        const dataInicio = document.getElementById('relInicio').value;
-        const dataFim = document.getElementById('relFim').value;
-        const tipoDRE = document.getElementById('relTipo').value; 
-        
+        const dataInicio = document.getElementById('relInicio').value; const dataFim = document.getElementById('relFim').value; const tipoDRE = document.getElementById('relTipo').value; 
         if(!dataInicio || !dataFim) return alert("Por favor, selecione as datas de Início e Fim para gerar o relatório.");
 
-        let totalRecebido = 0; 
-        let totalGasto = 0; 
-        let htmlExtrato = `
-            <table style="margin-top:20px;">
-                <thead>
-                    <tr>
-                        <th>Data Realizada</th>
-                        <th>Descrição / Cliente</th>
-                        <th>Tipo / Categoria</th>
-                        <th style="text-align:right;">Valor (R$)</th>
-                    </tr>
-                </thead>
-                <tbody>`;
+        let totalRecebido = 0; let totalGasto = 0; 
+        let htmlExtrato = `<table style="margin-top:20px;"><thead><tr><th>Data Realizada</th><th>Descrição / Cliente</th><th>Tipo / Categoria</th><th style="text-align:right;">Valor (R$)</th></tr></thead><tbody>`;
 
         if (tipoDRE === 'todos' || tipoDRE === 'entradas') {
             (window.marbeDB.financeiro || []).forEach(f => {
                 if (f.pago && f.dataRecebimento >= dataInicio && f.dataRecebimento <= dataFim) {
                     totalRecebido += f.valor;
-                    htmlExtrato += `
-                    <tr>
-                        <td style="font-weight:600;">${f.dataRecebimento.split('-').reverse().join('/')}</td>
-                        <td><strong style="color:var(--dark);">${f.cliente}</strong><br><span style="font-size:11px; color:var(--text-muted);">OS: ${f.os} - Parcela ${f.parcela}</span></td>
-                        <td><span class="badge badge-ok">RECEITA (BOLETO)</span></td>
-                        <td style="text-align:right; color:var(--success); font-weight:800;">+ ${window.fmtMoney(f.valor)}</td>
-                    </tr>`;
+                    htmlExtrato += `<tr><td style="font-weight:600;">${f.dataRecebimento.split('-').reverse().join('/')}</td><td><strong style="color:var(--text-main);">${f.cliente}</strong><br><span style="font-size:11px; color:var(--text-muted);">OS: ${f.os} - Parcela ${f.parcela}</span></td><td><span class="badge badge-ok">RECEITA (BOLETO)</span></td><td style="text-align:right; color:var(--success); font-weight:800;">+ ${window.fmtMoney(f.valor)}</td></tr>`;
                 }
             });
         }
@@ -1104,112 +866,65 @@
             (window.marbeDB.fin_despesas || []).forEach(d => {
                 if (d.pago && d.dataPagamento >= dataInicio && d.dataPagamento <= dataFim) {
                     totalGasto += d.valor;
-                    htmlExtrato += `
-                    <tr>
-                        <td style="font-weight:600;">${d.dataPagamento.split('-').reverse().join('/')}</td>
-                        <td><strong style="color:var(--dark);">${d.desc}</strong></td>
-                        <td><span class="badge badge-alert">SAÍDA (${d.categoria.toUpperCase()})</span></td>
-                        <td style="text-align:right; color:var(--danger); font-weight:800;">- ${window.fmtMoney(d.valor)}</td>
-                    </tr>`;
+                    htmlExtrato += `<tr><td style="font-weight:600;">${d.dataPagamento.split('-').reverse().join('/')}</td><td><strong style="color:var(--text-main);">${d.desc}</strong></td><td><span class="badge badge-alert">SAÍDA (${d.categoria.toUpperCase()})</span></td><td style="text-align:right; color:var(--danger); font-weight:800;">- ${window.fmtMoney(d.valor)}</td></tr>`;
                 }
             });
         }
 
-        if(totalRecebido === 0 && totalGasto === 0) {
-            htmlExtrato += `<tr><td colspan="4" style="text-align:center; padding:30px; color:var(--text-muted);">Nenhuma movimentação encontrada neste período/filtro.</td></tr>`;
-        }
-
+        if(totalRecebido === 0 && totalGasto === 0) { htmlExtrato += `<tr><td colspan="4" style="text-align:center; padding:40px; color:var(--text-muted);">Nenhuma movimentação encontrada neste período/filtro.</td></tr>`; }
         htmlExtrato += `</tbody></table>`;
-        
         let resultado = totalRecebido - totalGasto;
 
-        document.getElementById('relFaturado').innerText = window.fmtMoney(totalRecebido);
-        document.getElementById('relGasto').innerText = window.fmtMoney(totalGasto);
-        document.getElementById('relLiquido').innerText = window.fmtMoney(resultado);
-        document.getElementById('relLiquido').style.color = resultado >= 0 ? "var(--success)" : "var(--danger)";
+        document.getElementById('relFaturado').innerText = window.fmtMoney(totalRecebido); document.getElementById('relGasto').innerText = window.fmtMoney(totalGasto); document.getElementById('relLiquido').innerText = window.fmtMoney(resultado); document.getElementById('relLiquido').style.color = resultado >= 0 ? "var(--success)" : "var(--danger)";
         
-        document.getElementById('painelRelatorio').style.display = 'grid';
-        document.getElementById('botoesDRE').style.display = 'block'; 
-        document.getElementById('listaExtratoDetalhados').innerHTML = htmlExtrato;
+        document.getElementById('painelRelatorio').style.display = 'grid'; document.getElementById('botoesDRE').style.display = 'block'; document.getElementById('listaExtratoDetalhados').innerHTML = htmlExtrato;
     }
 
     window.gerarPDFDRE = function() {
-        const dtIni = document.getElementById('relInicio').value;
-        const dtFim = document.getElementById('relFim').value;
-        const tipoDRE = document.getElementById('relTipo').value;
-        
+        const dtIni = document.getElementById('relInicio').value; const dtFim = document.getElementById('relFim').value; const tipoDRE = document.getElementById('relTipo').value;
         if(!dtIni || !dtFim) return alert("Gere o relatório na tela primeiro.");
         if(!window.jspdf) return alert("Aguarde a biblioteca PDF carregar.");
         const { jsPDF } = window.jspdf; const doc = new jsPDF();
         
-        doc.setFontSize(14); doc.setFont("helvetica", "bold"); 
-        doc.text("DEMONSTRATIVO DE RESULTADOS (DRE) E FLUXO", 105, 15, {align: "center"});
-        doc.setFontSize(10); doc.setFont("helvetica", "normal");
-        let lblFiltro = tipoDRE === 'entradas' ? 'Somente Receitas' : (tipoDRE === 'saidas' ? 'Somente Despesas' : 'Geral');
+        doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text("DEMONSTRATIVO DE RESULTADOS (DRE) E FLUXO", 105, 15, {align: "center"});
+        doc.setFontSize(10); doc.setFont("helvetica", "normal"); let lblFiltro = tipoDRE === 'entradas' ? 'Somente Receitas' : (tipoDRE === 'saidas' ? 'Somente Despesas' : 'Geral');
         doc.text(`PERÍODO: ${dtIni.split('-').reverse().join('/')} até ${dtFim.split('-').reverse().join('/')} | Filtro: ${lblFiltro}`, 105, 22, {align: "center"});
         
-        let totalRecebido = 0; let totalGasto = 0; let bodyData = [];
-        let extratoArray = [];
+        let totalRecebido = 0; let totalGasto = 0; let bodyData = []; let extratoArray = [];
         
         if (tipoDRE === 'todos' || tipoDRE === 'entradas') {
             (window.marbeDB.financeiro || []).forEach(f => {
-                if (f.pago && f.dataRecebimento >= dtIni && f.dataRecebimento <= dtFim) {
-                    totalRecebido += f.valor;
-                    extratoArray.push({ dataIso: f.dataRecebimento, dataBr: f.dataRecebimento.split('-').reverse().join('/'), desc: `${f.cliente.substring(0,25)} (OS ${f.os})`, tipo: 'RECEITA (+)', valor: f.valor });
-                }
+                if (f.pago && f.dataRecebimento >= dtIni && f.dataRecebimento <= dtFim) { totalRecebido += f.valor; extratoArray.push({ dataIso: f.dataRecebimento, dataBr: f.dataRecebimento.split('-').reverse().join('/'), desc: `${f.cliente.substring(0,25)} (OS ${f.os})`, tipo: 'RECEITA (+)', valor: f.valor }); }
             });
         }
         
         if (tipoDRE === 'todos' || tipoDRE === 'saidas') {
             (window.marbeDB.fin_despesas || []).forEach(d => {
-                if (d.pago && d.dataPagamento >= dtIni && d.dataPagamento <= dtFim) {
-                    totalGasto += d.valor;
-                    extratoArray.push({ dataIso: d.dataPagamento, dataBr: d.dataPagamento.split('-').reverse().join('/'), desc: d.desc, tipo: `DESPESA (-)`, valor: d.valor * -1 });
-                }
+                if (d.pago && d.dataPagamento >= dtIni && d.dataPagamento <= dtFim) { totalGasto += d.valor; extratoArray.push({ dataIso: d.dataPagamento, dataBr: d.dataPagamento.split('-').reverse().join('/'), desc: d.desc, tipo: `DESPESA (-)`, valor: d.valor * -1 }); }
             });
         }
         
         extratoArray.sort((a,b) => a.dataIso.localeCompare(b.dataIso));
-        extratoArray.forEach(item => {
-            bodyData.push([item.dataBr, item.desc, item.tipo, window.fmtMoney(Math.abs(item.valor))]);
-        });
+        extratoArray.forEach(item => { bodyData.push([item.dataBr, item.desc, item.tipo, window.fmtMoney(Math.abs(item.valor))]); });
 
-        doc.autoTable({
-            startY: 30,
-            head: [['DATA', 'DESCRIÇÃO/CLIENTE', 'TIPO', 'VALOR']],
-            body: bodyData,
-            theme: 'grid',
-            headStyles: { fillColor: [15, 23, 42] },
-            columnStyles: { 3: { halign: 'right' } }
-        });
+        doc.autoTable({ startY: 30, head: [['DATA', 'DESCRIÇÃO/CLIENTE', 'TIPO', 'VALOR']], body: bodyData, theme: 'grid', headStyles: { fillColor: [15, 23, 42] }, columnStyles: { 3: { halign: 'right' } } });
         
-        let finalY = doc.lastAutoTable.finalY + 10;
-        let resultado = totalRecebido - totalGasto;
-        
-        doc.setFontSize(11);
-        doc.text(`TOTAL ENTRADAS (RECEITAS): ${window.fmtMoney(totalRecebido)}`, 20, finalY);
-        doc.text(`TOTAL SAÍDAS (DESPESAS): ${window.fmtMoney(totalGasto)}`, 20, finalY + 6);
-        
-        doc.setFontSize(13); doc.setFont("helvetica", "bold"); 
-        doc.setTextColor(resultado >= 0 ? 16 : 239, resultado >= 0 ? 185 : 68, resultado >= 0 ? 129 : 68);
-        doc.text(`RESULTADO DO CAIXA: ${window.fmtMoney(resultado)}`, 20, finalY + 15);
-        
+        let finalY = doc.lastAutoTable.finalY + 10; let resultado = totalRecebido - totalGasto;
+        doc.setFontSize(11); doc.text(`TOTAL ENTRADAS (RECEITAS): ${window.fmtMoney(totalRecebido)}`, 20, finalY); doc.text(`TOTAL SAÍDAS (DESPESAS): ${window.fmtMoney(totalGasto)}`, 20, finalY + 6);
+        doc.setFontSize(13); doc.setFont("helvetica", "bold"); doc.setTextColor(resultado >= 0 ? 16 : 239, resultado >= 0 ? 185 : 68, resultado >= 0 ? 129 : 68); doc.text(`RESULTADO DO CAIXA: ${window.fmtMoney(resultado)}`, 20, finalY + 15);
         window.open(URL.createObjectURL(doc.output('blob')), '_blank');
     }
 
     /* --- ABA 6: COMISSÕES --- */
     window.renderComissoes = function() {
-        let statusFilter = document.getElementById('filtroComissaoStatus').value;
-        let dtIni = document.getElementById('filtroComissaoInicio').value;
-        let dtFim = document.getElementById('filtroComissaoFim').value;
+        let statusFilter = document.getElementById('filtroComissaoStatus').value; let dtIni = document.getElementById('filtroComissaoInicio').value; let dtFim = document.getElementById('filtroComissaoFim').value;
         let html = '';
         
         let arrComissoes = (window.marbeDB.fin_despesas || []).map((d, i) => ({...d, indexOriginal: i})).filter(d => d.categoria === "Comissão - Marcelo");
         arrComissoes.sort((a,b) => a.venc.localeCompare(b.venc));
 
         arrComissoes.forEach(c => {
-            let matchesStatus = (statusFilter === 'pagas') ? c.pago : !c.pago;
-            let dateToCompare = c.pago ? c.dataPagamento : c.venc;
+            let matchesStatus = (statusFilter === 'pagas') ? c.pago : !c.pago; let dateToCompare = c.pago ? c.dataPagamento : c.venc;
             let matchesDate = (!dtIni || !dtFim) || (dateToCompare >= dtIni && dateToCompare <= dtFim);
 
             if(matchesStatus && matchesDate) {
@@ -1219,22 +934,22 @@
                 html += `
                 <div class="card-list" style="border-left-color:${color};">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <strong style="color:var(--dark); font-size:16px;">${c.desc}</strong>
-                        <span class="badge" style="background:#fff7ed; color:var(--comissao); border:1px solid #fed7aa;">Comissão Operacional</span>
+                        <strong style="color:var(--text-main); font-size:18px;">${c.desc}</strong>
+                        <span class="badge" style="background:rgba(234, 88, 12, 0.1); color:var(--comissao); border:1px solid var(--comissao);">Comissão Operacional</span>
                     </div>
-                    <div style="font-size:24px; font-weight:800; margin:12px 0; color:${color}">${window.fmtMoney(c.valor)}</div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px; padding-top:15px; border-top:1px dashed var(--border); flex-wrap:wrap; gap:10px;">
-                        <span style="font-size:13px; color:var(--text-muted)"><i data-lucide="calendar" style="width:14px; vertical-align:middle;"></i> ${lblData}</span>
-                        <div style="display:flex; gap:10px;">
-                            ${!c.pago ? `<button class="btn btn-outline" style="padding:10px 15px;" onclick="editarDespesa(${c.indexOriginal})"><i data-lucide="edit-3"></i> EDITAR</button>` : ''}
-                            ${!c.pago ? `<button class="btn" style="background:var(--comissao); padding:10px 20px;" onclick="pagarComissao(${c.indexOriginal})"><i data-lucide="check"></i> MARCAR COMO PAGA</button>` : ''}
+                    <div style="font-size:28px; font-weight:800; margin:15px 0; color:${color}">${window.fmtMoney(c.valor)}</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; padding-top:20px; border-top:1px dashed var(--border); flex-wrap:wrap; gap:10px;">
+                        <span style="font-size:14px; color:var(--text-muted)"><i data-lucide="calendar" style="width:16px; vertical-align:middle;"></i> ${lblData}</span>
+                        <div style="display:flex; gap:12px;">
+                            ${!c.pago ? `<button class="btn btn-outline" style="padding:12px 18px;" onclick="editarDespesa(${c.indexOriginal})"><i data-lucide="edit-3"></i> EDITAR</button>` : ''}
+                            ${!c.pago ? `<button class="btn" style="background:var(--comissao); padding:12px 25px;" onclick="pagarComissao(${c.indexOriginal})"><i data-lucide="check"></i> MARCAR COMO PAGA</button>` : ''}
                         </div>
                     </div>
                 </div>`;
             }
         });
 
-        document.getElementById('listaComissoes').innerHTML = html || "<div style='text-align:center; padding:40px; background:white; border-radius:12px; border:1px dashed var(--border); color:var(--text-muted);'><i data-lucide='calculator' style='width:32px; height:32px; opacity:0.5;'></i><p>Nenhuma comissão encontrada para este filtro.</p></div>";
+        document.getElementById('listaComissoes').innerHTML = html || "<div style='text-align:center; padding:50px; background:var(--card-bg); border-radius:12px; border:1px dashed var(--border); color:var(--text-muted);'><i data-lucide='calculator' style='width:40px; height:40px; opacity:0.5; margin-bottom:15px;'></i><p>Nenhuma comissão encontrada para este filtro.</p></div>";
         lucide.createIcons();
     }
 
@@ -1243,61 +958,35 @@
         let dataDigitada = prompt("Data em que o Marcelo recebeu a comissão (AAAA-MM-DD):", hojeStr);
         if(!dataDigitada) return; 
         
-        window.marbeDB.fin_despesas[i].pago = true;
-        window.marbeDB.fin_despesas[i].dataPagamento = dataDigitada;
-        window.salvarNuvem(true); 
-        renderComissoes();
+        window.marbeDB.fin_despesas[i].pago = true; window.marbeDB.fin_despesas[i].dataPagamento = dataDigitada;
+        window.salvarNuvem(true); renderComissoes();
     }
 
     window.gerarPDFComissoes = function() {
-        let statusFilter = document.getElementById('filtroComissaoStatus').value; 
-        let dtIni = document.getElementById('filtroComissaoInicio').value;
-        let dtFim = document.getElementById('filtroComissaoFim').value;
-        
+        let statusFilter = document.getElementById('filtroComissaoStatus').value; let dtIni = document.getElementById('filtroComissaoInicio').value; let dtFim = document.getElementById('filtroComissaoFim').value;
         if(!window.jspdf) return alert("Aguarde a biblioteca PDF carregar.");
         const { jsPDF } = window.jspdf; const doc = new jsPDF();
         
         let statusStr = statusFilter === 'pagas' ? "COMISSÕES JÁ PAGAS" : "COMISSÕES ABERTAS / PENDENTES";
-        
-        doc.setFontSize(14); doc.setFont("helvetica", "bold"); 
-        doc.text(`RELATÓRIO: ${statusStr}`, 105, 15, {align: "center"});
-        doc.setFontSize(10); doc.setFont("helvetica", "normal");
-        doc.text(`PERÍODO: ${dtIni.split('-').reverse().join('/')} até ${dtFim.split('-').reverse().join('/')}`, 105, 22, {align: "center"});
+        doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text(`RELATÓRIO: ${statusStr}`, 105, 15, {align: "center"});
+        doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`PERÍODO: ${dtIni.split('-').reverse().join('/')} até ${dtFim.split('-').reverse().join('/')}`, 105, 22, {align: "center"});
         
         let bodyData = []; let total = 0;
         let arrComissoes = (window.marbeDB.fin_despesas || []).filter(d => d.categoria === "Comissão - Marcelo");
         
         arrComissoes.forEach(c => {
-            let matchesStatus = (statusFilter === 'pagas') ? c.pago : !c.pago;
-            let dateToCompare = c.pago ? c.dataPagamento : c.venc;
+            let matchesStatus = (statusFilter === 'pagas') ? c.pago : !c.pago; let dateToCompare = c.pago ? c.dataPagamento : c.venc;
             let matchesDate = (!dtIni || !dtFim) || (dateToCompare >= dtIni && dateToCompare <= dtFim);
-
-            if(matchesStatus && matchesDate) {
-                total += c.valor;
-                let dtBr = dateToCompare.split('-').reverse().join('/');
-                bodyData.push([dtBr, c.desc, window.fmtMoney(c.valor)]);
-            }
+            if(matchesStatus && matchesDate) { total += c.valor; let dtBr = dateToCompare.split('-').reverse().join('/'); bodyData.push([dtBr, c.desc, window.fmtMoney(c.valor)]); }
         });
         
         if(bodyData.length === 0) return alert("Nenhuma comissão no filtro atual para imprimir.");
 
-        doc.autoTable({
-            startY: 30,
-            head: [['DATA', 'REFERÊNCIA DA COMISSÃO', 'VALOR (R$)']],
-            body: bodyData,
-            theme: 'striped',
-            headStyles: { fillColor: [234, 88, 12] },
-            columnStyles: { 2: { halign: 'right' } }
-        });
-        
+        doc.autoTable({ startY: 30, head: [['DATA', 'REFERÊNCIA DA COMISSÃO', 'VALOR (R$)']], body: bodyData, theme: 'striped', headStyles: { fillColor: [234, 88, 12] }, columnStyles: { 2: { halign: 'right' } } });
         let finalY = doc.lastAutoTable.finalY + 10;
-        doc.setFontSize(12); doc.setFont("helvetica", "bold"); 
-        doc.setTextColor(234, 88, 12);
-        doc.text(`TOTAL EM COMISSÕES NO PERÍODO: ${window.fmtMoney(total)}`, 195, finalY, {align: 'right'});
-        
+        doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(234, 88, 12); doc.text(`TOTAL EM COMISSÕES NO PERÍODO: ${window.fmtMoney(total)}`, 195, finalY, {align: 'right'});
         window.open(URL.createObjectURL(doc.output('blob')), '_blank');
     }
-
 </script>
 </body>
 </html>

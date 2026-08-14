@@ -56,12 +56,19 @@
 
   <style>
     :root { 
-      --primary: #0f172a; --primary-hover: #1e293b; --accent: #2563eb; --accent-hover: #1d4ed8;
+      /* Paleta Escura (Dark Mode) */
+      --bg-color: #0f172a;        
+      --card-bg: #1e293b;         
+      --border: #334155;          
+      --text-main: #f8fafc;       
+      --text-muted: #94a3b8;      
+      --sidebar-bg: #020617;      
+      
+      --primary: #3b82f6; --primary-hover: #2563eb; --accent: #3b82f6; --accent-hover: #2563eb;
       --success: #10b981; --danger: #ef4444; --info: #0ea5e9; --warning: #f59e0b;
-      --bg-color: #f8fafc; --card-bg: #ffffff; --border: #e2e8f0; 
-      --text-main: #334155; --text-muted: #64748b;
+      
       --frio: #0ea5e9; --morno: #f59e0b; --quente: #ef4444; --pendente: #3b82f6; --perdido: #64748b; --lead: #8b5cf6;
-      --sidebar-width: 260px; --sidebar-collapsed: 70px; --header-height: 70px; --border-radius: 10px;
+      --sidebar-width: 280px; --sidebar-collapsed: 80px; --header-height: 70px; --border-radius: 12px;
     }
     
     * { box-sizing: border-box; }
@@ -70,103 +77,113 @@
     /* App Layout (Shell) */
     .app-layout { display: flex; height: 100vh; overflow: hidden; }
     
-    /* Sidebar */
-    .sidebar { width: var(--sidebar-width); background: var(--primary); color: #fff; display: flex; flex-direction: column; transition: width 0.3s ease; flex-shrink: 0; z-index: 50; }
+    /* SIDEBAR UNIFICADA */
+    .sidebar { width: var(--sidebar-width); background: var(--sidebar-bg); color: #fff; display: flex; flex-direction: column; transition: width 0.3s ease; flex-shrink: 0; z-index: 50; border-right: 1px solid var(--border); }
     .sidebar.collapsed { width: var(--sidebar-collapsed); }
-    .sidebar-brand { height: var(--header-height); display: flex; align-items: center; padding: 0 20px; font-size: 18px; font-weight: 800; border-bottom: 1px solid rgba(255,255,255,0.1); letter-spacing: -0.5px; white-space: nowrap; overflow: hidden; }
-    .sidebar-brand i { margin-right: 12px; color: var(--accent); }
-    .sidebar-nav { flex: 1; overflow-y: auto; padding: 15px 10px; display: flex; flex-direction: column; gap: 4px; }
-    .sidebar-nav::-webkit-scrollbar { width: 4px; }
-    .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+    .sidebar-brand { height: var(--header-height); display: flex; align-items: center; padding: 0 25px; font-size: 20px; font-weight: 800; border-bottom: 1px solid var(--border); letter-spacing: -0.5px; white-space: nowrap; overflow: hidden; flex-shrink: 0;}
+    .sidebar-brand i { margin-right: 15px; color: var(--accent); width: 24px; height: 24px; }
     
-    .nav-label { font-size: 11px; color: #94a3b8; font-weight: 600; text-transform: uppercase; padding: 10px 10px 5px; margin-top: 10px; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; }
+    .sidebar-nav { flex: 1; overflow-y: auto; padding: 20px 15px; display: flex; flex-direction: column; }
+    .sidebar-nav::-webkit-scrollbar { width: 4px; }
+    .sidebar-nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    
+    .nav-label { font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; margin: 15px 0 8px 10px; letter-spacing: 1px; white-space: nowrap; overflow: hidden; }
     .sidebar.collapsed .nav-label { display: none; }
     
-    .tab-btn { display: flex; align-items: center; padding: 12px 10px; color: #cbd5e1; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 14px; transition: all 0.2s; white-space: nowrap; border: none; background: transparent; width: 100%; cursor: pointer; text-align: left; }
-    .tab-btn i { width: 20px; height: 20px; margin-right: 15px; flex-shrink: 0; }
-    .tab-btn:hover { background: rgba(255,255,255,0.05); color: #fff; }
-    .tab-btn.active { background: var(--accent); color: #fff; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .tab-btn { display: flex; align-items: center; padding: 12px 15px; color: #94a3b8; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 14px; transition: all 0.2s; white-space: nowrap; border: none; background: transparent; width: 100%; cursor: pointer; text-align: left; margin-bottom: 4px; }
+    .tab-btn i { width: 20px; height: 20px; margin-right: 15px; flex-shrink: 0; color: #64748b; transition: 0.2s; }
+    .tab-btn:hover { background: rgba(255,255,255,0.05); color: #f8fafc; }
+    .tab-btn:hover i { color: #f8fafc; }
+    .tab-btn.active { background: var(--accent); color: #fff; font-weight: 600; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2); }
+    .tab-btn.active i { color: #fff; }
     .tab-btn span { transition: opacity 0.2s; }
     .sidebar.collapsed .tab-btn span { display: none; }
-    .sidebar.collapsed .tab-btn { justify-content: center; padding: 12px 0; }
+    .sidebar.collapsed .tab-btn { justify-content: center; padding: 15px 0; }
     .sidebar.collapsed .tab-btn i { margin-right: 0; }
 
-    /* Main Content Area */
+    /* HEADER */
     .main-wrapper { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-    
-    /* Header */
-    .topbar { height: var(--header-height); background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 25px; z-index: 40; flex-shrink: 0; }
+    .topbar { height: var(--header-height); background: var(--card-bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; z-index: 40; flex-shrink: 0; }
     .topbar-left { display: flex; align-items: center; gap: 20px; }
-    .btn-toggle { background: transparent; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 6px; padding: 6px; transition: 0.2s; }
-    .btn-toggle:hover { background: var(--bg-color); color: var(--primary); }
-    .view-title { font-size: 18px; font-weight: 700; color: var(--primary); margin: 0; }
+    .btn-toggle { background: transparent; border: none; color: var(--text-main); cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 8px; padding: 8px; transition: 0.2s; }
+    .btn-toggle:hover { background: var(--bg-color); }
+    .view-title { font-size: 24px; font-weight: 700; color: var(--text-main); margin: 0; }
     
     .topbar-right { display: flex; align-items: center; gap: 20px; }
-    .user-profile { display: flex; align-items: center; gap: 10px; padding: 6px 12px; background: var(--bg-color); border-radius: 20px; border: 1px solid var(--border); cursor: pointer; }
-    .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
+    .user-profile { display: flex; align-items: center; gap: 12px; padding: 6px 16px; background: var(--bg-color); border-radius: 20px; border: 1px solid var(--border); cursor: pointer; }
+    .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
     .user-info { display: flex; flex-direction: column; }
-    .user-name { font-size: 13px; font-weight: 600; color: var(--primary); }
-    .user-role { font-size: 11px; color: var(--text-muted); }
+    .user-name { font-size: 14px; font-weight: 600; color: var(--text-main); }
+    .user-role { font-size: 12px; color: var(--text-muted); }
 
-    /* Content */
-    .content-area { flex: 1; overflow-y: auto; padding: 30px; background: var(--bg-color); }
+    /* Content Area */
+    .content-area { flex: 1; overflow-y: auto; padding: 35px; background: var(--bg-color); }
     
-    /* CRM Específico */
+    /* Inputs Dark Mode */
+    label { display: block; margin-top: 0; font-weight: 600; font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+    input, select, textarea { width: 100%; padding: 14px 16px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; color: var(--text-main); font-family: 'Inter', sans-serif; transition: all 0.2s; background: var(--bg-color); margin-bottom: 18px; outline: none; }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); background: var(--card-bg); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+    
+    .btn { padding: 14px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s; outline: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px;}
+    .btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .btn-outline { background: var(--card-bg); border: 1px solid var(--border); color: var(--text-main); }
+    .btn-outline:hover { background: var(--border); }
+
+    /* CRM Específico (Dark) */
     .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
-    .dash-card { background: var(--card-bg); padding: 15px; border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    .dash-card h3 { margin: 0 0 5px 0; font-size: 12px; color: var(--text-muted); text-transform: uppercase; }
-    .dash-card .value { font-size: 22px; font-weight: 700; color: var(--dark); }
+    .dash-card { background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .dash-card h3 { margin: 0 0 8px 0; font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+    .dash-card .value { font-size: 24px; font-weight: 800; color: var(--text-main); }
 
-    .global-panel { background: var(--dark); padding: 20px 25px; border-radius: 12px; margin-bottom: 20px; color: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-left: 5px solid #10b981; flex-wrap: wrap; gap: 15px; }
-    .global-panel h3 { margin: 0 0 5px 0; color: #cbd5e1; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .global-panel .val { font-size: 32px; font-weight: 800; color: #10b981; }
+    .global-panel { background: var(--sidebar-bg); padding: 25px 30px; border-radius: 12px; margin-bottom: 25px; border: 1px solid var(--border); border-left: 5px solid #10b981; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; box-shadow: 0 10px 15px rgba(0,0,0,0.2); }
+    .global-panel h3 { margin: 0 0 8px 0; color: var(--text-muted); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+    .global-panel .val { font-size: 36px; font-weight: 800; color: #10b981; }
     .global-panel .qtd-box { text-align: right; }
-    .global-panel .qtd { font-size: 24px; font-weight: 700; }
-    .global-panel .qtd-label { font-size: 12px; color: #cbd5e1; }
+    .global-panel .qtd { font-size: 28px; font-weight: 800; color: var(--text-main); }
+    .global-panel .qtd-label { font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; margin-top: 5px; }
 
-    .kanban-board { display: flex; gap: 15px; overflow-x: auto; padding-bottom: 10px; align-items: flex-start; }
-    .kanban-col { flex: 1; min-width: 300px; background: #e2e8f0; padding: 12px; border-radius: 10px; display: flex; flex-direction: column; gap: 12px; transition: all 0.3s ease; }
-    .kanban-header { font-weight: 700; font-size: 14px; text-transform: uppercase; padding-bottom: 10px; border-bottom: 2px solid rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+    /* Kanban Dark Mode */
+    .kanban-board { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 15px; align-items: flex-start; }
+    .kanban-board::-webkit-scrollbar { height: 8px; }
+    .kanban-board::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    
+    .kanban-col { flex: 1; min-width: 320px; background: var(--bg-color); padding: 15px; border-radius: 12px; display: flex; flex-direction: column; gap: 15px; transition: all 0.3s ease; border: 1px solid var(--border); }
+    .kanban-header { font-weight: 700; font-size: 14px; text-transform: uppercase; padding-bottom: 15px; border-bottom: 2px solid var(--border); display: flex; justify-content: space-between; align-items: center; letter-spacing: 0.5px; }
     
     .col-pendente .kanban-header { color: var(--pendente); }
     .col-frio .kanban-header { color: var(--frio); }
     .col-morno .kanban-header { color: var(--morno); }
     .col-quente .kanban-header { color: var(--quente); }
-    .col-perdido .kanban-header { color: var(--perdido); }
+    .col-perdido .kanban-header { color: var(--text-muted); }
 
-    .k-card { background: var(--card-bg); padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 4px solid #cbd5e1; display: flex; flex-direction: column; gap: 8px; transition: transform 0.2s; }
-    .k-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .k-card { background: var(--card-bg); padding: 18px; border-radius: 10px; border: 1px solid var(--border); border-left: 4px solid var(--border); display: flex; flex-direction: column; gap: 8px; transition: transform 0.2s, box-shadow 0.2s; }
+    .k-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px rgba(0,0,0,0.3); }
+    
     .col-pendente .k-card { border-left-color: var(--pendente); }
     .col-frio .k-card { border-left-color: var(--frio); }
     .col-morno .k-card { border-left-color: var(--morno); }
     .col-quente .k-card { border-left-color: var(--quente); }
-    .col-perdido .k-card { border-left-color: var(--perdido); opacity: 0.8; }
+    .col-perdido .k-card { border-left-color: var(--border); opacity: 0.7; }
 
-    .c-title { font-weight: 700; font-size: 14px; color: var(--dark); }
-    .c-subtitle { font-size: 11px; color: var(--text-muted); }
-    .c-value { font-size: 16px; font-weight: 700; color: var(--success); }
+    .c-title { font-weight: 700; font-size: 15px; color: var(--text-main); }
+    .c-subtitle { font-size: 12px; color: var(--text-muted); }
+    .c-value { font-size: 18px; font-weight: 800; color: var(--success); margin-top: 5px; }
     
-    .c-actions { display: flex; gap: 5px; margin-top: 10px; flex-wrap: wrap; }
-    .btn-sm { padding: 6px 10px; border: none; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; flex: 1; text-align: center; }
-    .btn-frio { background: #e0f2fe; color: #0284c7; }
-    .btn-morno { background: #fef3c7; color: #b45309; }
-    .btn-quente { background: #fee2e2; color: #b91c1c; }
-    .btn-ganho { background: #dcfce7; color: #15803d; }
-    .btn-perder { background: #e2e8f0; color: #475569; }
+    .c-actions { display: flex; gap: 8px; margin-top: 15px; flex-wrap: wrap; }
+    .btn-sm { padding: 8px 12px; border: none; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; cursor: pointer; flex: 1; text-align: center; border: 1px solid transparent; }
+    
+    /* Botões Escuros */
+    .btn-frio { background: #0c4a6e; color: #38bdf8; border-color: #0369a1; }
+    .btn-morno { background: #451a03; color: #fbbf24; border-color: #b45309; }
+    .btn-quente { background: #7f1d1d; color: #fca5a5; border-color: #b91c1c; }
+    .btn-ganho { background: #064e3b; color: #6ee7b7; border-color: #047857; }
+    .btn-perder { background: var(--bg-color); color: var(--text-muted); border-color: var(--border); }
 
-    .modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); display: none; z-index: 10000; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
-    .modal-content { background: #fff; width: 100%; max-width: 450px; padding: 35px; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
-    .modal-title { margin-top: 0; color: var(--dark); font-size: 20px; font-weight: 700; border-bottom: 1px solid var(--border); padding-bottom: 15px; margin-bottom: 20px; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(2, 6, 23, 0.9); display: none; z-index: 10000; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
+    .modal-content { background: var(--card-bg); width: 100%; max-width: 450px; padding: 40px; border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 25px 50px rgba(0,0,0,0.5); }
+    .modal-title { margin-top: 0; color: var(--text-main); font-size: 22px; font-weight: 800; border-bottom: 1px solid var(--border); padding-bottom: 20px; margin-bottom: 25px; }
     
-    label { display: block; margin-top: 0; font-weight: 600; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
-    select, input, textarea { width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; box-sizing: border-box; font-family: 'Inter', sans-serif; margin-bottom: 15px; outline: none; transition: 0.2s; }
-    input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
-    .btn { padding: 14px 20px; background: var(--accent); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s; outline: none; }
-    .btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
-    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-main); }
-    .btn-outline:hover { background: var(--bg-color); }
-    
-    .motivo-tag { display: inline-block; padding: 4px 8px; background: #f1f5f9; color: var(--text-muted); border-radius: 4px; font-size: 10px; font-weight: bold; margin-top: 5px; }
+    .motivo-tag { display: inline-block; padding: 6px 10px; background: var(--bg-color); color: var(--text-muted); border-radius: 6px; font-size: 11px; font-weight: 700; border: 1px solid var(--border); margin-top: 5px; }
 
     @media (max-width: 1024px) {
       .sidebar { position: fixed; height: 100%; transform: translateX(-100%); }
@@ -178,7 +195,7 @@
 
 <div class="app-layout" id="appContainer">
     
-  <!-- SIDEBAR -->
+  <!-- SIDEBAR DARK -->
   <aside class="sidebar" id="sidebar">
       <div class="sidebar-brand">
           <i data-lucide="layers"></i>
@@ -187,39 +204,27 @@
       
       <div class="sidebar-nav">
           <div class="nav-label">Visão Geral</div>
-          <button class="tab-btn" onclick="window.location.href='dashboard.html'">
-              <i data-lucide="layout-dashboard"></i> <span>Dashboard</span>
-          </button>
+          <button class="tab-btn" onclick="window.location.href='dashboard.html'"><i data-lucide="layout-dashboard"></i> <span>Dashboard</span></button>
 
           <div class="nav-label">Comercial</div>
-          <button class="tab-btn" onclick="window.location.href='index.html'">
-              <i data-lucide="calculator"></i> <span>Calculadora</span>
-          </button>
-          <button class="tab-btn active" onclick="window.location.href='crm.html'">
-              <i data-lucide="pie-chart"></i> <span>CRM Vendas</span>
-          </button>
+          <button class="tab-btn" onclick="window.location.href='index.html'"><i data-lucide="calculator"></i> <span>Calculadora</span></button>
+          <button class="tab-btn active" onclick="window.location.href='crm.html'"><i data-lucide="pie-chart"></i> <span>CRM Vendas</span></button>
 
           <div class="nav-label">Consultas e Dados</div>
-          <button class="tab-btn" onclick="window.location.href='pesquisa_descricao.html'">
-              <i data-lucide="search"></i> <span>Pesquisa Avançada</span>
-          </button>
+          <button class="tab-btn" onclick="window.location.href='pesquisa_descricao.html'"><i data-lucide="search"></i> <span>Pesquisa Avançada</span></button>
 
           <div class="nav-label">Operação & Fábrica</div>
-          <button class="tab-btn" onclick="window.location.href='pedido_entregue.html'">
-              <i data-lucide="package-check"></i> <span>Expedição</span>
-          </button>
+          <button class="tab-btn" onclick="window.location.href='pedido_entregue.html'"><i data-lucide="package-check"></i> <span>Expedição</span></button>
           
           <div class="nav-label">Administração</div>
-          <button class="tab-btn" onclick="window.location.href='financeiro.html'">
-              <i data-lucide="circle-dollar-sign"></i> <span>Financeiro</span>
-          </button>
+          <button class="tab-btn" onclick="window.location.href='financeiro.html'"><i data-lucide="circle-dollar-sign"></i> <span>Financeiro</span></button>
       </div>
   </aside>
 
   <!-- ÁREA PRINCIPAL -->
   <main class="main-wrapper">
       
-      <!-- HEADER -->
+      <!-- HEADER DARK -->
       <header class="topbar">
           <div class="topbar-left">
               <button class="btn-toggle" onclick="document.getElementById('sidebar').classList.toggle('collapsed')">
@@ -241,9 +246,11 @@
       <!-- CONTEÚDO CRM -->
       <div class="content-area">
           
-          <div style="background:var(--card-bg); padding:20px; border-radius:10px; border:1px solid var(--border); margin-bottom:20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-              <div style="font-weight:700; font-size:12px; margin-bottom:15px; color:var(--primary); text-transform:uppercase;"><i data-lucide="filter" style="width:14px; display:inline-block; vertical-align:middle; margin-right:4px;"></i> Filtros de Pesquisa</div>
-              <div style="display:flex; gap:15px; flex-wrap:wrap; align-items:flex-end;">
+          <div style="background:var(--card-bg); padding:25px; border-radius:12px; border:1px solid var(--border); margin-bottom:25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+              <div style="font-weight:700; font-size:13px; margin-bottom:20px; color:var(--accent); text-transform:uppercase; display:flex; align-items:center; gap:8px;">
+                  <i data-lucide="filter" style="width:16px;"></i> Filtros de Pesquisa
+              </div>
+              <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:flex-end;">
                   <div style="flex:1; min-width:150px;">
                       <label>Data Início</label>
                       <input type="date" id="filtroDataIni" style="margin-bottom:0;">
@@ -256,8 +263,8 @@
                       <label>Número da OS</label>
                       <input type="number" id="filtroOS" placeholder="Ex: 630" style="margin-bottom:0;" onkeyup="if(event.key==='Enter') renderKanban()">
                   </div>
-                  <div style="display:flex; gap:10px;">
-                      <button class="btn" style="background:var(--primary); width:auto;" onclick="renderKanban()">FILTRAR</button>
+                  <div style="display:flex; gap:12px;">
+                      <button class="btn" style="background:var(--accent); width:auto;" onclick="renderKanban()"><i data-lucide="search" style="width:18px;"></i> FILTRAR</button>
                       <button class="btn btn-outline" style="width:auto;" onclick="limparFiltrosCRM()">LIMPAR</button>
                   </div>
               </div>
@@ -275,94 +282,92 @@
           </div>
 
           <div class="dash-grid">
-              <div class="dash-card" style="border-bottom: 3px solid var(--pendente)">
+              <div class="dash-card" style="border-bottom: 4px solid var(--pendente)">
                   <h3>Pendentes (Novos)</h3>
                   <div class="value" id="valPendente">R$ 0,00</div>
               </div>
-              <div class="dash-card" style="border-bottom: 3px solid var(--frio)">
+              <div class="dash-card" style="border-bottom: 4px solid var(--frio)">
                   <h3>Frios (Afastados)</h3>
                   <div class="value" id="valFrio">R$ 0,00</div>
               </div>
-              <div class="dash-card" style="border-bottom: 3px solid var(--morno)">
+              <div class="dash-card" style="border-bottom: 4px solid var(--morno)">
                   <h3>Mornos (Analisando)</h3>
                   <div class="value" id="valMorno">R$ 0,00</div>
               </div>
-              <div class="dash-card" style="border-bottom: 3px solid var(--quente)">
+              <div class="dash-card" style="border-bottom: 4px solid var(--quente)">
                   <h3>Quentes (Quase Fechados)</h3>
                   <div class="value" id="valQuente">R$ 0,00</div>
               </div>
-              <div class="dash-card" style="border-bottom: 3px solid var(--success)">
+              <div class="dash-card" style="border-bottom: 4px solid var(--success)">
                   <h3>Pipeline Total (Aberto)</h3>
                   <div class="value" id="valTotal" style="color:var(--success)">R$ 0,00</div>
               </div>
           </div>
 
-          <!-- PAINEL DE VISÃO (Toggles de Colunas) -->
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:15px;">
-              <h3 style="color:var(--primary); margin:0; font-size:16px;">Controle de Visão (Funil)</h3>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                  <button class="btn btn-outline" id="btnTogLead" onclick="toggleCol('colunaLead', 'btnTogLead')" style="padding:8px 12px; font-size:11px; background:white; color:var(--primary);">
-                      <i data-lucide="eye" style="width:14px;"></i> <span>ENTRADA</span>
+          <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:20px; flex-wrap:wrap; gap:15px;">
+              <h3 style="color:var(--text-main); margin:0; font-size:18px; font-weight:700;">Visão do Funil</h3>
+              <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                  <button class="btn btn-outline" id="btnTogLead" onclick="toggleCol('colunaLead', 'btnTogLead')" style="padding:10px 15px; font-size:12px; color:var(--text-main);">
+                      <i data-lucide="eye" style="width:16px;"></i> <span>ENTRADA</span>
                   </button>
-                  <button class="btn btn-outline" id="btnTogPendente" onclick="toggleCol('colunaPendente', 'btnTogPendente')" style="padding:8px 12px; font-size:11px; background:white; color:var(--pendente);">
-                      <i data-lucide="eye" style="width:14px;"></i> <span>PENDENTES</span>
+                  <button class="btn btn-outline" id="btnTogPendente" onclick="toggleCol('colunaPendente', 'btnTogPendente')" style="padding:10px 15px; font-size:12px; color:var(--pendente); border-color:var(--pendente);">
+                      <i data-lucide="eye" style="width:16px;"></i> <span>PENDENTES</span>
                   </button>
-                  <button class="btn btn-outline" id="btnTogFrio" onclick="toggleCol('colunaFrio', 'btnTogFrio')" style="padding:8px 12px; font-size:11px; background:white; color:var(--frio);">
-                      <i data-lucide="eye" style="width:14px;"></i> <span>FRIOS</span>
+                  <button class="btn btn-outline" id="btnTogFrio" onclick="toggleCol('colunaFrio', 'btnTogFrio')" style="padding:10px 15px; font-size:12px; color:var(--frio); border-color:var(--frio);">
+                      <i data-lucide="eye" style="width:16px;"></i> <span>FRIOS</span>
                   </button>
-                  <button class="btn btn-outline" id="btnTogMorno" onclick="toggleCol('colunaMorno', 'btnTogMorno')" style="padding:8px 12px; font-size:11px; background:white; color:var(--morno);">
-                      <i data-lucide="eye" style="width:14px;"></i> <span>MORNOS</span>
+                  <button class="btn btn-outline" id="btnTogMorno" onclick="toggleCol('colunaMorno', 'btnTogMorno')" style="padding:10px 15px; font-size:12px; color:var(--morno); border-color:var(--morno);">
+                      <i data-lucide="eye" style="width:16px;"></i> <span>MORNOS</span>
                   </button>
-                  <button class="btn btn-outline" id="btnTogQuente" onclick="toggleCol('colunaQuente', 'btnTogQuente')" style="padding:8px 12px; font-size:11px; background:white; color:var(--quente);">
-                      <i data-lucide="eye" style="width:14px;"></i> <span>QUENTES</span>
+                  <button class="btn btn-outline" id="btnTogQuente" onclick="toggleCol('colunaQuente', 'btnTogQuente')" style="padding:10px 15px; font-size:12px; color:var(--quente); border-color:var(--quente);">
+                      <i data-lucide="eye" style="width:16px;"></i> <span>QUENTES</span>
                   </button>
-                  <button class="btn btn-outline" id="btnTogPerdidos" onclick="toggleCol('colunaPerdidos', 'btnTogPerdidos')" style="padding:8px 12px; font-size:11px; background:white; color:var(--text-muted); opacity:0.6;">
-                      <i data-lucide="eye-off" style="width:14px;"></i> <span>PERDIDOS</span>
+                  <button class="btn btn-outline" id="btnTogPerdidos" onclick="toggleCol('colunaPerdidos', 'btnTogPerdidos')" style="padding:10px 15px; font-size:12px; color:var(--text-muted); opacity:0.6;">
+                      <i data-lucide="eye-off" style="width:16px;"></i> <span>PERDIDOS</span>
                   </button>
               </div>
           </div>
 
-          <!-- KANBAN BOARD -->
+          <!-- KANBAN BOARD DARK -->
           <div class="kanban-board">
               
-              <div class="kanban-col col-lead" id="colunaLead" style="background: #f1f5f9; border: 1px dashed #cbd5e1; display:flex;">
-                  <div class="kanban-header" style="color: var(--primary);">
-                      📥 Entrada (Whats) <span id="countLead">0</span>
+              <div class="kanban-col col-lead" id="colunaLead" style="border-style: dashed; display:flex;">
+                  <div class="kanban-header" style="color: var(--text-main);">
+                      📥 Entrada (Whats) <span id="countLead" style="background:var(--card-bg); padding:4px 10px; border-radius:12px; font-size:11px;">0</span>
                   </div>
-                  <button class="btn btn-outline" style="width:100%; margin-bottom:10px; border-style:dashed; color:var(--primary);" onclick="abrirModalLead()">
-                      <i data-lucide="plus" style="width:16px;"></i> NOVO CONTATO
+                  <button class="btn btn-outline" style="width:100%; margin-bottom:15px; border-style:dashed; color:var(--text-main);" onclick="abrirModalLead()">
+                      <i data-lucide="plus" style="width:18px;"></i> NOVO CONTATO
                   </button>
                   <div id="colLeadContent"></div>
               </div>
 
               <div class="kanban-col col-pendente" id="colunaPendente" style="display:flex;">
-                  <div class="kanban-header">📋 Pendentes <span id="countPendente">0</span></div>
+                  <div class="kanban-header">📋 Pendentes <span id="countPendente" style="background:var(--card-bg); padding:4px 10px; border-radius:12px; font-size:11px; color:var(--text-main);">0</span></div>
                   <div id="colPendenteContent"></div>
               </div>
               <div class="kanban-col col-frio" id="colunaFrio" style="display:flex;">
-                  <div class="kanban-header">🧊 Frios <span id="countFrio">0</span></div>
+                  <div class="kanban-header">🧊 Frios <span id="countFrio" style="background:var(--card-bg); padding:4px 10px; border-radius:12px; font-size:11px; color:var(--text-main);">0</span></div>
                   <div id="colFrioContent"></div>
               </div>
               <div class="kanban-col col-morno" id="colunaMorno" style="display:flex;">
-                  <div class="kanban-header">🔥 Mornos <span id="countMorno">0</span></div>
+                  <div class="kanban-header">🔥 Mornos <span id="countMorno" style="background:var(--card-bg); padding:4px 10px; border-radius:12px; font-size:11px; color:var(--text-main);">0</span></div>
                   <div id="colMornoContent"></div>
               </div>
               <div class="kanban-col col-quente" id="colunaQuente" style="display:flex;">
-                  <div class="kanban-header">🧨 Quentes <span id="countQuente">0</span></div>
+                  <div class="kanban-header">🧨 Quentes <span id="countQuente" style="background:var(--card-bg); padding:4px 10px; border-radius:12px; font-size:11px; color:var(--text-main);">0</span></div>
                   <div id="colQuenteContent"></div>
               </div>
               
-              <!-- Coluna Perdidos inicia oculta (display:none) por padrão -->
-              <div class="kanban-col col-perdido" id="colunaPerdidos" style="display: none;">
-                  <div class="kanban-header">❌ Perdidos <span id="countPerdido">0</span></div>
+              <div class="kanban-col col-perdido" id="colunaPerdidos" style="display: none; opacity: 0.6;">
+                  <div class="kanban-header">❌ Perdidos <span id="countPerdido" style="background:var(--card-bg); padding:4px 10px; border-radius:12px; font-size:11px; color:var(--text-main);">0</span></div>
                   <div id="colPerdidoContent"></div>
               </div>
           </div>
           
-          <div style="background:var(--card-bg); padding:25px; border-radius:12px; margin-top:20px; border:1px solid var(--border);">
-              <h3 style="color:var(--primary); margin-top:0; font-size:16px;">Mapa de Perdas (Por que não fechamos?)</h3>
-              <p style="font-size:13px; color:var(--text-muted); margin-bottom:20px;">Visão inteligente dos motivos pelas quais os clientes recusaram orçamentos ou materiais que não atendemos.</p>
-              <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:15px;" id="dashPerdas"></div>
+          <div style="background:var(--card-bg); padding:30px; border-radius:12px; margin-top:30px; border:1px solid var(--border);">
+              <h3 style="color:var(--text-main); margin-top:0; font-size:18px; display:flex; align-items:center; gap:10px;"><i data-lucide="pie-chart" style="color:var(--danger);"></i> Mapa de Perdas (Por que não fechamos?)</h3>
+              <p style="font-size:14px; color:var(--text-muted); margin-bottom:25px;">Visão inteligente dos motivos pelas quais os clientes recusaram orçamentos ou materiais que não atendemos.</p>
+              <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:20px;" id="dashPerdas"></div>
           </div>
 
       </div>
@@ -372,8 +377,8 @@
 <!-- Modal Novo Contato Inicial (WhatsApp) -->
 <div id="modalLead" class="modal-overlay">
     <div class="modal-content">
-        <h3 class="modal-title" style="color:var(--primary)">📥 Novo Contato Inicial</h3>
-        <p style="font-size:13px; color:var(--text-muted); margin-bottom:20px;">Registre a triagem. Depois você decide se descarta ou se gera a OS oficial.</p>
+        <h3 class="modal-title" style="color:var(--text-main)">📥 Novo Contato Inicial</h3>
+        <p style="font-size:14px; color:var(--text-muted); margin-bottom:25px;">Registre a triagem. Depois você decide se descarta ou se gera a OS oficial.</p>
         
         <label>Nome do Cliente / Empresa</label>
         <input type="text" id="leadNome" placeholder="Ex: João - Metalúrgica">
@@ -382,11 +387,11 @@
         <input type="text" id="leadWhats" placeholder="(XX) 99999-9999">
         
         <label>Assunto / O que ele pediu?</label>
-        <textarea id="leadAssunto" rows="2" placeholder="Ex: Orçamento de rolo de PU, Peça de Nylon..."></textarea>
+        <textarea id="leadAssunto" rows="3" placeholder="Ex: Orçamento de rolo de PU, Peça de Nylon..."></textarea>
         
-        <div style="display:flex; gap:15px; margin-top:20px;">
+        <div style="display:flex; gap:20px; margin-top:30px;">
             <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('modalLead').style.display='none'">CANCELAR</button>
-            <button class="btn" style="background:var(--primary); flex:1;" onclick="salvarLead()">SALVAR CONTATO</button>
+            <button class="btn" style="background:var(--accent); flex:1;" onclick="salvarLead()">SALVAR CONTATO</button>
         </div>
     </div>
 </div>
@@ -395,7 +400,7 @@
 <div id="modalGanho" class="modal-overlay">
     <div class="modal-content">
         <h3 class="modal-title" style="color:var(--success)">🎉 Negócio Fechado!</h3>
-        <p style="font-size:13px; color:var(--text-muted); margin-bottom:25px;">Excelente! O orçamento virou um Pedido. Defina os prazos para enviar para a Produção.</p>
+        <p style="font-size:14px; color:var(--text-muted); margin-bottom:25px;">Excelente! O orçamento virou um Pedido. Defina os prazos para enviar para a Produção.</p>
         
         <label>Data de Início na Fábrica</label>
         <input type="date" id="ganhoEntrada">
@@ -403,7 +408,7 @@
         <label>Prazo Limite de Entrega</label>
         <input type="date" id="ganhoLimite">
         
-        <div style="display:flex; gap:15px; margin-top:20px;">
+        <div style="display:flex; gap:20px; margin-top:30px;">
             <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('modalGanho').style.display='none'">CANCELAR</button>
             <button class="btn" style="background:var(--success); flex:1;" onclick="confirmarGanho()">ENVIAR P/ PRODUÇÃO</button>
         </div>
@@ -414,7 +419,7 @@
 <div id="modalPerdido" class="modal-overlay">
     <div class="modal-content">
         <h3 class="modal-title" style="color:var(--danger)">Registrar Perda</h3>
-        <p style="font-size:13px; color:var(--text-muted); margin-bottom:25px;">Qual foi o motivo principal da recusa do cliente?</p>
+        <p style="font-size:14px; color:var(--text-muted); margin-bottom:25px;">Qual foi o motivo principal da recusa do cliente?</p>
         
         <label>Motivo da Perda</label>
         <select id="motivoPerda">
@@ -427,9 +432,9 @@
         </select>
         
         <label>Observação (Opcional)</label>
-        <textarea id="obsPerda" rows="2" placeholder="Ex: Achou caro o PU, Queria Nylon..."></textarea>
+        <textarea id="obsPerda" rows="3" placeholder="Ex: Achou caro o PU, Queria Nylon..."></textarea>
         
-        <div style="display:flex; gap:15px; margin-top:20px;">
+        <div style="display:flex; gap:20px; margin-top:30px;">
             <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('modalPerdido').style.display='none'">CANCELAR</button>
             <button class="btn" style="background:var(--danger); flex:1;" onclick="confirmarPerda()">ARQUIVAR</button>
         </div>
@@ -440,7 +445,6 @@
     lucide.createIcons();
     let idxAcao = null;
 
-    // ----- FUNÇÃO NOVA: TOGGLE INTELIGENTE (Painel de Visão Flexbox) -----
     window.toggleCol = function(colId, btnId) {
         let col = document.getElementById(colId);
         let btn = document.getElementById(btnId);
@@ -452,13 +456,12 @@
             icon.setAttribute('data-lucide', 'eye');
         } else {
             col.style.display = 'none';
-            btn.style.opacity = '0.6';
+            btn.style.opacity = '0.5';
             icon.setAttribute('data-lucide', 'eye-off');
         }
         lucide.createIcons();
     };
 
-    // ----- NOVAS FUNÇÕES PARA LEADS (WhatsApp) -----
     window.abrirModalLead = function() {
         document.getElementById('leadNome').value = '';
         document.getElementById('leadWhats').value = '';
@@ -577,19 +580,19 @@
         (window.marbeDB.leads || []).forEach((lead, index) => {
             cLead++;
             leadsHtml += `
-            <div class="k-card" style="border-left-color: var(--primary);">
+            <div class="k-card" style="border-left-color: var(--text-main);">
                 <div class="c-title">${lead.nome}</div>
                 <div class="c-subtitle">Whats: ${lead.telefone}</div>
-                <div style="font-size:12px; color:var(--text-main); margin:8px 0; background:white; padding:8px; border-radius:6px; border:1px solid var(--border);">
+                <div style="font-size:13px; color:var(--text-main); margin:10px 0; background:var(--bg-color); padding:10px; border-radius:8px; border:1px solid var(--border);">
                     <strong style="color:var(--text-muted)">Assunto:</strong><br>${lead.assunto}
                 </div>
                 <div class="c-actions">
-                    <button class="btn-sm" style="background:#fee2e2; color:var(--danger);" onclick="descartarLead(${index})">❌ Descartar</button>
-                    <button class="btn-sm" style="background:var(--primary); color:white;" onclick="converterLeadOS(${index})">📄 Gerar OS</button>
+                    <button class="btn-sm" style="background:#451a03; color:#fde68a; border-color:#b45309;" onclick="descartarLead(${index})">❌ Descartar</button>
+                    <button class="btn-sm" style="background:var(--accent); color:white;" onclick="converterLeadOS(${index})">📄 Gerar OS</button>
                 </div>
             </div>`;
         });
-        document.getElementById('colLeadContent').innerHTML = leadsHtml || '<div style="font-size:12px; color:var(--text-muted); text-align:center;">Nenhum contato</div>';
+        document.getElementById('colLeadContent').innerHTML = leadsHtml || '<div style="font-size:13px; color:var(--text-muted); text-align:center; padding: 20px 0;">Nenhum contato</div>';
         document.getElementById('countLead').innerText = cLead;
 
         (window.marbeDB.orçamentos || []).forEach((orc, index) => {
@@ -612,7 +615,7 @@
                 cardHtml += `<button class="btn-sm btn-frio" onclick="mudarStatus(${index}, 'frio')">Frio</button><button class="btn-sm btn-morno" onclick="mudarStatus(${index}, 'morno')">Morno</button><button class="btn-sm btn-quente" onclick="mudarStatus(${index}, 'quente')">Quente</button><button class="btn-sm btn-perder" onclick="abrirModalPerda(${index})">Perder</button>`;
             } else if (status === 'frio') {
                 vFrio += orc.total; cFrio++;
-                cardHtml += `<button class="btn-sm" style="background:#cbd5e1" onclick="mudarStatus(${index}, 'pendente')">Voltar</button><button class="btn-sm btn-morno" onclick="mudarStatus(${index}, 'morno')">Morno</button><button class="btn-sm btn-perder" onclick="abrirModalPerda(${index})">Perder</button>`;
+                cardHtml += `<button class="btn-sm" style="background:var(--bg-color); color:var(--text-main); border-color:var(--border);" onclick="mudarStatus(${index}, 'pendente')">Voltar</button><button class="btn-sm btn-morno" onclick="mudarStatus(${index}, 'morno')">Morno</button><button class="btn-sm btn-perder" onclick="abrirModalPerda(${index})">Perder</button>`;
             } else if (status === 'morno') {
                 vMorno += orc.total; cMorno++;
                 cardHtml += `<button class="btn-sm btn-frio" onclick="mudarStatus(${index}, 'frio')">Frio</button><button class="btn-sm btn-quente" onclick="mudarStatus(${index}, 'quente')">Quente</button><button class="btn-sm btn-perder" onclick="abrirModalPerda(${index})">Perder</button>`;
@@ -622,7 +625,7 @@
             } else if (status === 'perdido') {
                 cPerd++;
                 if(orc.os !== "CONTATO") {
-                    cardHtml += `<button class="btn-sm" style="background:#cbd5e1; width:100%" onclick="mudarStatus(${index}, 'pendente')">↻ Reabrir Orçamento</button>`;
+                    cardHtml += `<button class="btn-sm" style="background:var(--bg-color); color:var(--text-main); border-color:var(--border); width:100%" onclick="mudarStatus(${index}, 'pendente')">↻ Reabrir Orçamento</button>`;
                 }
             }
             cardHtml += `</div></div>`;
@@ -640,11 +643,11 @@
         document.getElementById('valGlobal').innerText = window.fmtMoney(vGlobal);
         document.getElementById('qtdGlobal').innerText = cGlobal;
 
-        document.getElementById('colPendenteContent').innerHTML = pendentes || '<div style="font-size:12px; color:var(--text-muted); text-align:center;">Vazio</div>';
-        document.getElementById('colFrioContent').innerHTML = frios || '<div style="font-size:12px; color:var(--text-muted); text-align:center;">Vazio</div>';
-        document.getElementById('colMornoContent').innerHTML = mornos || '<div style="font-size:12px; color:var(--text-muted); text-align:center;">Vazio</div>';
-        document.getElementById('colQuenteContent').innerHTML = quentes || '<div style="font-size:12px; color:var(--text-muted); text-align:center;">Vazio</div>';
-        document.getElementById('colPerdidoContent').innerHTML = perdidos || '<div style="font-size:12px; color:var(--text-muted); text-align:center;">Vazio</div>';
+        document.getElementById('colPendenteContent').innerHTML = pendentes || '<div style="font-size:13px; color:var(--text-muted); text-align:center; padding:20px 0;">Vazio</div>';
+        document.getElementById('colFrioContent').innerHTML = frios || '<div style="font-size:13px; color:var(--text-muted); text-align:center; padding:20px 0;">Vazio</div>';
+        document.getElementById('colMornoContent').innerHTML = mornos || '<div style="font-size:13px; color:var(--text-muted); text-align:center; padding:20px 0;">Vazio</div>';
+        document.getElementById('colQuenteContent').innerHTML = quentes || '<div style="font-size:13px; color:var(--text-muted); text-align:center; padding:20px 0;">Vazio</div>';
+        document.getElementById('colPerdidoContent').innerHTML = perdidos || '<div style="font-size:13px; color:var(--text-muted); text-align:center; padding:20px 0;">Vazio</div>';
 
         document.getElementById('countPendente').innerText = cPend;
         document.getElementById('countFrio').innerText = cFrio;
@@ -729,14 +732,14 @@
         Object.keys(perdas).forEach(motivo => {
             if (perdas[motivo] > 0) {
                 html += `
-                <div style="background:#f8fafc; padding:15px; border-radius:8px; border:1px solid var(--border);">
+                <div style="background:var(--bg-color); padding:20px; border-radius:10px; border:1px solid var(--border);">
                     <div style="font-size:12px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">${icones[motivo]} Por ${motivo}</div>
-                    <div style="font-size:20px; font-weight:700; color:var(--danger); margin:5px 0;">${perdas[motivo]} ${motivo === 'Fora de Linha' ? 'Contatos' : 'OSs'}</div>
-                    <div style="font-size:13px; color:var(--dark); font-weight:600;">Oportunidade Perdida:<br><span style="color:var(--warning)">${window.fmtMoney(valores[motivo])}</span></div>
+                    <div style="font-size:24px; font-weight:800; color:var(--danger); margin:8px 0;">${perdas[motivo]} ${motivo === 'Fora de Linha' ? 'Contatos' : 'OSs'}</div>
+                    <div style="font-size:14px; color:var(--text-main); font-weight:600;">Oportunidade Perdida:<br><span style="color:var(--warning)">${window.fmtMoney(valores[motivo])}</span></div>
                 </div>`;
             }
         });
-        document.getElementById('dashPerdas').innerHTML = html || '<p style="color:var(--text-muted); grid-column: 1 / -1;">Nenhuma perda registrada neste período.</p>';
+        document.getElementById('dashPerdas').innerHTML = html || '<p style="color:var(--text-muted); grid-column: 1 / -1; text-align:center; padding:20px;">Nenhuma perda registrada neste período.</p>';
     }
 </script>
 </body>
