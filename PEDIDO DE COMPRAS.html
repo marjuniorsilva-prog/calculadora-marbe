@@ -275,7 +275,7 @@
                   </div>
                   <div style="display:flex; justify-content:space-between; align-items:center; margin-top:30px; padding-top:20px; border-top:1px solid var(--border);">
                       <div style="font-size:16px; color:var(--text-muted);">TOTAL DO PEDIDO: <strong id="totalPedidoCompra" style="font-size:32px; color:var(--compra); margin-left:10px;">R$ 0,00</strong></div>
-                      <!-- BOTÃO MODIFICADO PARA INJETAR NO FINANCEIRO -->
+                      <!-- BOTÃO PARA INJETAR NO FINANCEIRO -->
                       <button class="btn btn-primary" style="padding:20px 40px; font-size:16px;" onclick="window.salvarPedidoCompra()"><i data-lucide="check-circle"></i> FINALIZAR PEDIDO (INJETA NO FINANCEIRO)</button>
                   </div>
               </div>
@@ -564,12 +564,19 @@
     };
 
     window.salvarFornecedor = function() {
-        const razao = document.getElementById('fornNome').value; if(!razao) return alert("Razão Social obrigatória!");
-        const index = parseInt(document.getElementById('fornIndex').value);
-        const novoForn = { razao: razao, cnpj: document.getElementById('fornCnpj').value, endereco: document.getElementById('fornEndereco').value, ie: document.getElementById('fornIE').value, contato: document.getElementById('fornContato').value, telefone: document.getElementById('fornTelefone').value, email: document.getElementById('fornEmail').value, tags: document.getElementById('fornTags').value };
-        if(!window.marbeDB.compras.fornecedores) window.marbeDB.compras.fornecedores = [];
-        if (index >= 0) window.marbeDB.compras.fornecedores[index] = novoForn; else window.marbeDB.compras.fornecedores.push(novoForn);
-        window.salvarNuvem(true); window.limparFormFornecedor(); alert(index >= 0 ? "Fornecedor atualizado!" : "Fornecedor cadastrado!"); window.updateUI();
+        try {
+            const razao = document.getElementById('fornNome').value; if(!razao) return alert("Razão Social obrigatória!");
+            const index = parseInt(document.getElementById('fornIndex').value);
+            const novoForn = { razao: razao, cnpj: document.getElementById('fornCnpj').value, endereco: document.getElementById('fornEndereco').value, ie: document.getElementById('fornIE').value, contato: document.getElementById('fornContato').value, telefone: document.getElementById('fornTelefone').value, email: document.getElementById('fornEmail').value, tags: document.getElementById('fornTags').value };
+            
+            if(!window.marbeDB.compras.fornecedores) window.marbeDB.compras.fornecedores = [];
+            if(!Array.isArray(window.marbeDB.compras.fornecedores)) window.marbeDB.compras.fornecedores = Object.values(window.marbeDB.compras.fornecedores);
+
+            if (index >= 0) window.marbeDB.compras.fornecedores[index] = novoForn; else window.marbeDB.compras.fornecedores.push(novoForn);
+            window.salvarNuvem(true); window.limparFormFornecedor(); alert(index >= 0 ? "Fornecedor atualizado!" : "Fornecedor cadastrado!"); window.updateUI();
+        } catch (e) {
+            alert("Erro interno ao salvar fornecedor: " + e.message);
+        }
     };
 
     window.editarFornecedor = function(i) {
@@ -599,12 +606,19 @@
     };
 
     window.salvarProdutoCompra = function() {
-        const nome = document.getElementById('prodNome').value; if(!nome) return alert("Nome obrigatório!");
-        const embTxt = document.getElementById('prodEmb').value.trim(); const fator = parseFloat(document.getElementById('prodFator').value) || 1; const custoEmb = parseFloat(document.getElementById('prodCustoEmb').value) || 0; const index = parseInt(document.getElementById('prodIndex').value);
-        const novoProd = { nome: nome, un: document.getElementById('prodUn').value, emb: embTxt !== '' ? embTxt : 'Avulso', fator: fator, custo_emb: custoEmb };
-        if(!window.marbeDB.compras.produtos) window.marbeDB.compras.produtos = [];
-        if (index >= 0) window.marbeDB.compras.produtos[index] = novoProd; else window.marbeDB.compras.produtos.push(novoProd);
-        window.salvarNuvem(true); window.limparFormProduto(); alert(index >= 0 ? "Produto atualizado!" : "Produto cadastrado!"); window.updateUI();
+        try {
+            const nome = document.getElementById('prodNome').value; if(!nome) return alert("Nome obrigatório!");
+            const embTxt = document.getElementById('prodEmb').value.trim(); const fator = parseFloat(document.getElementById('prodFator').value) || 1; const custoEmb = parseFloat(document.getElementById('prodCustoEmb').value) || 0; const index = parseInt(document.getElementById('prodIndex').value);
+            const novoProd = { nome: nome, un: document.getElementById('prodUn').value, emb: embTxt !== '' ? embTxt : 'Avulso', fator: fator, custo_emb: custoEmb };
+            
+            if(!window.marbeDB.compras.produtos) window.marbeDB.compras.produtos = [];
+            if(!Array.isArray(window.marbeDB.compras.produtos)) window.marbeDB.compras.produtos = Object.values(window.marbeDB.compras.produtos);
+
+            if (index >= 0) window.marbeDB.compras.produtos[index] = novoProd; else window.marbeDB.compras.produtos.push(novoProd);
+            window.salvarNuvem(true); window.limparFormProduto(); alert(index >= 0 ? "Produto atualizado!" : "Produto cadastrado!"); window.updateUI();
+        } catch (e) {
+            alert("Erro interno ao salvar produto: " + e.message);
+        }
     };
 
     window.editarProdutoCompra = function(i) {
@@ -659,52 +673,80 @@
         document.getElementById('totalPedidoCompra').innerText = window.fmtMoney(totalGlobal); lucide.createIcons();
     }
 
-    // --- FINALIZAR PEDIDO E ENVIAR PARA O FINANCEIRO ---
+    // --- FINALIZAR PEDIDO E ENVIAR PARA O FINANCEIRO COM ARMADURA ANTIFALHAS ---
     window.salvarPedidoCompra = function() {
-        if(itensPedidoAtual.length === 0) return alert("Adicione pelo menos um item ao pedido!");
-        const forn = document.getElementById('selectFornecedor').value; if(!forn) return alert("Selecione um fornecedor!");
-        
-        let nPedido = window.marbeDB.compras.seq++; 
-        let totalGlobal = itensPedidoAtual.reduce((acc, it) => acc + (it.q_emb * it.v_emb), 0);
+        try {
+            if(itensPedidoAtual.length === 0) return alert("Adicione pelo menos um item ao pedido!");
+            const forn = document.getElementById('selectFornecedor').value; 
+            if(!forn) return alert("Selecione um fornecedor!");
+            
+            // Garantir que a gaveta existe
+            if(!window.marbeDB.compras) window.marbeDB.compras = { seq: 1, pedidos: [] };
+            if(!window.marbeDB.compras.seq) window.marbeDB.compras.seq = 1;
+            
+            // Força a conversão pra lista caso o Firebase tenha transformado em bloco
+            if(!window.marbeDB.compras.pedidos) window.marbeDB.compras.pedidos = [];
+            if(!Array.isArray(window.marbeDB.compras.pedidos)) {
+                window.marbeDB.compras.pedidos = Object.values(window.marbeDB.compras.pedidos);
+            }
 
-        let dtEmissao = new Date().toISOString();
-        let novoPedido = { 
-            pc: nPedido, empresa_compradora: empresaSelecionada, fornecedor: forn, 
-            itens: JSON.parse(JSON.stringify(itensPedidoAtual)), total: totalGlobal, 
-            transportadora: document.getElementById('compraTransp').value, 
-            tipo_frete: document.getElementById('compraFreteTipo').value, 
-            prazo_entrega: document.getElementById('compraPrazo').value, 
-            tipo_pagamento: document.getElementById('compraPgtoTipo').value, 
-            detalhe_pagamento: document.getElementById('compraPgtoDet').value, 
-            obs: document.getElementById('obsCompra').value, 
-            data_emissao: dtEmissao, recebido: false 
-        };
+            let nPedido = window.marbeDB.compras.seq;
+            window.marbeDB.compras.seq++; // Avança a numeração
+            
+            let totalGlobal = itensPedidoAtual.reduce((acc, it) => acc + (it.q_emb * it.v_emb), 0);
+            let dtEmissao = new Date().toISOString();
+            
+            let novoPedido = { 
+                pc: nPedido, empresa_compradora: empresaSelecionada, fornecedor: forn, 
+                itens: JSON.parse(JSON.stringify(itensPedidoAtual)), total: totalGlobal, 
+                transportadora: document.getElementById('compraTransp').value, 
+                tipo_frete: document.getElementById('compraFreteTipo').value, 
+                prazo_entrega: document.getElementById('compraPrazo').value, 
+                tipo_pagamento: document.getElementById('compraPgtoTipo').value, 
+                detalhe_pagamento: document.getElementById('compraPgtoDet').value, 
+                obs: document.getElementById('obsCompra').value, 
+                data_emissao: dtEmissao, recebido: false 
+            };
 
-        if(!window.marbeDB.compras.pedidos) window.marbeDB.compras.pedidos = [];
-        window.marbeDB.compras.pedidos.push(novoPedido); 
-        
-        // ==========================================
-        // MÁGICA DE INTEGRAÇÃO FINANCEIRA
-        // ==========================================
-        let detalhePgto = document.getElementById('compraPgtoDet').value || 'A Combinar';
-        let despesaAutomatica = {
-            id: Date.now(),
-            tipo: "SAIDA", // Indica que é uma despesa
-            data: dtEmissao.split('T')[0], // Data de hoje
-            categoria: "Fornecedores / Matéria-Prima",
-            descricao: `Pedido Compras PC-${nPedido} | Fornecedor: ${forn} | Pgto: ${detalhePgto}`,
-            valor: totalGlobal,
-            status: "PENDENTE" // Fica aguardando o pagamento real
-        };
-        window.marbeDB.financeiro.transacoes.push(despesaAutomatica);
-        // ==========================================
+            window.marbeDB.compras.pedidos.push(novoPedido); 
+            
+            // --- INJEÇÃO NO FINANCEIRO COM ARMADURA ---
+            if(!window.marbeDB.financeiro) window.marbeDB.financeiro = { transacoes: [] };
+            if(!window.marbeDB.financeiro.transacoes) window.marbeDB.financeiro.transacoes = [];
+            if(!Array.isArray(window.marbeDB.financeiro.transacoes)) {
+                window.marbeDB.financeiro.transacoes = Object.values(window.marbeDB.financeiro.transacoes);
+            }
 
-        window.salvarNuvem(true); 
-        
-        alert(`Pedido de Compra Nº PC-${nPedido} gerado e Despesa lançada no Financeiro com sucesso!`);
-        
-        itensPedidoAtual = []; ['selectFornecedor', 'compraTransp', 'compraPrazo', 'compraPgtoDet', 'obsCompra'].forEach(id => document.getElementById(id).value = ''); window.renderItensPedido();
-        window.tabSection('tab-historico', document.getElementById('btn-tab-historico'));
+            let detalhePgto = document.getElementById('compraPgtoDet').value || 'A Combinar';
+            let despesaAutomatica = {
+                id: Date.now(),
+                tipo: "SAIDA",
+                data: dtEmissao.split('T')[0],
+                categoria: "Fornecedores / Matéria-Prima",
+                descricao: `Pedido Compras PC-${nPedido} | Fornecedor: ${forn} | Pgto: ${detalhePgto}`,
+                valor: totalGlobal,
+                status: "PENDENTE"
+            };
+            
+            window.marbeDB.financeiro.transacoes.push(despesaAutomatica);
+            // ------------------------------------------
+
+            window.salvarNuvem(true); 
+            
+            alert(`Pedido de Compra Nº PC-${nPedido} gerado e Despesa lançada no Financeiro com sucesso!`);
+            
+            // Limpeza da tela
+            itensPedidoAtual = []; 
+            ['selectFornecedor', 'compraTransp', 'compraPrazo', 'compraPgtoDet', 'obsCompra'].forEach(id => {
+                if(document.getElementById(id)) document.getElementById(id).value = '';
+            }); 
+            window.renderItensPedido();
+            window.tabSection('tab-historico', document.getElementById('btn-tab-historico'));
+            
+        } catch (erro) {
+            alert("Ocorreu um erro interno ao tentar salvar. Detalhe técnico: " + erro.message);
+            console.error(erro);
+        }
     };
 
     window.renderHistoricoCompras = function() {
@@ -727,15 +769,23 @@
     };
 
     window.confirmarRecebimento = function() {
-        const nf = document.getElementById('nfRecebimento').value.trim(); if(!nf) return alert("Digite o número da Nota Fiscal.");
-        const index = parseInt(document.getElementById('idxRecebimento').value); let pedido = window.marbeDB.compras.pedidos[index];
-        pedido.itens.forEach(it => {
-            let nomeItem = it.n; let qtdReal = parseFloat(it.q_total); let unidade = it.un;
-            if(!window.marbeDB.almoxarifado.saldos[nomeItem]) { window.marbeDB.almoxarifado.saldos[nomeItem] = { qtd: 0, un: unidade }; }
-            window.marbeDB.almoxarifado.saldos[nomeItem].qtd += qtdReal;
-            window.marbeDB.almoxarifado.movimentacoes.push({ data: new Date().toISOString(), tipo: 'ENTRADA', item: nomeItem, qtd: qtdReal, un: unidade, origem: pedido.fornecedor, doc: `NF: ${nf} / PC: ${pedido.pc}` });
-        });
-        pedido.recebido = true; pedido.nf_entrada = nf; window.salvarNuvem(true); document.getElementById('modalReceberNF').style.display = 'none'; alert(`Entrada da NF ${nf} realizada! Saldo do Almoxarifado atualizado.`); window.updateUI();
+        try {
+            const nf = document.getElementById('nfRecebimento').value.trim(); if(!nf) return alert("Digite o número da Nota Fiscal.");
+            const index = parseInt(document.getElementById('idxRecebimento').value); let pedido = window.marbeDB.compras.pedidos[index];
+            
+            if(!window.marbeDB.almoxarifado.movimentacoes) window.marbeDB.almoxarifado.movimentacoes = [];
+            if(!Array.isArray(window.marbeDB.almoxarifado.movimentacoes)) window.marbeDB.almoxarifado.movimentacoes = Object.values(window.marbeDB.almoxarifado.movimentacoes);
+
+            pedido.itens.forEach(it => {
+                let nomeItem = it.n; let qtdReal = parseFloat(it.q_total); let unidade = it.un;
+                if(!window.marbeDB.almoxarifado.saldos[nomeItem]) { window.marbeDB.almoxarifado.saldos[nomeItem] = { qtd: 0, un: unidade }; }
+                window.marbeDB.almoxarifado.saldos[nomeItem].qtd += qtdReal;
+                window.marbeDB.almoxarifado.movimentacoes.push({ data: new Date().toISOString(), tipo: 'ENTRADA', item: nomeItem, qtd: qtdReal, un: unidade, origem: pedido.fornecedor, doc: `NF: ${nf} / PC: ${pedido.pc}` });
+            });
+            pedido.recebido = true; pedido.nf_entrada = nf; window.salvarNuvem(true); document.getElementById('modalReceberNF').style.display = 'none'; alert(`Entrada da NF ${nf} realizada! Saldo do Almoxarifado atualizado.`); window.updateUI();
+        } catch(e) {
+            alert("Erro ao processar recebimento: " + e.message);
+        }
     };
 
     window.renderSaldosEstoque = function() {
@@ -772,15 +822,23 @@
     };
 
     window.registrarSaida = function() {
-        let nomeItem = document.getElementById('baixaItem').value; let qtd = parseFloat(document.getElementById('baixaQtd').value); let funcionario = document.getElementById('baixaFuncionario').value.trim(); let categoria = document.getElementById('baixaCategoria').value; let osDestino = document.getElementById('baixaOS').value.trim();
-        if(!nomeItem) return alert("Selecione um item."); if(!qtd || qtd <= 0) return alert("Quantidade inválida."); if(!funcionario) return alert("Informe o NOME do funcionário.");
-        if(categoria === 'Matéria-Prima' && !osDestino) return alert("BLOQUEIO: Informe a OS.");
-        let saldoObj = window.marbeDB.almoxarifado.saldos[nomeItem];
-        if(qtd > saldoObj.qtd) { if(!confirm(`Atenção: Saldo insuficiente (${saldoObj.qtd.toFixed(2)}). Forçar retirada negativa?`)) return; }
-        saldoObj.qtd -= qtd;
-        window.marbeDB.almoxarifado.movimentacoes.push({ data: new Date().toISOString(), tipo: 'SAÍDA', item: nomeItem, qtd: qtd, un: saldoObj.un, origem: funcionario, destino: categoria === 'Matéria-Prima' ? `OS: ${osDestino}` : 'Consumo Geral' });
-        window.salvarNuvem(true); alert(`Retirada autorizada.`);
-        ['baixaItem','baixaQtd','baixaFuncionario','baixaOS'].forEach(id=>document.getElementById(id).value=''); document.getElementById('avisoSaldoBaixa').innerText = ''; window.updateUI(); window.tabSection('tab-saldos', document.getElementById('btn-tab-saldos'));
+        try {
+            let nomeItem = document.getElementById('baixaItem').value; let qtd = parseFloat(document.getElementById('baixaQtd').value); let funcionario = document.getElementById('baixaFuncionario').value.trim(); let categoria = document.getElementById('baixaCategoria').value; let osDestino = document.getElementById('baixaOS').value.trim();
+            if(!nomeItem) return alert("Selecione um item."); if(!qtd || qtd <= 0) return alert("Quantidade inválida."); if(!funcionario) return alert("Informe o NOME do funcionário.");
+            if(categoria === 'Matéria-Prima' && !osDestino) return alert("BLOQUEIO: Informe a OS.");
+            let saldoObj = window.marbeDB.almoxarifado.saldos[nomeItem];
+            if(qtd > saldoObj.qtd) { if(!confirm(`Atenção: Saldo insuficiente (${saldoObj.qtd.toFixed(2)}). Forçar retirada negativa?`)) return; }
+            saldoObj.qtd -= qtd;
+            
+            if(!window.marbeDB.almoxarifado.movimentacoes) window.marbeDB.almoxarifado.movimentacoes = [];
+            if(!Array.isArray(window.marbeDB.almoxarifado.movimentacoes)) window.marbeDB.almoxarifado.movimentacoes = Object.values(window.marbeDB.almoxarifado.movimentacoes);
+
+            window.marbeDB.almoxarifado.movimentacoes.push({ data: new Date().toISOString(), tipo: 'SAÍDA', item: nomeItem, qtd: qtd, un: saldoObj.un, origem: funcionario, destino: categoria === 'Matéria-Prima' ? `OS: ${osDestino}` : 'Consumo Geral' });
+            window.salvarNuvem(true); alert(`Retirada autorizada.`);
+            ['baixaItem','baixaQtd','baixaFuncionario','baixaOS'].forEach(id=>document.getElementById(id).value=''); document.getElementById('avisoSaldoBaixa').innerText = ''; window.updateUI(); window.tabSection('tab-saldos', document.getElementById('btn-tab-saldos'));
+        } catch(e) {
+            alert("Erro ao processar a baixa: " + e.message);
+        }
     };
     
     window.gerarPDFCompra = function(numeroPC) {
