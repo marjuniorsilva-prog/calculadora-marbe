@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Compras e Almoxarifado - ERP Marbe</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+  
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyATu_V6e1shKRpgBOkX1lw2beyzUEZUCo0",
+      authDomain: "marbeapp-e2db8.firebaseapp.com",
+      projectId: "marbeapp-e2db8",
+      storageBucket: "marbeapp-e2db8.firebasestorage.app",
+      messagingSenderId: "435226749841",
+      appId: "1:435226749841:web:c2b5f5dee676412b228830"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    window.marbeDB = null;
+
+    onValue(ref(db, 'sistema/'), (snapshot) => {
+      const data = snapshot.val();
+      if (data) { 
+          window.marbeDB = data; 
+          
+          if (!window.marbeDB.compras) {
+              window.marbeDB.compras = { fornecedores: [], produtos: [], pedidos: [], seq: 1 };
+          }
+          // NOVA GAVETA DO ALMOXARIFADO (ESTOQUE FÍSICO)
+          if (!window.marbeDB.almoxarifado) {
+              window.marbeDB.almoxarifado = { saldos: {}, movimentacoes: [] };
+          }
+          
+          updateUI();
+      }
+    });
+
+    window.salvarNuvem = function(silencioso = false) { 
+        set(ref(db, 'sistema/'), window.marbeDB)
+            .then(() => { if(!silencioso) alert("Módulo salvo com sucesso!"); })
+            .catch((error) => { alert("Erro ao salvar: " + error.message); });
+    };
+
+    window.fmtMoney = (v) => { return parseFloat(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+
+    window.abrirPDFMobile = (blob, nomeArquivo) => {
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        const a = document.createElement('a');
+        a.href = url; a.download = `${nomeArquivo}.pdf`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    };
+  </script>
+
+  <style>
+    :root { 
+      --bg-color: #0f172a; --card-bg: #1e293b; --border: #334155; --text-main: #f8fafc; --text-muted: #94a3b8; --sidebar-bg: #020617;      
+      --primary: #3b82f6; --success: #10b981; --danger: #ef4444; 
+      --compra: #f97316; --compra-hover: #ea580c; --estoque: #8b5cf6;
+      --sidebar-width: 280px; --sidebar-collapsed: 80px; --header-height: 70px; --border-radius: 12px;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg-color); margin: 0; padding: 0; color: var(--text-main); font-size: 14px; overflow-x: hidden; }
+    .app-layout { display: flex; height: 100vh; overflow: hidden; }
+    
+    .sidebar { width: var(--sidebar-width); background: var(--sidebar-bg); color: #fff; display: flex; flex-direction: column; transition: width 0.3s ease; flex-shrink: 0; z-index: 50; border-right: 1px solid var(--border); }
+    .sidebar-brand { height: var(--header-height); display: flex; align-items: center; padding: 0 25px; font-size: 20px; font-weight: 800; border-bottom: 1px solid var(--border); letter-spacing: -0.5px; white-space: nowrap; overflow: hidden; flex-shrink: 0; color:var(--compra);}
+    .sidebar-brand i { margin-right: 15px; color: var(--compra); width: 24px; height: 24px; }
+    .sidebar-nav { flex: 1; overflow-y: auto; padding: 20px 15px; display: flex; flex-direction: column; }
+    .sidebar-nav::-webkit-scrollbar { width: 4px; }
+    .sidebar-nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    .nav-label { font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; margin: 15px 0 8px 10px; letter-spacing: 1px; white-space: nowrap; overflow: hidden; }
+    .tab-btn { display: flex; align-items: center; padding: 14px 15px; color: #94a3b8; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 14px; transition: all 0.2s; white-space: nowrap; border: none; background: transparent; width: 100%; cursor: pointer; text-align: left; margin-bottom: 6px; }
+    .tab-btn i { width: 20px; height: 20px; margin-right: 15px; flex-shrink: 0; color: #64748b; transition: 0.2s; }
+    .tab-btn:hover { background: rgba(255,255,255,0.05); color: #f8fafc; }
+    .tab-btn:hover i { color: #f8fafc; }
+    .tab-btn.active { background: var(--compra); color: #fff; font-weight: 600; box-shadow: 0 4px 6px rgba(249, 115, 22, 0.2); }
+    .tab-btn.active i { color: #fff; }
+    .tab-btn.active-estoque { background: var(--estoque); color: #fff; font-weight: 600; box-shadow: 0 4px 6px rgba(139, 92, 246, 0.2); }
+    .tab-btn.active-estoque i { color: #fff; }
+    .sidebar-footer { padding: 15px; border-top: 1px solid var(--border); flex-shrink: 0; }
+
+    .main-wrapper { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .topbar { height: var(--header-height); background: var(--card-bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; z-index: 40; flex-shrink: 0; }
+    .topbar-left { display: flex; align-items: center; gap: 20px; }
+    .btn-toggle { background: transparent; border: none; color: var(--text-main); cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 8px; padding: 8px; transition: 0.2s; }
+    .btn-toggle:hover { background: var(--bg-color); }
+    .view-title { font-size: 24px; font-weight: 700; color: var(--text-main); margin: 0; }
+    .topbar-right { display: flex; align-items: center; gap: 20px; }
+    .user-profile { display: flex; align-items: center; gap: 12px; padding: 6px 16px; background: var(--bg-color); border-radius: 20px; border: 1px solid var(--border); cursor: pointer; }
+    .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--compra); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+    .user-info { display: flex; flex-direction: column; }
+    .user-name { font-size: 14px; font-weight: 600; color: var(--text-main); }
+    .user-role { font-size: 12px; color: var(--text-muted); }
+    
+    .content-area { flex: 1; overflow-y: auto; padding: 35px; background: var(--bg-color); }
+    .section { display: none; animation: fadeIn 0.3s ease-out; }
+    .section.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .sub-tabs { display: flex; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; background: var(--card-bg); padding: 10px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .sub-tab-btn { flex: 1; padding: 14px 15px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; font-weight: 600; border-radius: 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s ease; min-width: 150px; }
+    .sub-tab-btn:hover { background: var(--bg-color); color: var(--text-main); }
+    .sub-tab-btn.active { background: var(--compra); color: white; box-shadow: 0 4px 6px rgba(249, 115, 22, 0.2); }
+    .sub-tab-btn.active-estoque { background: var(--estoque); color: white; box-shadow: 0 4px 6px rgba(139, 92, 246, 0.2); }
+
+    .card-panel { background: var(--card-bg); padding: 30px; border-radius: var(--border-radius); border: 1px solid var(--border); margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .card-header { font-size: 15px; font-weight: 700; color: var(--compra); margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--border); text-transform: uppercase; display: flex; align-items: center; gap: 10px; }
+    
+    label { display: block; margin-top: 0; font-weight: 600; font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+    input, select, textarea { width: 100%; padding: 14px 16px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; color: var(--text-main); font-family: 'Inter', sans-serif; transition: all 0.2s; background: var(--bg-color); margin-bottom: 18px; outline: none; }
+    input:focus, select:focus, textarea:focus { border-color: var(--compra); background: var(--card-bg); box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2); }
+    
+    .row { display: flex; gap: 20px; }
+    .col { flex: 1; min-width: 0; }
+    
+    .btn { padding: 14px 24px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 10px; outline: none; }
+    .btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .btn-primary { background: var(--compra); color: white; }
+    .btn-estoque { background: var(--estoque); color: white; }
+    .btn-success { background: var(--success); color: white; }
+    .btn-outline { background: var(--card-bg); border: 1px solid var(--border); color: var(--text-main); }
+    .btn-outline:hover { background: var(--border); }
+
+    .table-container { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    table th { background: var(--bg-color); border-bottom: 1px solid var(--border); padding: 16px; text-align: left; font-weight: 600; color: var(--text-muted); text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; }
+    table td { border-bottom: 1px solid var(--border); padding: 16px; color: var(--text-main); vertical-align: middle; }
+    table tr:hover td { background-color: var(--bg-color); }
+
+    .empresa-selector { display: flex; gap: 15px; margin-bottom: 25px; }
+    .empresa-option { flex: 1; border: 2px solid var(--border); background: var(--bg-color); padding: 20px; border-radius: 12px; cursor: pointer; text-align: center; transition: 0.2s; }
+    .empresa-option.active { border-color: var(--compra); background: rgba(249, 115, 22, 0.1); }
+    .empresa-option h3 { margin: 0 0 5px 0; color: var(--text-main); font-size: 18px; font-weight: 800; }
+    .empresa-option p { margin: 0; color: var(--text-muted); font-size: 12px; }
+
+    .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+    .dash-card { background: var(--card-bg); padding: 25px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .dash-card h3 { margin: 0 0 10px 0; font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
+    .dash-card .value { font-size: 28px; font-weight: 800; color: var(--text-main); }
+
+    @media (max-width: 1024px) {
+      .row { flex-direction: column; gap: 0; }
+      .empresa-selector { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-layout" id="appContainer">
+    
+  <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand"><i data-lucide="package"></i><span>Suprimentos</span></div>
+      
+      <div class="sidebar-nav">
+          <div class="nav-label" style="color:var(--compra); font-size:12px;">Departamento de Compras</div>
+          <button class="tab-btn active" id="btn-compras" onclick="abrirModulo('compras')"><i data-lucide="shopping-cart"></i> <span>Módulo de Compras</span></button>
+          <button class="tab-btn" id="btn-cadastros" onclick="abrirModulo('cadastros')"><i data-lucide="book-open"></i> <span>Fornecedores & Itens</span></button>
+          
+          <div class="nav-label" style="color:var(--estoque); font-size:12px; margin-top:25px;">Gestão de Almoxarifado</div>
+          <button class="tab-btn" id="btn-estoque" onclick="abrirModulo('estoque')"><i data-lucide="boxes"></i> <span>Estoque Físico (Saldos)</span></button>
+          <button class="tab-btn" id="btn-retirada" onclick="abrirModulo('retirada')"><i data-lucide="scan-line"></i> <span>Retirada / Baixa de Uso</span></button>
+      </div>
+      
+      <div class="sidebar-footer">
+          <button class="tab-btn" onclick="window.location.href='index.html'" style="color: var(--text-muted); background:transparent; border:1px solid var(--border);">
+              <i data-lucide="log-out"></i> <span>Voltar ao ERP</span>
+          </button>
+      </div>
+  </aside>
+
+  <main class="main-wrapper">
+      <header class="topbar">
+          <div class="topbar-left">
+              <button class="btn-toggle" onclick="document.getElementById('sidebar').classList.toggle('collapsed')"><i data-lucide="menu"></i></button>
+              <h2 class="view-title" id="mainTitle">Módulo de Compras (PO)</h2>
+          </div>
+          <div class="topbar-right">
+              <div class="user-profile">
+                  <div class="avatar" id="avatarRole">CP</div>
+                  <div class="user-info"><span class="user-name">Operador</span><span class="user-role" id="lblRole">Compras</span></div>
+              </div>
+          </div>
+      </header>
+
+      <div class="content-area">
+          
+          <!-- SUBMENUS DINÂMICOS -->
+          <div class="sub-tabs" id="submenu-compras">
+              <button class="sub-tab-btn active" onclick="tabSection('tab-pedido')"><i data-lucide="shopping-bag" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Gerar Pedido (PO)</button>
+              <button class="sub-tab-btn" onclick="tabSection('tab-historico')"><i data-lucide="history" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Histórico de Compras</button>
+          </div>
+          <div class="sub-tabs" id="submenu-cadastros" style="display:none;">
+              <button class="sub-tab-btn active" onclick="tabSection('tab-fornecedores')"><i data-lucide="truck" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Agenda Fornecedores</button>
+              <button class="sub-tab-btn" onclick="tabSection('tab-produtos')"><i data-lucide="package-plus" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Catálogo de Insumos</button>
+          </div>
+          <div class="sub-tabs" id="submenu-estoque" style="display:none;">
+              <button class="sub-tab-btn active-estoque active" onclick="tabSection('tab-saldos')"><i data-lucide="layers" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Saldo nas Prateleiras</button>
+              <button class="sub-tab-btn active-estoque" onclick="tabSection('tab-extrato')"><i data-lucide="list" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Extrato de Movimentações</button>
+          </div>
+          <div class="sub-tabs" id="submenu-retirada" style="display:none;">
+              <button class="sub-tab-btn active-estoque active" onclick="tabSection('tab-baixa')"><i data-lucide="scan-barcode" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Realizar Baixa / Retirada</button>
+          </div>
+
+          <!-- ========================================== -->
+          <!-- ÁREA: COMPRAS (GERAR PEDIDO E HISTÓRICO) -->
+          <!-- ========================================== -->
+          <div id="tab-pedido" class="section active">
+              <div class="card-panel">
+                  <div class="card-header"><i data-lucide="building"></i> 1. Empresa Compradora (Faturamento)</div>
+                  <div class="empresa-selector">
+                      <div class="empresa-option active" id="btnMarbe" onclick="selecionarEmpresa('MARBE')"><h3>GRUPO MARBE (PU)</h3><p>CNPJ: 41.755.585/0001-37</p></div>
+                      <div class="empresa-option" id="btnSB" onclick="selecionarEmpresa('SB')"><h3>SB BORRACHAS</h3><p>CNPJ: 61.149.312/0001-56</p></div>
+                  </div>
+              </div>
+              <div class="card-panel">
+                  <div class="card-header"><i data-lucide="store"></i> 2. Seleção do Fornecedor</div>
+                  <label>Buscar Fornecedor Cadastrado</label>
+                  <select id="selectFornecedor" style="font-weight:600; color:var(--compra);"><option value="">-- Carregando... --</option></select>
+              </div>
+              <div class="card-panel">
+                  <div class="card-header"><i data-lucide="shopping-cart"></i> 3. Itens a Comprar</div>
+                  <div style="background:var(--bg-color); padding:20px; border-radius:10px; border:1px dashed var(--border); margin-bottom:20px;">
+                      <div class="row">
+                          <div class="col" style="flex:2"><label>Produto / Insumo</label><input type="text" id="itemNome" list="listaProdutosDatalist" placeholder="Ex: Cola PU"><datalist id="listaProdutosDatalist"></datalist></div>
+                          <div class="col"><label id="labelItemQtd">Quantidade</label><input type="number" id="itemQtd" placeholder="Ex: 1"></div>
+                          <div class="col" style="flex:1"><label>Unid. Interna</label><input type="text" id="itemUn" readonly disabled placeholder="Auto" style="text-align:center; font-weight:bold; background:var(--card-bg);"></div>
+                          <div class="col"><label>Preço Embalagem (R$)</label><input type="number" id="itemPreco" placeholder="Ex: 160.00"></div>
+                      </div>
+                      <div id="ajudaCalculoItem" style="font-size:12px; color:var(--success); margin-top:-5px; margin-bottom:15px; font-weight:600; display:flex; align-items:center; gap:6px;"></div>
+                      <button class="btn btn-outline" style="width:100%; border-color:var(--compra); color:var(--compra);" onclick="adicionarItemCompra()"><i data-lucide="plus"></i> ADICIONAR ITEM AO PEDIDO</button>
+                  </div>
+                  <div class="table-container">
+                      <table>
+                          <thead><tr><th>Insumo / Descrição</th><th style="text-align:center">Quantidade Pedida</th><th style="text-align:right">Valor da Embalagem</th><th style="text-align:right">Total do Item</th><th style="text-align:center">Remover</th></tr></thead>
+                          <tbody id="tabelaItensCompra"><tr><td colspan="5" style="text-align:center; padding:30px; color:var(--text-muted);">Vazio.</td></tr></tbody>
+                      </table>
+                  </div>
+              </div>
+              <div class="card-panel">
+                  <div class="card-header"><i data-lucide="truck"></i> 4. Logística e Pagamento</div>
+                  <div class="row">
+                      <div class="col"><label>Transportadora</label><input type="text" id="compraTransp" placeholder="Ex: TNT, Retira"></div>
+                      <div class="col"><label>Tipo de Frete</label><select id="compraFreteTipo"><option value="FOB (Por nossa conta)">FOB (Por nossa conta)</option><option value="CIF (Por conta do Fornecedor)">CIF (Por conta do Fornecedor)</option></select></div>
+                      <div class="col"><label>Prazo de Entrega</label><input type="text" id="compraPrazo" placeholder="Ex: 5 dias úteis"></div>
+                  </div>
+                  <div class="row" style="margin-top: 10px;">
+                      <div class="col"><label>Forma de Pagamento</label><select id="compraPgtoTipo"><option value="A Prazo">A Prazo</option><option value="À Vista">À Vista</option></select></div>
+                      <div class="col" style="flex:2"><label>Detalhes</label><input type="text" id="compraPgtoDet" placeholder="Ex: Boleto 28/56 dias"></div>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:30px; padding-top:20px; border-top:1px solid var(--border);">
+                      <div style="font-size:16px; color:var(--text-muted);">TOTAL DO PEDIDO: <strong id="totalPedidoCompra" style="font-size:32px; color:var(--compra); margin-left:10px;">R$ 0,00</strong></div>
+                      <button class="btn btn-primary" style="padding:20px 40px; font-size:16px;" onclick="salvarPedidoCompra()"><i data-lucide="check-circle"></i> FINALIZAR PEDIDO</button>
+                  </div>
+              </div>
+          </div>
+
+          <div id="tab-historico" class="section">
+              <h2 class="view-title" style="color:var(--compra); margin-bottom: 25px;">Histórico de Pedidos Emitidos</h2>
+              <div id="listaHistoricoCompras"></div>
+          </div>
+
+          <!-- ========================================== -->
+          <!-- ÁREA: CADASTROS (FORNECEDORES E PRODUTOS)  -->
+          <!-- ========================================== -->
+          <div id="tab-fornecedores" class="section">
+              <div class="card-panel">
+                  <div class="card-header"><i data-lucide="book-open"></i> Ficha da Agenda</div>
+                  <div class="row">
+                      <div class="col" style="flex:1"><label>CNPJ <span style="color:var(--compra); font-size:11px;">(Auto)</span></label><input type="text" id="fornCnpj" onblur="buscaCNPJFornecedor(this.value)"></div>
+                      <div class="col" style="flex:2"><label>Razão Social</label><input type="text" id="fornNome"></div>
+                  </div>
+                  <div class="row">
+                      <div class="col" style="flex:2"><label>Endereço Completo</label><input type="text" id="fornEndereco"></div>
+                      <div class="col" style="flex:1"><label>Inscrição Estadual</label><input type="text" id="fornIE"></div>
+                  </div>
+                  <div class="row">
+                      <div class="col"><label>Vendedor</label><input type="text" id="fornContato"></div>
+                      <div class="col"><label>WhatsApp</label><input type="text" id="fornTelefone"></div>
+                      <div class="col"><label>E-mail</label><input type="text" id="fornEmail"></div>
+                  </div>
+                  <div class="row" style="margin-top: 10px; margin-bottom: 10px;">
+                      <div class="col"><label style="color:var(--compra);">O que este fornecedor vende? (Palavras-chave separadas por vírgula)</label><input type="text" id="fornTags" placeholder="Ex: Cola, PU, Acetinado, Lixas..."></div>
+                  </div>
+                  <input type="hidden" id="fornIndex" value="-1">
+                  <div style="display:flex; gap:15px; margin-top:15px;">
+                      <button class="btn btn-outline" style="flex:1;" onclick="limparFormFornecedor()">LIMPAR FICHA</button>
+                      <button class="btn btn-primary" id="btnSalvarForn" style="flex:2;" onclick="salvarFornecedor()"><i data-lucide="save"></i> GRAVAR FORNECEDOR</button>
+                  </div>
+              </div>
+              <div class="card-panel">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px; flex-wrap:wrap; gap:15px;">
+                      <h3 style="margin:0; font-size: 16px; font-weight:700; color:var(--text-main); display:flex; align-items:center; gap:8px;"><i data-lucide="search" style="color:var(--compra); width:20px;"></i> Buscar na Agenda</h3>
+                      <input type="text" id="buscaFornecedor" placeholder="Buscar por material ou nome..." style="width:400px; padding:12px;" onkeyup="renderFornecedores()">
+                  </div>
+                  <div class="table-container">
+                      <table><thead><tr><th>Fornecedor / Produtos</th><th>Contato</th><th>WhatsApp</th><th style="text-align:center;">Ações</th></tr></thead><tbody id="tabelaFornecedores"></tbody></table>
+                  </div>
+              </div>
+          </div>
+
+          <div id="tab-produtos" class="section">
+              <div class="card-panel">
+                  <div class="card-header"><i data-lucide="package-plus"></i> Ficha de Cadastro de Insumo</div>
+                  <div class="row" style="margin-bottom: 20px;">
+                      <div class="col" style="flex:2"><label>Nome do Insumo</label><input type="text" id="prodNome"></div>
+                      <div class="col" style="flex:1"><label>Unidade (Interna)</label><select id="prodUn"><option value="KG">KG</option><option value="UN">UN</option><option value="MT">MT</option><option value="LT">LT</option><option value="CX">CX</option></select></div>
+                  </div>
+                  <div style="background: rgba(249, 115, 22, 0.05); padding: 15px; border-radius: 8px; border: 1px solid var(--compra); margin-bottom: 20px;">
+                      <h4 style="margin-top:0; color:var(--compra); font-size:13px; margin-bottom:15px;"><i data-lucide="box" style="width:16px; vertical-align:middle;"></i> Embalagem do Fornecedor</h4>
+                      <div class="row">
+                          <div class="col"><label>Tipo Embalagem</label><input type="text" id="prodEmb" placeholder="Ex: Galão"></div>
+                          <div class="col"><label>Qtd na Embalagem</label><input type="number" id="prodFator" placeholder="Ex: 3.2"></div>
+                          <div class="col"><label>Preço Embalagem (R$)</label><input type="number" id="prodCustoEmb" placeholder="Ex: 160.00"></div>
+                      </div>
+                  </div>
+                  <input type="hidden" id="prodIndex" value="-1">
+                  <div style="display:flex; gap:15px;">
+                      <button class="btn btn-outline" style="flex:1;" onclick="window.limparFormProduto()">LIMPAR FICHA</button>
+                      <button class="btn btn-primary" id="btnSalvarProduto" style="flex:2;" onclick="window.salvarProdutoCompra()"><i data-lucide="save"></i> GRAVAR NO CATÁLOGO</button>
+                  </div>
+              </div>
+              <div class="card-panel">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px; flex-wrap:wrap; gap:15px;">
+                      <h3 style="margin:0; font-size: 16px; font-weight:700; color:var(--text-main); display:flex; align-items:center; gap:8px;"><i data-lucide="search" style="color:var(--compra); width:20px;"></i> Catálogo Ativo</h3>
+                      <input type="text" id="buscaProduto" placeholder="Buscar insumo..." style="width:350px; padding:10px;" onkeyup="window.renderProdutosCompra()">
+                  </div>
+                  <div class="table-container">
+                      <table><thead><tr><th>Produto / Insumo</th><th style="text-align:center">Embalagem</th><th style="text-align:right">Custo Declarado</th><th style="text-align:center">Ações</th></tr></thead><tbody id="tabelaProdutosCompra"></tbody></table>
+                  </div>
+              </div>
+          </div>
+
+          <!-- ========================================== -->
+          <!-- ÁREA: ALMOXARIFADO (ESTOQUE E RETIRADA)    -->
+          <!-- ========================================== -->
+          <div id="tab-saldos" class="section">
+              <div class="dash-grid">
+                  <div class="dash-card" style="border-left: 4px solid var(--estoque);">
+                      <h3 style="color:var(--estoque)">Itens Únicos em Estoque</h3>
+                      <div class="value" id="kpiEstoqueItens">0</div>
+                  </div>
+                  <div class="dash-card" style="border-left: 4px solid var(--success);">
+                      <h3 style="color:var(--success)">Total de Entradas (Mês)</h3>
+                      <div class="value" id="kpiEstoqueEntradas">0</div>
+                  </div>
+                  <div class="dash-card" style="border-left: 4px solid var(--danger);">
+                      <h3 style="color:var(--danger)">Total de Saídas (Mês)</h3>
+                      <div class="value" id="kpiEstoqueSaidas">0</div>
+                  </div>
+              </div>
+
+              <div class="card-panel">
+                  <div class="card-header" style="color:var(--estoque); border-bottom-color:var(--estoque);"><i data-lucide="layers"></i> Posição Física do Almoxarifado (Prateleira)</div>
+                  <div class="table-container">
+                      <table>
+                          <thead><tr><th>Insumo / Material</th><th style="text-align:right;">Saldo Atual</th><th style="text-align:center;">Unidade</th></tr></thead>
+                          <tbody id="tabelaSaldosEstoque">
+                              <tr><td colspan="3" style="text-align:center; padding:30px; color:var(--text-muted);">Nenhum material em estoque.</td></tr>
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+          </div>
+
+          <div id="tab-extrato" class="section">
+              <h2 class="view-title" style="color:var(--estoque); margin-bottom: 25px;">Auditoria de Movimentações (Kardex)</h2>
+              <div class="table-container">
+                  <table>
+                      <thead><tr><th>Data/Hora</th><th>Tipo</th><th>Material</th><th style="text-align:center;">Qtd</th><th>Colaborador / Origem</th><th>Destino (OS)</th></tr></thead>
+                      <tbody id="tabelaExtratoEstoque"></tbody>
+                  </table>
+              </div>
+          </div>
+
+          <div id="tab-baixa" class="section">
+              <div class="card-panel" style="border:1px solid var(--estoque); box-shadow: 0 10px 25px rgba(139, 92, 246, 0.1);">
+                  <div class="card-header" style="color:var(--estoque); border-bottom-color:var(--estoque);"><i data-lucide="scan-barcode"></i> Retirada de Material (Baixa de Estoque)</div>
+                  
+                  <div class="row">
+                      <div class="col" style="flex:2">
+                          <label>Qual material está sendo retirado?</label>
+                          <select id="baixaItem" style="font-weight:600;" onchange="verificarSaldoBaixa()">
+                              <option value="">-- Selecione o Insumo --</option>
+                          </select>
+                          <div id="avisoSaldoBaixa" style="font-size:12px; font-weight:700; color:var(--info); margin-top:-10px; margin-bottom:15px;"></div>
+                      </div>
+                      <div class="col" style="flex:1">
+                          <label>Quantidade Retirada</label>
+                          <input type="number" id="baixaQtd" placeholder="Ex: 3.5">
+                      </div>
+                  </div>
+
+                  <div class="row">
+                      <div class="col">
+                          <label>Nome do Funcionário (Quem pegou?)</label>
+                          <input type="text" id="baixaFuncionario" placeholder="Ex: João Silva">
+                      </div>
+                      <div class="col">
+                          <label>Categoria de Uso</label>
+                          <select id="baixaCategoria" onchange="toggleOSBaixa()">
+                              <option value="Uso Geral">Uso Geral / Consumo (Lixas, EPI, Manutenção)</option>
+                              <option value="Matéria-Prima">Matéria-Prima (Aplicado em OS Específica)</option>
+                          </select>
+                      </div>
+                  </div>
+
+                  <div class="row" id="blocoOSDestino" style="display:none; background:rgba(239, 68, 68, 0.05); padding:15px; border-radius:8px; border:1px dashed var(--danger); margin-bottom:15px;">
+                      <div class="col">
+                          <label style="color:var(--danger);"><i data-lucide="alert-triangle" style="width:14px; vertical-align:middle;"></i> Rastreio Obrigatório: Em quais OSs isso será usado?</label>
+                          <input type="text" id="baixaOS" placeholder="Ex: OS 630, OS 645" style="border-color:var(--danger);">
+                      </div>
+                  </div>
+
+                  <button class="btn btn-estoque" style="width:100%; padding:20px; font-size:16px;" onclick="registrarSaida()"><i data-lucide="check-square"></i> CONFIRMAR RETIRADA DE MATERIAL</button>
+              </div>
+          </div>
+
+      </div>
+  </main>
+</div>
+
+<!-- Modal Receber NF -->
+<div id="modalReceberNF" style="position:fixed; inset:0; background:rgba(2,6,23,0.9); display:none; z-index:10000; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(4px);">
+    <div style="background:var(--card-bg); width:100%; max-width:450px; padding:40px; border-radius:16px; border: 1px solid var(--border);">
+        <h3 style="margin-top:0; color:var(--success); font-size:22px; font-weight:800;"><i data-lucide="package-check"></i> Recebimento de Carga</h3>
+        <p style="font-size:14px; color:var(--text-muted); margin-bottom:25px;">Informe o número da Nota Fiscal para dar entrada oficial. Os itens deste pedido irão automaticamente para o Saldo do Almoxarifado.</p>
+        <label>Número da Nota Fiscal (NF-e)</label>
+        <input type="text" id="nfRecebimento" placeholder="Ex: 0001548">
+        <input type="hidden" id="idxRecebimento">
+        <div style="display:flex; gap:20px; margin-top:30px;">
+            <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('modalReceberNF').style.display='none'">CANCELAR</button>
+            <button class="btn btn-success" style="flex:1;" onclick="confirmarRecebimento()"><i data-lucide="check"></i> CONFIRMAR ENTRADA</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    lucide.createIcons();
+
+    let empresaSelecionada = 'MARBE';
+    let itensPedidoAtual = [];
+    let produtoSelecionadoNoCarrinho = null;
+
+    // Controle de Navegação Módulos (Sidebar)
+    window.abrirModulo = function(modulo) {
+        document.querySelectorAll('.sidebar-nav .tab-btn').forEach(e => e.classList.remove('active', 'active-estoque'));
+        document.getElementById('submenu-compras').style.display = 'none';
+        document.getElementById('submenu-cadastros').style.display = 'none';
+        document.getElementById('submenu-estoque').style.display = 'none';
+        document.getElementById('submenu-retirada').style.display = 'none';
+        
+        if(modulo === 'compras') {
+            document.getElementById('btn-compras').classList.add('active');
+            document.getElementById('submenu-compras').style.display = 'flex';
+            document.getElementById('mainTitle').innerText = 'Módulo Oficial de Compras';
+            document.documentElement.style.setProperty('--primary', '#f97316'); // Laranja
+            tabSection('tab-pedido');
+        } else if(modulo === 'cadastros') {
+            document.getElementById('btn-cadastros').classList.add('active');
+            document.getElementById('submenu-cadastros').style.display = 'flex';
+            document.getElementById('mainTitle').innerText = 'Fornecedores & Catálogo';
+            document.documentElement.style.setProperty('--primary', '#f97316'); 
+            tabSection('tab-fornecedores');
+        } else if(modulo === 'estoque') {
+            document.getElementById('btn-estoque').classList.add('active-estoque');
+            document.getElementById('submenu-estoque').style.display = 'flex';
+            document.getElementById('mainTitle').innerText = 'Almoxarifado & Estoque Central';
+            document.documentElement.style.setProperty('--primary', '#8b5cf6'); // Roxo
+            tabSection('tab-saldos');
+        } else if(modulo === 'retirada') {
+            document.getElementById('btn-retirada').classList.add('active-estoque');
+            document.getElementById('submenu-retirada').style.display = 'flex';
+            document.getElementById('mainTitle').innerText = 'Catraca de Retirada (Baixa)';
+            document.documentElement.style.setProperty('--primary', '#8b5cf6'); 
+            tabSection('tab-baixa');
+        }
+    };
+
+    // Controle de Sub-Abas
+    window.tabSection = function(id) {
+        document.querySelectorAll('.section').forEach(e => e.classList.remove('active'));
+        document.querySelectorAll('.sub-tab-btn').forEach(e => e.classList.remove('active', 'active-estoque'));
+        
+        document.getElementById(id).classList.add('active');
+        
+        // Pinta o sub-botão correspondente
+        let botoes = document.querySelectorAll('.sub-tab-btn');
+        botoes.forEach(b => {
+            if(b.getAttribute('onclick').includes(`('${id}')`)) {
+                if(id.includes('saldos') || id.includes('extrato') || id.includes('baixa')) b.classList.add('active-estoque');
+                else b.classList.add('active');
+            }
+        });
+        
+        updateUI();
+    };
+
+    window.selecionarEmpresa = function(empresa) {
+        empresaSelecionada = empresa;
+        document.getElementById('btnMarbe').classList.remove('active');
+        document.getElementById('btnSB').classList.remove('active');
+        if(empresa === 'MARBE') document.getElementById('btnMarbe').classList.add('active');
+        else document.getElementById('btnSB').classList.add('active');
+    };
+
+    function updateUI() {
+        if(!window.marbeDB || !window.marbeDB.compras) return;
+        renderFornecedores();
+        renderProdutosCompra();
+        renderHistoricoCompras();
+        renderSaldosEstoque();
+        renderExtratoEstoque();
+        
+        // Preenche combos
+        let comboForn = `<option value="">-- Selecione um Fornecedor --</option>`;
+        (window.marbeDB.compras.fornecedores || []).forEach(f => { comboForn += `<option value="${f.razao}">${f.razao}</option>`; });
+        document.getElementById('selectFornecedor').innerHTML = comboForn;
+
+        let listProd = '';
+        (window.marbeDB.compras.produtos || []).forEach(p => { listProd += `<option value="${p.nome}">`; });
+        document.getElementById('listaProdutosDatalist').innerHTML = listProd;
+
+        let comboBaixa = `<option value="">-- Selecione o Insumo no Estoque --</option>`;
+        if(window.marbeDB.almoxarifado && window.marbeDB.almoxarifado.saldos) {
+            Object.keys(window.marbeDB.almoxarifado.saldos).sort().forEach(nome => {
+                let s = window.marbeDB.almoxarifado.saldos[nome];
+                if(s.qtd > 0) comboBaixa += `<option value="${nome}">${nome} (Saldo: ${s.qtd.toFixed(2)} ${s.un})</option>`;
+            });
+        }
+        document.getElementById('baixaItem').innerHTML = comboBaixa;
+    }
+
+    /* ========================================================================= */
+    /* 1. FUNÇÕES DE COMPRAS (PEDIDOS, PDF, FORNECEDOR E PRODUTO)                */
+    /* ========================================================================= */
+    
+    // (Omitindo aqui o código repetido das funções de Fornecedor e Produto por brevidade de leitura, MAS SÃO IDÊNTICAS AO CÓDIGO ANTERIOR)
+    // PARA NÃO QUEBRAR O SISTEMA, VOU MANTER AS FUNÇÕES COMPLETAS ABAIXO:
+
+    window.buscaCNPJFornecedor = async function(v) {
+        const cnpj = v.replace(/\D/g, ''); if (cnpj.length !== 14) return;
+        try { const r = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`); const d = await r.json();
+            document.getElementById('fornNome').value = d.razao_social || "";
+            document.getElementById('fornEndereco').value = d.logradouro ? `${d.logradouro}, ${d.numero || 'S/N'} - ${d.bairro}, ${d.municipio} - ${d.uf}` : "";
+        } catch (e) {}
+    };
+
+    window.limparFormFornecedor = function() {
+        ['fornNome', 'fornCnpj', 'fornEndereco', 'fornIE', 'fornContato', 'fornTelefone', 'fornEmail', 'fornTags'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('fornIndex').value = '-1';
+        document.getElementById('btnSalvarForn').innerHTML = '<i data-lucide="save"></i> GRAVAR FORNECEDOR NA AGENDA';
+        lucide.createIcons();
+    };
+
+    window.salvarFornecedor = function() {
+        const razao = document.getElementById('fornNome').value;
+        if(!razao) return alert("Razão Social é obrigatória!");
+        const index = parseInt(document.getElementById('fornIndex').value);
+        const novoForn = { razao: razao, cnpj: document.getElementById('fornCnpj').value, endereco: document.getElementById('fornEndereco').value, ie: document.getElementById('fornIE').value, contato: document.getElementById('fornContato').value, telefone: document.getElementById('fornTelefone').value, email: document.getElementById('fornEmail').value, tags: document.getElementById('fornTags').value };
+        if(!window.marbeDB.compras.fornecedores) window.marbeDB.compras.fornecedores = [];
+        if (index >= 0) window.marbeDB.compras.fornecedores[index] = novoForn; else window.marbeDB.compras.fornecedores.push(novoForn);
+        window.salvarNuvem(true); window.limparFormFornecedor(); alert(index >= 0 ? "Fornecedor atualizado!" : "Fornecedor cadastrado!"); updateUI();
+    };
+
+    window.editarFornecedor = function(i) {
+        let f = window.marbeDB.compras.fornecedores[i];
+        document.getElementById('fornNome').value = f.razao || ''; document.getElementById('fornCnpj').value = f.cnpj || ''; document.getElementById('fornEndereco').value = f.endereco || ''; document.getElementById('fornIE').value = f.ie || ''; document.getElementById('fornContato').value = f.contato || ''; document.getElementById('fornTelefone').value = f.telefone || ''; document.getElementById('fornEmail').value = f.email || ''; document.getElementById('fornTags').value = f.tags || ''; document.getElementById('fornIndex').value = i;
+        document.getElementById('btnSalvarForn').innerHTML = '<i data-lucide="save"></i> ATUALIZAR DADOS DO FORNECEDOR';
+        lucide.createIcons(); window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    window.renderFornecedores = function() {
+        let html = ''; let termo = (document.getElementById('buscaFornecedor').value || '').toLowerCase();
+        (window.marbeDB.compras.fornecedores || []).forEach((f, i) => {
+            let tags = f.tags || ''; let stringBusca = (f.razao + ' ' + (f.cnpj||'') + ' ' + tags).toLowerCase();
+            if (termo && !stringBusca.includes(termo)) return;
+            let tagsHtml = '';
+            if(tags) { tagsHtml = tags.split(',').map(t => { let trimTag = t.trim(); if(trimTag) return `<span style="display:inline-block; background:rgba(249,115,22,0.1); color:var(--compra); padding:3px 8px; border-radius:4px; font-size:10px; margin-right:5px; margin-top:5px; font-weight:700; border:1px solid var(--compra); text-transform:uppercase;">${trimTag}</span>`; return ''; }).join(''); }
+            html += `<tr><td><strong style="color:var(--text-main); font-size:15px;">${f.razao}</strong><br><span style="font-size:12px; color:var(--text-muted);">CNPJ: ${f.cnpj || '-'}</span><br>${tagsHtml}</td><td>${f.contato || '-'}</td><td>${f.telefone || '-'}</td><td style="text-align:center; white-space:nowrap;"><button class="btn btn-outline" style="padding:6px 10px; margin-right:5px;" onclick="window.editarFornecedor(${i})"><i data-lucide="edit-3" style="width:16px;"></i></button><button class="btn btn-outline" style="padding:6px 10px; color:var(--danger); border-color:var(--danger);" onclick="window.excluirFornecedor(${i})"><i data-lucide="trash-2" style="width:16px;"></i></button></td></tr>`;
+        });
+        document.getElementById('tabelaFornecedores').innerHTML = html || '<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">Nenhum fornecedor encontrado na busca.</td></tr>'; lucide.createIcons();
+    };
+
+    window.excluirFornecedor = function(i) { if(confirm("Deseja realmente excluir este fornecedor da Agenda?")) { window.marbeDB.compras.fornecedores.splice(i, 1); window.salvarNuvem(true); updateUI(); } };
+
+    window.limparFormProduto = function() {
+        ['prodNome', 'prodEmb', 'prodFator', 'prodCustoEmb'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('prodIndex').value = '-1';
+        document.getElementById('btnSalvarProduto').innerHTML = '<i data-lucide="save"></i> GRAVAR PRODUTO NO CATÁLOGO'; lucide.createIcons();
+    };
+
+    window.salvarProdutoCompra = function() {
+        const nome = document.getElementById('prodNome').value; if(!nome) return alert("Nome do insumo é obrigatório!");
+        const embTxt = document.getElementById('prodEmb').value.trim(); const fator = parseFloat(document.getElementById('prodFator').value) || 1; const custoEmb = parseFloat(document.getElementById('prodCustoEmb').value) || 0; const index = parseInt(document.getElementById('prodIndex').value);
+        const novoProd = { nome: nome, un: document.getElementById('prodUn').value, emb: embTxt !== '' ? embTxt : 'Avulso', fator: fator, custo_emb: custoEmb };
+        if(!window.marbeDB.compras.produtos) window.marbeDB.compras.produtos = [];
+        if (index >= 0) window.marbeDB.compras.produtos[index] = novoProd; else window.marbeDB.compras.produtos.push(novoProd);
+        window.salvarNuvem(true); window.limparFormProduto(); alert(index >= 0 ? "Produto atualizado com sucesso!" : "Produto cadastrado!"); updateUI();
+    };
+
+    window.editarProdutoCompra = function(i) {
+        let p = window.marbeDB.compras.produtos[i];
+        document.getElementById('prodNome').value = p.nome; document.getElementById('prodUn').value = p.un || 'KG'; document.getElementById('prodEmb').value = p.emb === 'Avulso' ? '' : p.emb; document.getElementById('prodFator').value = p.fator; document.getElementById('prodCustoEmb').value = p.custo_emb || 0; document.getElementById('prodIndex').value = i;
+        document.getElementById('btnSalvarProduto').innerHTML = '<i data-lucide="save"></i> ATUALIZAR PRODUTO'; lucide.createIcons(); window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    window.renderProdutosCompra = function() {
+        let html = ''; let termo = (document.getElementById('buscaProduto').value || '').toLowerCase();
+        (window.marbeDB.compras.produtos || []).forEach((p, i) => {
+            if (termo && !p.nome.toLowerCase().includes(termo)) return;
+            let precoDaEmbalagem = parseFloat(p.custo_emb) || 0; let qtdNaEmbalagem = parseFloat(p.fator) || 1; let precoDoQuilo = precoDaEmbalagem / qtdNaEmbalagem;
+            let infoEmbalagem = p.emb !== 'Avulso' ? `<span style="color:var(--compra); font-weight:700;">${p.emb}</span> <span style="font-size:12px; color:var(--text-muted);">(Contém ${p.fator} ${p.un})</span>` : `<span style="color:var(--text-muted);">Unitário (${p.un})</span>`;
+            let infoCusto = p.emb !== 'Avulso' ? `${window.fmtMoney(precoDaEmbalagem)} por ${p.emb}<br><span style="font-size:11px; color:var(--text-muted);">(= ${window.fmtMoney(precoDoQuilo)} / ${p.un})</span>` : `${window.fmtMoney(precoDaEmbalagem)} / ${p.un}`;
+            html += `<tr><td><strong style="color:var(--text-main);">${p.nome}</strong></td><td style="text-align:center;">${infoEmbalagem}</td><td style="text-align:right; font-weight:600; color:var(--text-main);">${infoCusto}</td><td style="text-align:center; white-space:nowrap;"><button class="btn btn-outline" style="padding:6px 10px; margin-right:5px;" onclick="window.editarProdutoCompra(${i})"><i data-lucide="edit-3" style="width:16px;"></i></button><button class="btn btn-outline" style="padding:6px 10px; color:var(--danger); border-color:var(--danger);" onclick="window.excluirProdutoCompra(${i})"><i data-lucide="trash-2" style="width:16px;"></i></button></td></tr>`;
+        });
+        document.getElementById('tabelaProdutosCompra').innerHTML = html || '<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">Nenhum produto encontrado.</td></tr>'; lucide.createIcons();
+    };
+
+    window.excluirProdutoCompra = function(i) { if(confirm("Deseja excluir este insumo do catálogo?")) { window.marbeDB.compras.produtos.splice(i, 1); window.salvarNuvem(true); updateUI(); } };
+
+    document.getElementById('itemNome').addEventListener('change', function() {
+        const prod = (window.marbeDB.compras.produtos || []).find(p => p.nome === this.value);
+        if(prod) { produtoSelecionadoNoCarrinho = prod; document.getElementById('itemPreco').value = prod.custo_emb || 0; document.getElementById('itemUn').value = prod.un;
+            if(prod.emb !== 'Avulso') { document.getElementById('labelItemQtd').innerText = `Quantidade (${prod.emb}s)`; document.getElementById('ajudaCalculoItem').innerHTML = `<i data-lucide="check-circle" style="width:14px;"></i> Automático: Cada ${prod.emb} cobrará ${window.fmtMoney(prod.custo_emb || 0)} e entregará ${prod.fator} ${prod.un}.`; } 
+            else { document.getElementById('labelItemQtd').innerText = `Quantidade (${prod.un})`; document.getElementById('ajudaCalculoItem').innerHTML = ``; } lucide.createIcons();
+        } else { produtoSelecionadoNoCarrinho = null; document.getElementById('itemUn').value = ''; document.getElementById('labelItemQtd').innerText = 'Quantidade'; document.getElementById('ajudaCalculoItem').innerHTML = ''; }
+    });
+
+    window.adicionarItemCompra = function() {
+        const nome = document.getElementById('itemNome').value; const qtdInserida = parseFloat(document.getElementById('itemQtd').value); const precoEmbalagem = parseFloat(document.getElementById('itemPreco').value) || 0;
+        if(!nome || !qtdInserida) return alert("Preencha Nome e Quantidade do item.");
+        let fatorMultiplicador = 1; let embalagemNome = 'Avulso'; let unidadeMedida = document.getElementById('itemUn').value || 'UN';
+        if(produtoSelecionadoNoCarrinho) { fatorMultiplicador = parseFloat(produtoSelecionadoNoCarrinho.fator) || 1; embalagemNome = produtoSelecionadoNoCarrinho.emb || 'Avulso'; unidadeMedida = produtoSelecionadoNoCarrinho.un || 'UN'; }
+        let qtdTotalCalculada = qtdInserida * fatorMultiplicador;
+        itensPedidoAtual.push({ n: nome, q_emb: qtdInserida, emb: embalagemNome, fator: fatorMultiplicador, q_total: qtdTotalCalculada, un: unidadeMedida, v_emb: precoEmbalagem });
+        document.getElementById('itemNome').value = ''; document.getElementById('itemQtd').value = ''; document.getElementById('itemPreco').value = ''; document.getElementById('itemUn').value = ''; document.getElementById('labelItemQtd').innerText = 'Quantidade'; document.getElementById('ajudaCalculoItem').innerHTML = ''; produtoSelecionadoNoCarrinho = null; renderItensPedido();
+    };
+
+    window.removerItemCompra = function(index) { itensPedidoAtual.splice(index, 1); renderItensPedido(); };
+
+    function renderItensPedido() {
+        let html = ''; let totalGlobal = 0;
+        itensPedidoAtual.forEach((it, i) => {
+            let totalItem = it.q_emb * it.v_emb; totalGlobal += totalItem;
+            let colunaQtdHtml = it.emb !== 'Avulso' ? `<strong style="color:var(--text-main); font-size:15px;">${it.q_emb} ${it.emb}</strong><br><span style="font-size:11px; color:var(--text-muted);">(Contém ${it.q_total} ${it.un})</span>` : `<strong style="color:var(--text-main); font-size:15px;">${it.q_emb} ${it.un}</strong>`;
+            html += `<tr><td><strong style="color:var(--compra); font-size:14px;">${it.n}</strong></td><td style="text-align:center;">${colunaQtdHtml}</td><td style="text-align:right;">${window.fmtMoney(it.v_emb)} <span style="font-size:11px; color:var(--text-muted);">/ ${it.emb !== 'Avulso' ? it.emb : it.un}</span></td><td style="text-align:right; font-weight:800; font-size:15px; color:var(--text-main);">${window.fmtMoney(totalItem)}</td><td style="text-align:center;"><button class="btn btn-outline" style="padding:4px; color:var(--danger); border-color:var(--danger);" onclick="window.removerItemCompra(${i})"><i data-lucide="trash-2" style="width:16px;"></i></button></td></tr>`;
+        });
+        document.getElementById('tabelaItensCompra').innerHTML = html || '<tr><td colspan="5" style="text-align:center; padding:30px; color:var(--text-muted);">Nenhum item adicionado ao pedido ainda.</td></tr>';
+        document.getElementById('totalPedidoCompra').innerText = window.fmtMoney(totalGlobal); lucide.createIcons();
+    }
+
+    window.salvarPedidoCompra = function() {
+        if(itensPedidoAtual.length === 0) return alert("Adicione pelo menos um item ao pedido!");
+        const forn = document.getElementById('selectFornecedor').value; if(!forn) return alert("Selecione um fornecedor!");
+        let nPedido = window.marbeDB.compras.seq++; let totalGlobal = itensPedidoAtual.reduce((acc, it) => acc + (it.q_emb * it.v_emb), 0);
+        let novoPedido = { pc: nPedido, empresa_compradora: empresaSelecionada, fornecedor: forn, itens: JSON.parse(JSON.stringify(itensPedidoAtual)), total: totalGlobal, transportadora: document.getElementById('compraTransp').value, tipo_frete: document.getElementById('compraFreteTipo').value, prazo_entrega: document.getElementById('compraPrazo').value, tipo_pagamento: document.getElementById('compraPgtoTipo').value, detalhe_pagamento: document.getElementById('compraPgtoDet').value, obs: document.getElementById('obsCompra').value, data_emissao: new Date().toISOString(), recebido: false };
+        if(!window.marbeDB.compras.pedidos) window.marbeDB.compras.pedidos = [];
+        window.marbeDB.compras.pedidos.push(novoPedido); window.salvarNuvem(); alert(`Pedido de Compra Nº PC-${nPedido} gerado com sucesso!`);
+        itensPedidoAtual = []; ['selectFornecedor', 'compraTransp', 'compraPrazo', 'compraPgtoDet', 'obsCompra'].forEach(id => document.getElementById(id).value = ''); renderItensPedido();
+        tabCompras('tab-historico', document.getElementById('btn-tab-historico'));
+    };
+
+    function renderHistoricoCompras() {
+        let html = ''; let pedidosReverse = [...(window.marbeDB.compras.pedidos || [])].reverse();
+        pedidosReverse.forEach((p, originalReverseIndex) => {
+            let realIndex = (window.marbeDB.compras.pedidos.length - 1) - originalReverseIndex; // Pegar o index correto no array original
+            let dataEmissao = p.data_emissao ? new Date(p.data_emissao).toLocaleDateString('pt-BR') : 'N/D';
+            let corBadge = p.empresa_compradora === 'MARBE' ? 'background:#3b82f6;' : 'background:#f97316;';
+            let btnReceber = p.recebido 
+                ? `<span style="color:var(--success); font-weight:800; font-size:12px; margin-right:15px;"><i data-lucide="check-circle" style="width:16px; vertical-align:middle;"></i> MATERIAL RECEBIDO</span>` 
+                : `<button class="btn btn-success" style="margin-right:10px;" onclick="abrirRecebimentoNF(${realIndex})"><i data-lucide="truck"></i> RECEBER MATERIAL (NF)</button>`;
+
+            html += `
+            <div class="card-list" style="border-left-color: ${p.recebido ? 'var(--success)' : 'var(--compra)'};">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div>
+                        <strong style="font-size:16px; color:var(--text-main);">PC ${p.pc} - ${p.fornecedor}</strong><br>
+                        <span style="font-size:12px; color:var(--text-muted); display:block; margin-top:5px;">Emitido em: ${dataEmissao}</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <span style="padding:4px 10px; border-radius:6px; font-size:10px; font-weight:800; color:white; ${corBadge}">${p.empresa_compradora}</span><br>
+                        <strong style="font-size:20px; color:var(--compra); display:block; margin-top:8px;">${window.fmtMoney(p.total)}</strong>
+                    </div>
+                </div>
+                <div style="margin-top:15px; padding-top:15px; border-top:1px dashed var(--border); text-align:right;">
+                    ${btnReceber}
+                    <button class="btn btn-outline" style="color:var(--compra); border-color:var(--compra);" onclick="window.gerarPDFCompra(${p.pc})"><i data-lucide="printer"></i> GERAR PDF DE ENVIO</button>
+                </div>
+            </div>`;
+        });
+        document.getElementById('listaHistoricoCompras').innerHTML = html || '<div style="text-align:center; padding:40px; color:var(--text-muted);">Nenhum pedido de compra emitido no sistema.</div>'; lucide.createIcons();
+    }
+
+    /* ========================================================================= */
+    /* 2. FUNÇÕES DO ALMOXARIFADO (ESTOQUE E RETIRADA)                           */
+    /* ========================================================================= */
+
+    window.abrirRecebimentoNF = function(index) {
+        document.getElementById('idxRecebimento').value = index;
+        document.getElementById('nfRecebimento').value = '';
+        document.getElementById('modalReceberNF').style.display = 'flex';
+    };
+
+    window.confirmarRecebimento = function() {
+        const nf = document.getElementById('nfRecebimento').value.trim();
+        if(!nf) return alert("Por favor, digite o número da Nota Fiscal do Fornecedor.");
+        const index = parseInt(document.getElementById('idxRecebimento').value);
+        let pedido = window.marbeDB.compras.pedidos[index];
+
+        // Processa cada item do pedido e joga no saldo do Almoxarifado
+        pedido.itens.forEach(it => {
+            let nomeItem = it.n;
+            let qtdReal = parseFloat(it.q_total); // É a quantidade em KG/UN, não a quantidade de galões
+            let unidade = it.un;
+
+            if(!window.marbeDB.almoxarifado.saldos[nomeItem]) {
+                window.marbeDB.almoxarifado.saldos[nomeItem] = { qtd: 0, un: unidade };
+            }
+            window.marbeDB.almoxarifado.saldos[nomeItem].qtd += qtdReal;
+
+            // Registra a auditoria
+            window.marbeDB.almoxarifado.movimentacoes.push({
+                data: new Date().toISOString(),
+                tipo: 'ENTRADA',
+                item: nomeItem,
+                qtd: qtdReal,
+                un: unidade,
+                origem: pedido.fornecedor,
+                doc: `NF: ${nf} / PC: ${pedido.pc}`
+            });
+        });
+
+        pedido.recebido = true;
+        pedido.nf_entrada = nf;
+        
+        window.salvarNuvem(true);
+        document.getElementById('modalReceberNF').style.display = 'none';
+        alert(`Entrada da NF ${nf} realizada com sucesso!\nOs itens já constam no Saldo do Almoxarifado.`);
+        updateUI();
+    };
+
+    window.renderSaldosEstoque = function() {
+        let saldos = window.marbeDB.almoxarifado.saldos || {};
+        let keys = Object.keys(saldos).sort();
+        let html = '';
+        
+        let totaisUnicos = 0;
+        keys.forEach(nome => {
+            let s = saldos[nome];
+            if(s.qtd > 0) totaisUnicos++;
+            html += `<tr>
+                <td><strong style="color:var(--text-main); font-size:15px;">${nome}</strong></td>
+                <td style="text-align:right;"><strong style="font-size:18px; color:var(--estoque);">${s.qtd.toFixed(2)}</strong></td>
+                <td style="text-align:center; color:var(--text-muted); font-weight:700;">${s.un}</td>
+            </tr>`;
+        });
+        
+        document.getElementById('tabelaSaldosEstoque').innerHTML = html || '<tr><td colspan="3" style="text-align:center; padding:30px; color:var(--text-muted);">Almoxarifado Vazio.</td></tr>';
+        document.getElementById('kpiEstoqueItens').innerText = totaisUnicos;
+        
+        // KPIs do Mês
+        let mesAtual = new Date().toISOString().substring(0, 7); // YYYY-MM
+        let ent = 0, sai = 0;
+        (window.marbeDB.almoxarifado.movimentacoes || []).forEach(m => {
+            if(m.data.startsWith(mesAtual)) {
+                if(m.tipo === 'ENTRADA') ent++;
+                if(m.tipo === 'SAÍDA') sai++;
+            }
+        });
+        document.getElementById('kpiEstoqueEntradas').innerText = ent;
+        document.getElementById('kpiEstoqueSaidas').innerText = sai;
+    };
+
+    window.renderExtratoEstoque = function() {
+        let movs = [...(window.marbeDB.almoxarifado.movimentacoes || [])].reverse();
+        let html = '';
+        
+        movs.forEach(m => {
+            let dataFmt = new Date(m.data).toLocaleString('pt-BR');
+            let isEntrada = m.tipo === 'ENTRADA';
+            let badgeTipo = isEntrada ? `<span style="background:#064e3b; color:#6ee7b7; padding:4px 8px; border-radius:6px; font-size:10px; font-weight:800;">ENTRADA</span>` : `<span style="background:#7f1d1d; color:#fca5a5; padding:4px 8px; border-radius:6px; font-size:10px; font-weight:800;">SAÍDA</span>`;
+            let corVal = isEntrada ? 'var(--success)' : 'var(--danger)';
+            let sinalVal = isEntrada ? '+' : '-';
+            
+            html += `<tr>
+                <td style="font-size:12px; color:var(--text-muted);">${dataFmt}</td>
+                <td>${badgeTipo}</td>
+                <td><strong style="color:var(--text-main);">${m.item}</strong></td>
+                <td style="text-align:center; font-weight:800; color:${corVal};">${sinalVal} ${m.qtd} ${m.un}</td>
+                <td style="font-size:13px; color:var(--text-main);">${m.origem || '-'} <br><span style="font-size:11px; color:var(--text-muted);">${m.doc || ''}</span></td>
+                <td style="font-size:13px; color:var(--text-muted); font-weight:600;">${m.destino || '-'}</td>
+            </tr>`;
+        });
+        document.getElementById('tabelaExtratoEstoque').innerHTML = html || '<tr><td colspan="6" style="text-align:center; padding:30px; color:var(--text-muted);">Nenhuma movimentação registrada.</td></tr>';
+    };
+
+    // FORMULÁRIO DE RETIRADA
+    window.verificarSaldoBaixa = function() {
+        let nome = document.getElementById('baixaItem').value;
+        if(!nome) { document.getElementById('avisoSaldoBaixa').innerText = ''; return; }
+        let saldo = window.marbeDB.almoxarifado.saldos[nome];
+        document.getElementById('avisoSaldoBaixa').innerText = `Saldo Disponível: ${saldo.qtd.toFixed(2)} ${saldo.un}`;
+    };
+
+    window.toggleOSBaixa = function() {
+        let cat = document.getElementById('baixaCategoria').value;
+        if(cat === 'Matéria-Prima') document.getElementById('blocoOSDestino').style.display = 'block';
+        else document.getElementById('blocoOSDestino').style.display = 'none';
+    };
+
+    window.registrarSaida = function() {
+        let nomeItem = document.getElementById('baixaItem').value;
+        let qtd = parseFloat(document.getElementById('baixaQtd').value);
+        let funcionario = document.getElementById('baixaFuncionario').value.trim();
+        let categoria = document.getElementById('baixaCategoria').value;
+        let osDestino = document.getElementById('baixaOS').value.trim();
+
+        if(!nomeItem) return alert("Selecione um item do estoque.");
+        if(!qtd || qtd <= 0) return alert("Digite uma quantidade válida para retirada.");
+        if(!funcionario) return alert("Obrigatório informar o NOME do funcionário que está retirando o material.");
+        
+        if(categoria === 'Matéria-Prima' && !osDestino) {
+            return alert("BLOQUEIO DE RASTREIO:\n\nComo o material é 'Matéria-Prima', você DEVE informar o número da(s) OS(s) em que ele será aplicado.");
+        }
+
+        let saldoObj = window.marbeDB.almoxarifado.saldos[nomeItem];
+        if(qtd > saldoObj.qtd) {
+            if(!confirm(`ATENÇÃO: Você está tentando retirar ${qtd}, mas o sistema diz que só temos ${saldoObj.qtd.toFixed(2)} em estoque.\nDeseja forçar a retirada e deixar o estoque negativo? (Requer inventário urgente)`)) return;
+        }
+
+        // Subtrai do saldo
+        saldoObj.qtd -= qtd;
+
+        // Registra Movimentação
+        window.marbeDB.almoxarifado.movimentacoes.push({
+            data: new Date().toISOString(),
+            tipo: 'SAÍDA',
+            item: nomeItem,
+            qtd: qtd,
+            un: saldoObj.un,
+            origem: funcionario,
+            destino: categoria === 'Matéria-Prima' ? `Para Produção: ${osDestino}` : 'Consumo Geral (Fábrica)'
+        });
+
+        window.salvarNuvem(true);
+        
+        alert(`Retirada de ${qtd} ${saldoObj.un} de ${nomeItem} autorizada e registrada no nome de ${funcionario}.`);
+        
+        // Limpa form
+        document.getElementById('baixaItem').value = '';
+        document.getElementById('baixaQtd').value = '';
+        document.getElementById('baixaFuncionario').value = '';
+        document.getElementById('baixaOS').value = '';
+        document.getElementById('avisoSaldoBaixa').innerText = '';
+        
+        updateUI();
+        tabSection('tab-saldos'); // Volta pra tela de saldo pra ver a redução
+    };
+    
+    // (Omitindo função window.gerarPDFCompra por limite de texto, mas ela continua intacta como enviei antes, pode manter a sua versão de gerarPDFCompra no final do código!)
+    window.gerarPDFCompra = function(numeroPC) {
+        const pedido = window.marbeDB.compras.pedidos.find(p => p.pc === numeroPC);
+        if(!pedido) return;
+        const { jsPDF } = window.jspdf; const doc = new jsPDF();
+        let razaoCompradora = ""; let cnpjComprador = "";
+        if(pedido.empresa_compradora === 'MARBE') { razaoCompradora = "GRUPO MARBE POLIURETANO ALTA PERFORMANCE LTDA"; cnpjComprador = "41.755.585/0001-37"; } else { razaoCompradora = "SB COMERCIO DE BORRACHAS E SERVICOS LTDA"; cnpjComprador = "61.149.312/0001-56"; }
+        let enderecoEntrega = "Rua São Carlos, 84 - Vila Mariana - Ribeirão Preto / SP";
+        doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.text("PEDIDO DE COMPRA OFICIAL", 105, 20, {align: "center"});
+        doc.setFontSize(12); doc.setTextColor(249, 115, 22); doc.text(`NÚMERO DO PEDIDO: PC-${pedido.pc}`, 105, 28, {align: "center"}); doc.setTextColor(0,0,0);
+        doc.setLineWidth(0.5); doc.line(20, 32, 190, 32);
+        doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text("DADOS DO COMPRADOR E FATURAMENTO:", 20, 42); doc.setFontSize(9); doc.setFont("helvetica", "normal");
+        doc.text(`RAZÃO SOCIAL: ${razaoCompradora}`, 20, 48); doc.text(`CNPJ: ${cnpjComprador}`, 20, 53); doc.setFont("helvetica", "bold"); doc.text(`ENDEREÇO DE ENTREGA: ${enderecoEntrega}`, 20, 58); doc.setFont("helvetica", "normal");
+        doc.setLineWidth(0.2); doc.line(20, 62, 190, 62);
+        doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text("FORNECEDOR:", 20, 72); doc.setFontSize(9); doc.setFont("helvetica", "normal");
+        let fornecedorObj = window.marbeDB.compras.fornecedores.find(f => f.razao === pedido.fornecedor);
+        doc.text(`RAZÃO SOCIAL: ${pedido.fornecedor}`, 20, 78);
+        if(fornecedorObj) { doc.text(`CNPJ: ${fornecedorObj.cnpj || 'N/D'}  |  IE: ${fornecedorObj.ie || 'ISENTO'}`, 20, 83); doc.text(`ENDEREÇO: ${fornecedorObj.endereco || 'N/D'}`, 20, 88); doc.text(`VENDEDOR: ${fornecedorObj.contato || 'N/D'}  |  TEL: ${fornecedorObj.telefone || 'N/D'}`, 20, 93); }
+        let itensBody = pedido.itens.map(it => { let strQuantidade = it.emb !== 'Avulso' ? `${it.q_emb} ${it.emb}(S)\n(${it.q_total} ${it.un})` : `${it.q_emb} ${it.un}`; return [ it.n.toUpperCase(), strQuantidade, window.fmtMoney(it.v_emb), window.fmtMoney(it.q_emb * it.v_emb) ]; });
+        doc.autoTable({ startY: 100, head: [['DESCRIÇÃO DO INSUMO/PRODUTO', 'QUANTIDADE E EMBALAGEM', 'V. UNITÁRIO', 'TOTAL DO ITEM']], body: itensBody, theme: 'grid', headStyles: { fillColor: [249, 115, 22] }, styles: { fontSize: 9, cellPadding: 3 }, columnStyles: { 1: { halign: 'center' }, 2: { halign: 'right' }, 3: { halign: 'right' } } });
+        let finalY = doc.lastAutoTable.finalY + 15;
+        doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.text(`TOTAL APROVADO: ${window.fmtMoney(pedido.total)}`, 190, finalY, {align: 'right'});
+        finalY += 15; doc.setFontSize(9); doc.setFont("helvetica", "bold"); doc.text("DADOS LOGÍSTICOS E FINANCEIROS:", 20, finalY); doc.setFont("helvetica", "normal");
+        finalY += 6; doc.text(`TRANSPORTADORA: ${pedido.transportadora || 'Não informada'}`, 20, finalY); finalY += 5; doc.text(`TIPO DE FRETE: ${pedido.tipo_frete || 'Não informado'}`, 20, finalY); finalY += 5; doc.text(`PRAZO DE ENTREGA: ${pedido.prazo_entrega || 'A Combinar'}`, 20, finalY); finalY += 5; doc.text(`FORMA DE PAGAMENTO: ${pedido.tipo_pagamento || 'A Combinar'} - ${pedido.detalhe_pagamento || ''}`, 20, finalY);
+        if(pedido.obs) { finalY += 10; doc.setFont("helvetica", "bold"); doc.text(`OBSERVAÇÕES DO PEDIDO:`, 20, finalY); doc.setFont("helvetica", "normal"); const splitObs = doc.splitTextToSize(pedido.obs, 170); doc.text(splitObs, 20, finalY + 5); }
+        window.abrirPDFMobile(doc.output('blob'), `PEDIDO_COMPRA_PC${pedido.pc}_${pedido.fornecedor}`);
+    };
+</script>
+</body>
+</html>

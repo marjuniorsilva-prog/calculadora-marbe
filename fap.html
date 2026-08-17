@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Apontamento FAP - ERP Marbe</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+  
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyATu_V6e1shKRpgBOkX1lw2beyzUEZUCo0",
+      authDomain: "marbeapp-e2db8.firebaseapp.com",
+      projectId: "marbeapp-e2db8",
+      storageBucket: "marbeapp-e2db8.firebasestorage.app",
+      messagingSenderId: "435226749841",
+      appId: "1:435226749841:web:c2b5f5dee676412b228830"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    window.marbeDB = null;
+
+    onValue(ref(db, 'sistema/'), (snapshot) => {
+      const data = snapshot.val();
+      if (data) { 
+          window.marbeDB = data; 
+          
+          if (!window.marbeDB.producao) {
+              window.marbeDB.producao = {
+                  funcionarios: [],
+                  processos: ['Lixamento', 'Desengraxe', 'Jateamento', 'Aplicação de Adesivo', 'Fundição PU', 'Usinagem/Torno', 'Acabamento/Rebarba', 'Limpeza da Fábrica', 'Manutenção de Equipamento'],
+                  apontamentos: []
+              };
+          }
+          
+          window.updateUI();
+      }
+    });
+
+    window.salvarNuvem = function(silencioso = false) { 
+        set(ref(db, 'sistema/'), window.marbeDB)
+            .then(() => { if(!silencioso) alert("Apontamento salvo com sucesso!"); })
+            .catch((error) => { alert("Erro ao salvar: " + error.message); });
+    };
+    
+    document.addEventListener("DOMContentLoaded", () => {
+        let hoje = new Date().toISOString().split('T')[0];
+        document.getElementById('fapData').value = hoje;
+        document.getElementById('filtroData').value = hoje;
+    });
+
+    window.abrirPDFMobile = (blob, nomeArquivo) => {
+        try {
+            const url = URL.createObjectURL(blob);
+            window.open(url, '_blank');
+            const a = document.createElement('a');
+            a.href = url; a.download = `${nomeArquivo}.pdf`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        } catch (e) {
+            alert("Erro ao tentar baixar o PDF: " + e.message);
+        }
+    };
+  </script>
+
+  <style>
+    :root { 
+      --bg-color: #0f172a; --card-bg: #1e293b; --border: #334155; --text-main: #f8fafc; --text-muted: #94a3b8; --sidebar-bg: #020617;      
+      --primary: #3b82f6; --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
+      --fap: #0d9488; --fap-hover: #0f766e;
+      --sidebar-width: 280px; --header-height: 70px; --border-radius: 12px;
+    }
+    
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg-color); margin: 0; padding: 0; color: var(--text-main); font-size: 14px; overflow-x: hidden; }
+    
+    .app-layout { display: flex; height: 100vh; overflow: hidden; }
+    
+    .sidebar { width: var(--sidebar-width); background: var(--sidebar-bg); color: #fff; display: flex; flex-direction: column; flex-shrink: 0; z-index: 50; border-right: 1px solid var(--border); }
+    .sidebar-brand { height: var(--header-height); display: flex; align-items: center; padding: 0 25px; font-size: 20px; font-weight: 800; border-bottom: 1px solid var(--border); color:var(--fap);}
+    .sidebar-brand i { margin-right: 15px; color: var(--fap); width: 24px; height: 24px; }
+    
+    .sidebar-nav { flex: 1; overflow-y: auto; padding: 20px 15px; display: flex; flex-direction: column; }
+    .sidebar-nav::-webkit-scrollbar { width: 4px; }
+    .sidebar-nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    
+    .nav-label { font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; margin: 15px 0 8px 10px; letter-spacing: 1px; }
+    
+    .tab-btn { display: flex; align-items: center; padding: 14px 15px; color: #94a3b8; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 14px; transition: all 0.2s; border: none; background: transparent; width: 100%; cursor: pointer; text-align: left; margin-bottom: 6px; }
+    .tab-btn i { width: 20px; height: 20px; margin-right: 15px; flex-shrink: 0; color: #64748b; transition: 0.2s; }
+    .tab-btn:hover { background: rgba(255,255,255,0.05); color: #f8fafc; }
+    .tab-btn:hover i { color: #f8fafc; }
+    .tab-btn.active { background: var(--fap); color: #fff; font-weight: 600; box-shadow: 0 4px 6px rgba(13, 148, 136, 0.2); }
+    .tab-btn.active i { color: #fff; }
+
+    .sidebar-footer { padding: 15px; border-top: 1px solid var(--border); flex-shrink: 0; }
+
+    .main-wrapper { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .topbar { height: var(--header-height); background: var(--card-bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; flex-shrink: 0; }
+    .view-title { font-size: 24px; font-weight: 700; color: var(--text-main); margin: 0; display:flex; align-items:center; gap:10px; }
+    
+    .user-profile { display: flex; align-items: center; gap: 12px; padding: 6px 16px; background: var(--bg-color); border-radius: 20px; border: 1px solid var(--border); }
+    .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--fap); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+    .user-info { display: flex; flex-direction: column; }
+    .user-name { font-size: 14px; font-weight: 600; color: var(--text-main); }
+    .user-role { font-size: 12px; color: var(--text-muted); }
+    
+    .content-area { flex: 1; overflow-y: auto; padding: 35px; background: var(--bg-color); }
+    .section { display: none; animation: fadeIn 0.3s ease-out; }
+    .section.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .card-panel { background: var(--card-bg); padding: 30px; border-radius: var(--border-radius); border: 1px solid var(--border); margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .card-header { font-size: 15px; font-weight: 700; color: var(--fap); margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--border); text-transform: uppercase; display: flex; align-items: center; gap: 10px; }
+    
+    label { display: block; font-weight: 600; font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+    input, select, textarea { width: 100%; padding: 14px 16px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; color: var(--text-main); font-family: 'Inter', sans-serif; background: var(--bg-color); margin-bottom: 18px; outline: none; transition:0.2s;}
+    input:focus, select:focus, textarea:focus { border-color: var(--fap); box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.2); }
+    
+    .row { display: flex; gap: 20px; }
+    .col { flex: 1; min-width: 0; }
+    
+    .btn { padding: 14px 24px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 10px; }
+    .btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .btn-fap { background: var(--fap); color: white; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-outline { background: var(--card-bg); border: 1px solid var(--border); color: var(--text-main); }
+    .btn-outline:hover { background: var(--border); }
+
+    .table-container { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    table th { background: var(--bg-color); border-bottom: 1px solid var(--border); padding: 16px; text-align: left; font-weight: 600; color: var(--text-muted); text-transform: uppercase; font-size: 12px; }
+    table td { border-bottom: 1px solid var(--border); padding: 16px; color: var(--text-main); vertical-align: middle; }
+    table tr:hover td { background-color: var(--bg-color); }
+
+    .badge-os { background: rgba(59, 130, 246, 0.1); color: var(--primary); padding: 4px 10px; border-radius: 6px; font-weight: 800; font-size: 12px; border: 1px solid var(--primary); }
+    .badge-interno { background: rgba(100, 116, 139, 0.1); color: var(--text-muted); padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; border: 1px solid var(--border); }
+    
+    .badge-aprovado { background: rgba(16, 185, 129, 0.1); color: var(--success); padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 800; border: 1px solid var(--success); }
+    .badge-reprovado { background: rgba(239, 68, 68, 0.1); color: var(--danger); padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 800; border: 1px solid var(--danger); }
+
+    /* DASHBOARD FUNCIONARIO DO MES */
+    .podium-card { background: linear-gradient(135deg, rgba(13, 148, 136, 0.1), transparent); border: 1px solid var(--fap); border-radius: 12px; padding: 25px; display: flex; align-items: center; gap: 25px; margin-bottom: 25px; position: relative; overflow: hidden;}
+    .podium-icon { background: var(--fap); color: white; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 10px 15px rgba(13, 148, 136, 0.3); z-index:2;}
+    .podium-info { z-index:2; }
+    .podium-info h4 { margin: 0; color: var(--text-muted); font-size: 12px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px; }
+    .podium-info h2 { margin: 5px 0 0 0; color: var(--text-main); font-size: 24px; font-weight: 800; }
+    .podium-info p { margin: 5px 0 0 0; color: var(--fap); font-weight: 700; font-size: 14px; }
+    .podium-bg-icon { position: absolute; right: -20px; bottom: -30px; width: 150px; height: 150px; color: rgba(13, 148, 136, 0.05); z-index:1; }
+
+    @media (max-width: 1024px) { .row { flex-direction: column; gap: 0; } }
+  </style>
+</head>
+<body>
+
+<div class="app-layout">
+    
+  <aside class="sidebar">
+      <div class="sidebar-brand"><i data-lucide="factory"></i><span>Operação / PCP</span></div>
+      
+      <div class="sidebar-nav">
+          <div class="nav-label" style="color:var(--fap);">Atividades de Fábrica</div>
+          
+          <button class="tab-btn active" onclick="window.tabFap('tab-lancar', this)">
+              <i data-lucide="clipboard-edit"></i> <span>Lançar Atividade (FAP)</span>
+          </button>
+          
+          <button class="tab-btn" onclick="window.tabFap('tab-relatorio', this)">
+              <i data-lucide="file-bar-chart"></i> <span>Relatórios / Fichas</span>
+          </button>
+          
+          <div class="nav-label" style="margin-top:25px;">Configurações</div>
+          <button class="tab-btn" onclick="window.tabFap('tab-cadastros', this)">
+              <i data-lucide="users"></i> <span>Cadastros Base</span>
+          </button>
+      </div>
+      
+      <div class="sidebar-footer">
+          <button class="tab-btn" onclick="window.location.href='index.html'" style="color: var(--text-muted); border:1px solid var(--border);">
+              <i data-lucide="log-out"></i> <span>Sair p/ ERP Central</span>
+          </button>
+      </div>
+  </aside>
+
+  <main class="main-wrapper">
+      <header class="topbar">
+          <div class="view-title"><i data-lucide="activity" style="color:var(--fap);"></i> Controle de Chão de Fábrica (FAP)</div>
+          <div class="user-profile">
+              <div class="avatar">EN</div>
+              <div class="user-info"><span class="user-name">Encarregado</span><span class="user-role">Produção</span></div>
+          </div>
+      </header>
+
+      <div class="content-area">
+          
+          <!-- ABA 1: LANÇAMENTO DA FAP -->
+          <div id="tab-lancar" class="section active">
+              <div class="card-panel" style="border-top: 4px solid var(--fap);">
+                  <div class="card-header"><i data-lucide="timer"></i> Lançar Apontamento do Papel para o Sistema</div>
+                  
+                  <div class="row">
+                      <div class="col" style="flex:1">
+                          <label>Data da Execução</label>
+                          <input type="date" id="fapData">
+                      </div>
+                      <div class="col" style="flex:2">
+                          <label>Funcionário / Operador</label>
+                          <select id="fapFuncionario" style="font-weight:600; color:var(--fap);">
+                              <option value="">-- Cadastre os funcionários na aba Configurações --</option>
+                          </select>
+                      </div>
+                  </div>
+
+                  <div class="row">
+                      <div class="col" style="flex:1">
+                          <label>Nº da OS Relacionada</label>
+                          <input type="text" id="fapOS" placeholder="Ex: 650 (Deixe branco se interno)">
+                      </div>
+                      <div class="col" style="flex:2">
+                          <label>Qual Processo foi executado?</label>
+                          <select id="fapProcesso"></select>
+                      </div>
+                  </div>
+
+                  <div class="row" style="background:rgba(13, 148, 136, 0.05); padding:15px; border-radius:8px; border:1px solid var(--fap); margin-bottom:20px;">
+                      <div class="col">
+                          <label>Hora de Início</label>
+                          <input type="time" id="fapHoraIni" placeholder="Ex: 08:00">
+                      </div>
+                      <div class="col">
+                          <label>Hora do Término</label>
+                          <input type="time" id="fapHoraFim" placeholder="Ex: 11:30" onblur="window.calcularHoras()">
+                      </div>
+                      <div class="col">
+                          <label>Total de Horas Gastas</label>
+                          <input type="text" id="fapTotalHoras" disabled readonly style="background:var(--card-bg); font-weight:800; color:var(--text-main); text-align:center;">
+                      </div>
+                      <div class="col">
+                          <label>Status / Avaliação</label>
+                          <select id="fapStatus" style="font-weight:700;">
+                              <option value="Aprovado" style="color:var(--success);">✅ Tempo Aprovado</option>
+                              <option value="Reprovado" style="color:var(--danger);">❌ Tempo Reprovado</option>
+                          </select>
+                      </div>
+                  </div>
+
+                  <label>Observações / Relato do Serviço (Opcional)</label>
+                  <textarea id="fapObs" rows="2" placeholder="Ex: A peça estava com muita ferrugem, foi necessário jateamento duplo."></textarea>
+                  
+                  <div style="text-align: right; margin-top:20px;">
+                      <button class="btn btn-fap" style="padding: 16px 30px; font-size:16px;" onclick="window.salvarApontamento()"><i data-lucide="check-square"></i> REGISTRAR APONTAMENTO</button>
+                  </div>
+              </div>
+
+              <h3 style="color:var(--text-main); margin-top:40px; margin-bottom:15px; display:flex; align-items:center; gap:8px;"><i data-lucide="list-checks" style="color:var(--fap);"></i> Lançamentos Feitos Hoje</h3>
+              <div class="table-container">
+                  <table>
+                      <thead><tr><th>Funcionário</th><th>OS / Serviço</th><th>Processo</th><th style="text-align:center;">Período / Horas</th><th style="text-align:center;">Status</th><th style="text-align:center;">Ações</th></tr></thead>
+                      <tbody id="tabelaApontamentosHoje"></tbody>
+                  </table>
+              </div>
+          </div>
+
+          <!-- ABA 2: RELATÓRIOS E FICHAS -->
+          <div id="tab-relatorio" class="section">
+              
+              <!-- PÓDIO FUNCIONÁRIO DO MÊS -->
+              <div class="podium-card">
+                  <i data-lucide="award" class="podium-bg-icon"></i>
+                  <div class="podium-icon"><i data-lucide="trophy"></i></div>
+                  <div class="podium-info">
+                      <h4>🏆 Funcionário Destaque do Mês Atual</h4>
+                      <h2 id="podioNome">Calculando...</h2>
+                      <p id="podioHoras">Com 0 horas operacionais válidas e aprovadas.</p>
+                  </div>
+              </div>
+
+              <div class="card-panel">
+                  <div class="card-header" style="display:flex; justify-content:space-between;">
+                      <span><i data-lucide="filter"></i> Filtros de Relatório (Digital)</span>
+                      <!-- BOTÃO CORRIGIDO -->
+                      <button class="btn btn-outline" style="padding:8px 15px; border-color:var(--text-main);" onclick="window.gerarFichaBrancoPDF()"><i data-lucide="file-text"></i> IMPRIMIR FICHA EM BRANCO (P/ FÁBRICA)</button>
+                  </div>
+                  
+                  <div class="row">
+                      <div class="col">
+                          <label>Data Específica</label>
+                          <input type="date" id="filtroData" onchange="window.renderRelatorio()">
+                      </div>
+                      <div class="col">
+                          <label>Filtrar por Funcionário (Opcional)</label>
+                          <select id="filtroFunc" onchange="window.renderRelatorio()">
+                              <option value="TODOS">Todos os Funcionários</option>
+                          </select>
+                      </div>
+                      <div class="col">
+                          <label>Filtrar por OS (Opcional)</label>
+                          <input type="text" id="filtroOS" placeholder="Digite a OS..." onkeyup="window.renderRelatorio()">
+                      </div>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px; border-top:1px solid var(--border); padding-top:15px;">
+                      <div style="font-size:16px; color:var(--text-muted);">Horas Totais Aprovadas no Filtro: <strong id="kpiHorasRelatorio" style="color:var(--fap); font-size:24px; margin-left:10px;">0.0h</strong></div>
+                      <!-- BOTÃO CORRIGIDO -->
+                      <button class="btn btn-outline" style="border-color:var(--fap); color:var(--fap);" onclick="window.gerarPDFFap()"><i data-lucide="printer"></i> IMPRIMIR RELATÓRIO DO FILTRO</button>
+                  </div>
+              </div>
+
+              <div class="table-container">
+                  <table>
+                      <thead><tr><th>Data</th><th>Funcionário</th><th>OS / Destino</th><th>Processo</th><th style="text-align:center;">Período / Horas</th><th style="text-align:center;">Status</th></tr></thead>
+                      <tbody id="tabelaRelatorio"></tbody>
+                  </table>
+              </div>
+          </div>
+
+          <!-- ABA 3: CADASTROS BASE -->
+          <div id="tab-cadastros" class="section">
+              <div class="row">
+                  <div class="col" style="flex:1">
+                      <div class="card-panel">
+                          <div class="card-header"><i data-lucide="user-plus"></i> Equipe (Funcionários)</div>
+                          <div style="display:flex; gap:10px; margin-bottom:20px;">
+                              <input type="text" id="cadFuncNome" placeholder="Nome do Funcionário" style="margin:0;">
+                              <button class="btn btn-fap" onclick="window.addFuncionario()"><i data-lucide="plus"></i></button>
+                          </div>
+                          <table style="margin-top:0;">
+                              <thead><tr><th>Nome Cadastrado</th><th style="text-align:right;">Excluir</th></tr></thead>
+                              <tbody id="listaCadFuncionarios"></tbody>
+                          </table>
+                      </div>
+                  </div>
+                  
+                  <div class="col" style="flex:1">
+                      <div class="card-panel">
+                          <div class="card-header"><i data-lucide="settings-2"></i> Tipos de Processos / Serviços</div>
+                          <div style="display:flex; gap:10px; margin-bottom:20px;">
+                              <input type="text" id="cadProcessoNome" placeholder="Ex: Soldagem, Pintura..." style="margin:0;">
+                              <button class="btn btn-outline" onclick="window.addProcesso()"><i data-lucide="plus"></i></button>
+                          </div>
+                          <table style="margin-top:0;">
+                              <thead><tr><th>Processo Operacional</th><th style="text-align:right;">Excluir</th></tr></thead>
+                              <tbody id="listaCadProcessos"></tbody>
+                          </table>
+                      </div>
+                  </div>
+              </div>
+          </div>
+
+      </div>
+  </main>
+</div>
+
+<script>
+    lucide.createIcons();
+
+    window.tabFap = function(id, btnElement) {
+        document.querySelectorAll('.section').forEach(e => e.classList.remove('active'));
+        document.querySelectorAll('.sidebar-nav .tab-btn').forEach(e => e.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        if(btnElement) btnElement.classList.add('active');
+        window.updateUI();
+    };
+
+    window.updateUI = function() {
+        if(!window.marbeDB || !window.marbeDB.producao) return;
+        
+        let funcOptions = '<option value="">-- Selecione o Operador --</option>';
+        let funcFiltroOptions = '<option value="TODOS">Todos os Funcionários</option>';
+        let listFuncsHtml = '';
+        
+        (window.marbeDB.producao.funcionarios || []).forEach((f, i) => {
+            funcOptions += `<option value="${f}">${f}</option>`;
+            funcFiltroOptions += `<option value="${f}">${f}</option>`;
+            listFuncsHtml += `<tr><td>${f}</td><td style="text-align:right;"><button class="btn btn-outline" style="padding:4px; color:var(--danger); border:none;" onclick="window.rmFuncionario(${i})"><i data-lucide="trash-2" style="width:16px;"></i></button></td></tr>`;
+        });
+        document.getElementById('fapFuncionario').innerHTML = funcOptions;
+        document.getElementById('filtroFunc').innerHTML = funcFiltroOptions;
+        document.getElementById('listaCadFuncionarios').innerHTML = listFuncsHtml || '<tr><td colspan="2" style="text-align:center; color:var(--text-muted);">Nenhum funcionário cadastrado.</td></tr>';
+
+        let procOptions = '';
+        let listProcHtml = '';
+        (window.marbeDB.producao.processos || []).forEach((p, i) => {
+            procOptions += `<option value="${p}">${p}</option>`;
+            listProcHtml += `<tr><td>${p}</td><td style="text-align:right;"><button class="btn btn-outline" style="padding:4px; color:var(--danger); border:none;" onclick="window.rmProcesso(${i})"><i data-lucide="trash-2" style="width:16px;"></i></button></td></tr>`;
+        });
+        document.getElementById('fapProcesso').innerHTML = procOptions;
+        document.getElementById('listaCadProcessos').innerHTML = listProcHtml || '<tr><td colspan="2" style="text-align:center; color:var(--text-muted);">Nenhum processo cadastrado.</td></tr>';
+
+        window.renderHoje();
+        window.renderRelatorio();
+        window.calcularDestaqueDoMes();
+        lucide.createIcons();
+    };
+
+    window.calcularHoras = function() {
+        let hi = document.getElementById('fapHoraIni').value;
+        let hf = document.getElementById('fapHoraFim').value;
+        if(hi && hf) {
+            let inicio = new Date(`2000-01-01T${hi}`);
+            let fim = new Date(`2000-01-01T${hf}`);
+            if(fim < inicio) fim.setDate(fim.getDate() + 1);
+            let diffHrs = (fim - inicio) / (1000 * 60 * 60);
+            let horasDecimal = (diffHrs).toFixed(2); 
+            document.getElementById('fapTotalHoras').value = `${horasDecimal} h`;
+            return parseFloat(horasDecimal);
+        }
+        return 0;
+    };
+
+    window.salvarApontamento = function() {
+        let data = document.getElementById('fapData').value;
+        let func = document.getElementById('fapFuncionario').value;
+        let os = document.getElementById('fapOS').value.trim();
+        let proc = document.getElementById('fapProcesso').value;
+        let hi = document.getElementById('fapHoraIni').value;
+        let hf = document.getElementById('fapHoraFim').value;
+        let obs = document.getElementById('fapObs').value;
+        let status = document.getElementById('fapStatus').value;
+        let horasGasto = window.calcularHoras();
+
+        if(!data || !func || !proc || !hi || !hf) return alert("Preencha todos os campos obrigatórios.");
+        if(horasGasto <= 0) return alert("Horário de término deve ser maior que o início.");
+
+        let novoFap = {
+            id: Date.now(),
+            data: data,
+            func: func,
+            os: os,
+            processo: proc,
+            inicio: hi,
+            fim: hf,
+            horas: horasGasto,
+            status: status,
+            obs: obs
+        };
+
+        if(!window.marbeDB.producao.apontamentos) window.marbeDB.producao.apontamentos = [];
+        window.marbeDB.producao.apontamentos.push(novoFap);
+        
+        window.salvarNuvem(true);
+        
+        document.getElementById('fapOS').value = '';
+        document.getElementById('fapHoraIni').value = hf;
+        document.getElementById('fapHoraFim').value = '';
+        document.getElementById('fapTotalHoras').value = '';
+        document.getElementById('fapObs').value = '';
+        document.getElementById('fapStatus').value = 'Aprovado';
+        
+        alert("Apontamento registrado com sucesso!");
+        window.updateUI();
+    };
+
+    window.calcularDestaqueDoMes = function() {
+        let hoje = new Date();
+        let mesAtualStr = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+        
+        let pontuacao = {};
+        
+        (window.marbeDB.producao.apontamentos || []).forEach(ap => {
+            if(ap.data.startsWith(mesAtualStr) && ap.status === 'Aprovado') {
+                if(!pontuacao[ap.func]) pontuacao[ap.func] = 0;
+                pontuacao[ap.func] += parseFloat(ap.horas);
+            }
+        });
+
+        let liderNome = "Sem Lançamentos";
+        let liderHoras = 0;
+
+        Object.keys(pontuacao).forEach(nome => {
+            if(pontuacao[nome] > liderHoras) {
+                liderHoras = pontuacao[nome];
+                liderNome = nome;
+            }
+        });
+
+        if(liderHoras > 0) {
+            document.getElementById('podioNome').innerText = liderNome.toUpperCase();
+            document.getElementById('podioHoras').innerText = `Acumulou ${liderHoras.toFixed(2)} horas operacionais aprovadas neste mês.`;
+        } else {
+            document.getElementById('podioNome').innerText = "Aguardando Apontamentos";
+            document.getElementById('podioHoras').innerText = "Nenhuma hora aprovada registrada no mês atual.";
+        }
+    };
+
+    window.renderHoje = function() {
+        let hojeStr = new Date().toISOString().split('T')[0];
+        let html = '';
+        let apReverse = [...(window.marbeDB.producao.apontamentos || [])].reverse();
+        
+        apReverse.forEach((ap, idxReverso) => {
+            if(ap.data === hojeStr) {
+                let realIdx = (window.marbeDB.producao.apontamentos.length - 1) - idxReverso;
+                let badgeOS = ap.os ? `<span class="badge-os">OS ${ap.os}</span>` : `<span class="badge-interno">Uso Interno</span>`;
+                let badgeStatus = ap.status === 'Reprovado' ? `<span class="badge-reprovado">REPROVADO</span>` : `<span class="badge-aprovado">APROVADO</span>`;
+                
+                html += `<tr>
+                    <td><strong style="color:var(--text-main);">${ap.func}</strong></td>
+                    <td>${badgeOS}</td>
+                    <td>${ap.processo}</td>
+                    <td style="text-align:center; font-weight:600;">${ap.inicio} às ${ap.fim} <br><span style="color:var(--fap); font-size:12px;">(${ap.horas} h)</span></td>
+                    <td style="text-align:center;">${badgeStatus}</td>
+                    <td style="text-align:center;"><button class="btn btn-outline" style="padding:6px; color:var(--danger); border:none;" onclick="window.excluirFap(${realIdx})"><i data-lucide="trash-2" style="width:16px;"></i></button></td>
+                </tr>`;
+            }
+        });
+        document.getElementById('tabelaApontamentosHoje').innerHTML = html || '<tr><td colspan="6" style="text-align:center; padding:30px; color:var(--text-muted);">Nenhum apontamento feito hoje ainda.</td></tr>';
+        lucide.createIcons();
+    };
+
+    window.renderRelatorio = function() {
+        let fData = document.getElementById('filtroData').value;
+        let fFunc = document.getElementById('filtroFunc').value;
+        let fOs = document.getElementById('filtroOS').value.toLowerCase().trim();
+        
+        let html = '';
+        let somaHoras = 0;
+        let apReverse = [...(window.marbeDB.producao.apontamentos || [])].reverse();
+        
+        apReverse.forEach((ap, idxReverso) => {
+            let passar = true;
+            if(fData && ap.data !== fData) passar = false;
+            if(fFunc !== 'TODOS' && ap.func !== fFunc) passar = false;
+            if(fOs && !(ap.os || '').toLowerCase().includes(fOs)) passar = false;
+            
+            if(passar) {
+                if(ap.status !== 'Reprovado') somaHoras += parseFloat(ap.horas);
+                
+                let dataBr = ap.data.split('-').reverse().join('/');
+                let badgeOS = ap.os ? `<span class="badge-os">OS ${ap.os}</span>` : `<span class="badge-interno">Uso Interno</span>`;
+                let descExtra = ap.obs ? `<br><span style="font-size:11px; color:var(--text-muted);">${ap.obs}</span>` : '';
+                let badgeStatus = ap.status === 'Reprovado' ? `<span class="badge-reprovado">REPROVADO</span>` : `<span class="badge-aprovado">APROVADO</span>`;
+                
+                html += `<tr>
+                    <td>${dataBr}</td>
+                    <td><strong style="color:var(--text-main);">${ap.func}</strong></td>
+                    <td>${badgeOS}</td>
+                    <td>${ap.processo} ${descExtra}</td>
+                    <td style="text-align:center; font-weight:600; color:${ap.status === 'Reprovado' ? 'var(--danger)' : 'var(--text-main)'}">${ap.inicio} - ${ap.fim} <br><span style="font-size:12px;">(${ap.horas} h)</span></td>
+                    <td style="text-align:center;">${badgeStatus}</td>
+                </tr>`;
+            }
+        });
+        
+        document.getElementById('tabelaRelatorio').innerHTML = html || '<tr><td colspan="6" style="text-align:center; padding:30px; color:var(--text-muted);">Nenhum apontamento encontrado para este filtro.</td></tr>';
+        document.getElementById('kpiHorasRelatorio').innerText = somaHoras.toFixed(2) + 'h';
+        lucide.createIcons();
+    };
+
+    window.excluirFap = function(idx) {
+        if(confirm("Deseja realmente apagar este apontamento de produção?")) {
+            window.marbeDB.producao.apontamentos.splice(idx, 1);
+            window.salvarNuvem(true);
+            window.updateUI();
+        }
+    };
+
+    window.addFuncionario = function() {
+        let n = document.getElementById('cadFuncNome').value.trim();
+        if(!n) return;
+        if(!window.marbeDB.producao.funcionarios) window.marbeDB.producao.funcionarios = [];
+        window.marbeDB.producao.funcionarios.push(n); window.salvarNuvem(true); document.getElementById('cadFuncNome').value = ''; window.updateUI();
+    };
+    window.rmFuncionario = function(i) { window.marbeDB.producao.funcionarios.splice(i, 1); window.salvarNuvem(true); window.updateUI(); };
+
+    window.addProcesso = function() {
+        let p = document.getElementById('cadProcessoNome').value.trim();
+        if(!p) return;
+        if(!window.marbeDB.producao.processos) window.marbeDB.producao.processos = [];
+        window.marbeDB.producao.processos.push(p); window.salvarNuvem(true); document.getElementById('cadProcessoNome').value = ''; window.updateUI();
+    };
+    window.rmProcesso = function(i) { window.marbeDB.producao.processos.splice(i, 1); window.salvarNuvem(true); window.updateUI(); };
+
+    /* ========================================================================================= */
+    /* GERAR PDF FICHA EM BRANCO PARA O PEÃO PREENCHER NA FÁBRICA                                */
+    /* ========================================================================================= */
+    window.gerarFichaBrancoPDF = function() {
+        try {
+            alert("Gerando PDF da Ficha em Branco. Aguarde um instante...");
+            const { jsPDF } = window.jspdf; 
+            const doc = new jsPDF();
+            
+            doc.setFontSize(18); doc.setFont("helvetica", "bold"); 
+            doc.text("FICHA DE APONTAMENTO DIÁRIO (FAP)", 105, 20, {align: "center"});
+            
+            doc.setFontSize(11); doc.setFont("helvetica", "bold");
+            doc.text("Nome do Operador: __________________________________________________", 15, 35);
+            doc.text("Data: _____ / _____ / 20_____", 155, 35);
+            
+            doc.setLineWidth(0.5); doc.line(15, 42, 195, 42);
+
+            let bodyData = [];
+            for(let i=0; i<12; i++) {
+                bodyData.push(['', '', '', '', '', '']); 
+            }
+
+            doc.autoTable({ 
+                startY: 48, 
+                head: [['OS / DESTINO', 'PROCESSO OU SERVIÇO EXECUTADO', 'INÍCIO', 'TÉRMINO', 'TOTAL HS', 'VISTO CHEFIA']], 
+                body: bodyData, 
+                theme: 'grid', 
+                headStyles: { fillColor: [13, 148, 136], halign: 'center' }, 
+                styles: { minCellHeight: 14, lineColor: [100,100,100] }, 
+                columnStyles: { 
+                    0: {cellWidth: 28}, 
+                    1: {cellWidth: 68}, 
+                    2: {cellWidth: 20}, 
+                    3: {cellWidth: 20}, 
+                    4: {cellWidth: 20}, 
+                    5: {cellWidth: 24} 
+                }
+            });
+
+            let finalY = doc.lastAutoTable.finalY + 25;
+            
+            doc.setFontSize(10); doc.setFont("helvetica", "bold");
+            doc.text("Assinatura do Operador: _________________________________________________", 15, finalY);
+            
+            doc.text("Avaliação p/ Sistema:   [   ] Aprovado    [   ] Reprovado", 115, finalY);
+            
+            doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(150, 150, 150);
+            doc.text("Documento interno para controle de custos e horas operacionais da fábrica. Entregar preenchido ao final do turno.", 105, finalY + 15, {align: "center"});
+
+            window.abrirPDFMobile(doc.output('blob'), `FAP_Em_Branco_Fabrica`);
+        } catch(e) {
+            alert("Erro ao tentar gerar o PDF: " + e.message);
+        }
+    };
+
+    // --- GERAR PDF DO RELATÓRIO PREENCHIDO ---
+    window.gerarPDFFap = function() {
+        try {
+            alert("Gerando Relatório Preenchido. Aguarde...");
+            let fData = document.getElementById('filtroData').value;
+            let fFunc = document.getElementById('filtroFunc').value;
+            let fOs = document.getElementById('filtroOS').value.toLowerCase().trim();
+            
+            const { jsPDF } = window.jspdf; 
+            const doc = new jsPDF();
+            
+            doc.setFontSize(16); doc.setFont("helvetica", "bold"); 
+            doc.text("RELATÓRIO DE ATIVIDADE PROFISSIONAL (FAP)", 105, 20, {align: "center"});
+            
+            doc.setFontSize(10); doc.setFont("helvetica", "normal");
+            let subtitle = `Filtros -> Data: ${fData ? fData.split('-').reverse().join('/') : 'Todas'} | Operador: ${fFunc} | OS: ${fOs ? fOs.toUpperCase() : 'Todas'}`;
+            doc.text(subtitle, 105, 28, {align: "center"});
+            
+            doc.setLineWidth(0.5); doc.line(15, 32, 195, 32);
+
+            let bodyData = [];
+            let somaHoras = 0;
+            let apReverse = [...(window.marbeDB.producao.apontamentos || [])]; 
+            
+            apReverse.forEach((ap) => {
+                let passar = true;
+                if(fData && ap.data !== fData) passar = false;
+                if(fFunc !== 'TODOS' && ap.func !== fFunc) passar = false;
+                if(fOs && !(ap.os || '').toLowerCase().includes(fOs)) passar = false;
+                
+                if(passar) {
+                    if(ap.status !== 'Reprovado') somaHoras += parseFloat(ap.horas);
+                    let dataBr = ap.data.split('-').reverse().join('/');
+                    let dest = ap.os ? `OS ${ap.os}` : `Uso Interno`;
+                    let proc = ap.obs ? `${ap.processo}\n(Obs: ${ap.obs})` : ap.processo;
+                    
+                    bodyData.push([dataBr, ap.func, dest, proc, `${ap.inicio} às ${ap.fim} (${ap.horas}h)`, ap.status || 'Aprovado']);
+                }
+            });
+
+            if(bodyData.length === 0) return alert("Nenhum dado para gerar relatório com esses filtros.");
+
+            doc.autoTable({ 
+                startY: 38, 
+                head: [['DATA', 'OPERADOR', 'DESTINO/OS', 'PROCESSO EXECUTADO', 'PERÍODO / HORAS', 'STATUS']], 
+                body: bodyData, 
+                theme: 'grid', 
+                headStyles: { fillColor: [13, 148, 136] }, 
+                styles: { fontSize: 9, cellPadding: 3 },
+                columnStyles: { 4: { halign: 'center', fontStyle: 'bold' }, 5: { halign: 'center' } }
+            });
+
+            let finalY = doc.lastAutoTable.finalY + 15;
+            doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(13, 148, 136);
+            doc.text(`TOTAL DE HORAS VÁLIDAS/APROVADAS: ${somaHoras.toFixed(2)} Horas`, 195, finalY, {align: 'right'});
+
+            window.abrirPDFMobile(doc.output('blob'), `Relatorio_FAP_Preenchido`);
+        } catch(e) {
+            alert("Erro ao tentar gerar o PDF: " + e.message);
+        }
+    };
+
+</script>
+</body>
+</html>
