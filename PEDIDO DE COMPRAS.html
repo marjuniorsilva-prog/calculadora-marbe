@@ -41,7 +41,6 @@
           if (!window.marbeDB.almoxarifado) {
               window.marbeDB.almoxarifado = { saldos: {}, movimentacoes: [] };
           }
-          // Prepara a gaveta financeira se não existir
           if (!window.marbeDB.financeiro) {
               window.marbeDB.financeiro = { transacoes: [] };
           }
@@ -198,7 +197,7 @@
       <header class="topbar">
           <div class="topbar-left">
               <button class="btn-toggle" onclick="document.getElementById('sidebar').classList.toggle('collapsed')"><i data-lucide="menu"></i></button>
-              <h2 class="view-title" id="mainTitle">Módulo de Compras (PO)</h2>
+              <h2 class="view-title" id="mainTitle">Módulo Oficial de Compras (PO)</h2>
           </div>
           <div class="topbar-right">
               <div class="user-profile">
@@ -273,10 +272,14 @@
                       <div class="col"><label>Forma de Pagamento</label><select id="compraPgtoTipo"><option value="A Prazo">A Prazo</option><option value="À Vista">À Vista</option></select></div>
                       <div class="col" style="flex:2"><label>Detalhes</label><input type="text" id="compraPgtoDet" placeholder="Ex: Boleto 28/56 dias"></div>
                   </div>
+                  
+                  <label style="margin-top: 10px;">Observações Internas (Aparece no PDF)</label>
+                  <textarea id="obsCompra" rows="2" placeholder="Ex: Entregar apenas no período da manhã. Aos cuidados de Marcelo."></textarea>
+                  
                   <div style="display:flex; justify-content:space-between; align-items:center; margin-top:30px; padding-top:20px; border-top:1px solid var(--border);">
                       <div style="font-size:16px; color:var(--text-muted);">TOTAL DO PEDIDO: <strong id="totalPedidoCompra" style="font-size:32px; color:var(--compra); margin-left:10px;">R$ 0,00</strong></div>
-                      <!-- BOTÃO PARA INJETAR NO FINANCEIRO -->
-                      <button class="btn btn-primary" style="padding:20px 40px; font-size:16px;" onclick="window.salvarPedidoCompra()"><i data-lucide="check-circle"></i> FINALIZAR PEDIDO (INJETA NO FINANCEIRO)</button>
+                      <!-- AQUI APENAS GERA O PEDIDO E PDF (NÃO INJETA AINDA) -->
+                      <button class="btn btn-primary" style="padding:20px 40px; font-size:16px;" onclick="window.salvarPedidoCompra()"><i data-lucide="check-circle"></i> FINALIZAR PEDIDO DE COMPRA</button>
                   </div>
               </div>
           </div>
@@ -450,7 +453,7 @@
 <div id="modalReceberNF" style="position:fixed; inset:0; background:rgba(2,6,23,0.9); display:none; z-index:10000; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(4px);">
     <div style="background:var(--card-bg); width:100%; max-width:450px; padding:40px; border-radius:16px; border: 1px solid var(--border);">
         <h3 style="margin-top:0; color:var(--success); font-size:22px; font-weight:800;"><i data-lucide="package-check"></i> Recebimento de Carga</h3>
-        <p style="font-size:14px; color:var(--text-muted); margin-bottom:25px;">Informe o número da Nota Fiscal para dar entrada oficial. Os itens deste pedido irão automaticamente para o Saldo do Almoxarifado.</p>
+        <p style="font-size:14px; color:var(--text-muted); margin-bottom:25px;">Informe a NF para dar entrada. <strong style="color:var(--text-main);">Os itens irão para o Estoque e a Despesa será enviada ao Contas a Pagar.</strong></p>
         <label>Número da Nota Fiscal (NF-e)</label>
         <input type="text" id="nfRecebimento" placeholder="Ex: 0001548">
         <input type="hidden" id="idxRecebimento">
@@ -673,28 +676,29 @@
         document.getElementById('totalPedidoCompra').innerText = window.fmtMoney(totalGlobal); lucide.createIcons();
     }
 
-    // --- FINALIZAR PEDIDO E ENVIAR PARA O FINANCEIRO COM ARMADURA ANTIFALHAS ---
+    // --- FINALIZAR PEDIDO (SOMENTE GERA O PEDIDO - NÃO INJETA AINDA) ---
     window.salvarPedidoCompra = function() {
         try {
             if(itensPedidoAtual.length === 0) return alert("Adicione pelo menos um item ao pedido!");
             const forn = document.getElementById('selectFornecedor').value; 
             if(!forn) return alert("Selecione um fornecedor!");
             
-            // Garantir que a gaveta existe
             if(!window.marbeDB.compras) window.marbeDB.compras = { seq: 1, pedidos: [] };
             if(!window.marbeDB.compras.seq) window.marbeDB.compras.seq = 1;
             
-            // Força a conversão pra lista caso o Firebase tenha transformado em bloco
             if(!window.marbeDB.compras.pedidos) window.marbeDB.compras.pedidos = [];
             if(!Array.isArray(window.marbeDB.compras.pedidos)) {
                 window.marbeDB.compras.pedidos = Object.values(window.marbeDB.compras.pedidos);
             }
 
             let nPedido = window.marbeDB.compras.seq;
-            window.marbeDB.compras.seq++; // Avança a numeração
+            window.marbeDB.compras.seq++; 
             
             let totalGlobal = itensPedidoAtual.reduce((acc, it) => acc + (it.q_emb * it.v_emb), 0);
             let dtEmissao = new Date().toISOString();
+            
+            let elemObs = document.getElementById('obsCompra');
+            let obsText = elemObs ? elemObs.value : '';
             
             let novoPedido = { 
                 pc: nPedido, empresa_compradora: empresaSelecionada, fornecedor: forn, 
@@ -704,38 +708,16 @@
                 prazo_entrega: document.getElementById('compraPrazo').value, 
                 tipo_pagamento: document.getElementById('compraPgtoTipo').value, 
                 detalhe_pagamento: document.getElementById('compraPgtoDet').value, 
-                obs: document.getElementById('obsCompra').value, 
+                obs: obsText, 
                 data_emissao: dtEmissao, recebido: false 
             };
 
             window.marbeDB.compras.pedidos.push(novoPedido); 
             
-            // --- INJEÇÃO NO FINANCEIRO COM ARMADURA ---
-            if(!window.marbeDB.financeiro) window.marbeDB.financeiro = { transacoes: [] };
-            if(!window.marbeDB.financeiro.transacoes) window.marbeDB.financeiro.transacoes = [];
-            if(!Array.isArray(window.marbeDB.financeiro.transacoes)) {
-                window.marbeDB.financeiro.transacoes = Object.values(window.marbeDB.financeiro.transacoes);
-            }
-
-            let detalhePgto = document.getElementById('compraPgtoDet').value || 'A Combinar';
-            let despesaAutomatica = {
-                id: Date.now(),
-                tipo: "SAIDA",
-                data: dtEmissao.split('T')[0],
-                categoria: "Fornecedores / Matéria-Prima",
-                descricao: `Pedido Compras PC-${nPedido} | Fornecedor: ${forn} | Pgto: ${detalhePgto}`,
-                valor: totalGlobal,
-                status: "PENDENTE"
-            };
-            
-            window.marbeDB.financeiro.transacoes.push(despesaAutomatica);
-            // ------------------------------------------
-
             window.salvarNuvem(true); 
             
-            alert(`Pedido de Compra Nº PC-${nPedido} gerado e Despesa lançada no Financeiro com sucesso!`);
+            alert(`Pedido de Compra Nº PC-${nPedido} gerado com sucesso!\n\nEle ficará aguardando no Histórico. Quando a NF chegar, clique em "Receber Material" para gerar o Estoque e a Despesa Financeira.`);
             
-            // Limpeza da tela
             itensPedidoAtual = []; 
             ['selectFornecedor', 'compraTransp', 'compraPrazo', 'compraPgtoDet', 'obsCompra'].forEach(id => {
                 if(document.getElementById(id)) document.getElementById(id).value = '';
@@ -744,7 +726,7 @@
             window.tabSection('tab-historico', document.getElementById('btn-tab-historico'));
             
         } catch (erro) {
-            alert("Ocorreu um erro interno ao tentar salvar. Detalhe técnico: " + erro.message);
+            alert("Ocorreu um erro interno ao tentar salvar o Pedido. Detalhe técnico: " + erro.message);
             console.error(erro);
         }
     };
@@ -762,7 +744,7 @@
     }
 
     /* ========================================================================= */
-    /* ALMOXARIFADO E ESTOQUE                                                    */
+    /* ALMOXARIFADO, ESTOQUE E INJEÇÃO FINANCEIRA (NO RECEBIMENTO)               */
     /* ========================================================================= */
     window.abrirRecebimentoNF = function(index) {
         document.getElementById('idxRecebimento').value = index; document.getElementById('nfRecebimento').value = ''; document.getElementById('modalReceberNF').style.display = 'flex';
@@ -773,6 +755,7 @@
             const nf = document.getElementById('nfRecebimento').value.trim(); if(!nf) return alert("Digite o número da Nota Fiscal.");
             const index = parseInt(document.getElementById('idxRecebimento').value); let pedido = window.marbeDB.compras.pedidos[index];
             
+            // 1. INJEÇÃO NO ESTOQUE FÍSICO
             if(!window.marbeDB.almoxarifado.movimentacoes) window.marbeDB.almoxarifado.movimentacoes = [];
             if(!Array.isArray(window.marbeDB.almoxarifado.movimentacoes)) window.marbeDB.almoxarifado.movimentacoes = Object.values(window.marbeDB.almoxarifado.movimentacoes);
 
@@ -782,7 +765,36 @@
                 window.marbeDB.almoxarifado.saldos[nomeItem].qtd += qtdReal;
                 window.marbeDB.almoxarifado.movimentacoes.push({ data: new Date().toISOString(), tipo: 'ENTRADA', item: nomeItem, qtd: qtdReal, un: unidade, origem: pedido.fornecedor, doc: `NF: ${nf} / PC: ${pedido.pc}` });
             });
-            pedido.recebido = true; pedido.nf_entrada = nf; window.salvarNuvem(true); document.getElementById('modalReceberNF').style.display = 'none'; alert(`Entrada da NF ${nf} realizada! Saldo do Almoxarifado atualizado.`); window.updateUI();
+            
+            // 2. INJEÇÃO NO FINANCEIRO
+            if(!window.marbeDB.financeiro) window.marbeDB.financeiro = { transacoes: [] };
+            if(!window.marbeDB.financeiro.transacoes) window.marbeDB.financeiro.transacoes = [];
+            if(!Array.isArray(window.marbeDB.financeiro.transacoes)) {
+                window.marbeDB.financeiro.transacoes = Object.values(window.marbeDB.financeiro.transacoes);
+            }
+
+            let detalhePgto = pedido.detalhe_pagamento || 'A Combinar';
+            let despesaAutomatica = {
+                id: Date.now(),
+                tipo: "SAIDA", // É uma despesa a pagar
+                data: new Date().toISOString().split('T')[0], // Data de hoje (recebimento)
+                categoria: "Fornecedores / Matéria-Prima",
+                descricao: `NF: ${nf} | Pedido PC-${pedido.pc} | Fornecedor: ${pedido.fornecedor} | Pgto: ${detalhePgto}`,
+                valor: pedido.total,
+                status: "PENDENTE" // Entra vermelho aguardando o pagamento do boleto
+            };
+            
+            window.marbeDB.financeiro.transacoes.push(despesaAutomatica);
+
+            // Confirma o recebimento no pedido
+            pedido.recebido = true; 
+            pedido.nf_entrada = nf; 
+            
+            window.salvarNuvem(true); 
+            document.getElementById('modalReceberNF').style.display = 'none'; 
+            
+            alert(`SUCESSO!\n\n1. Estoque Físico Atualizado.\n2. Despesa gerada no Financeiro aguardando pagamento.`); 
+            window.updateUI();
         } catch(e) {
             alert("Erro ao processar recebimento: " + e.message);
         }
