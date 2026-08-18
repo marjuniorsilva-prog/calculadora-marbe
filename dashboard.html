@@ -29,8 +29,7 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // Agora buscamos as pastas exatas que você me explicou!
-    const gavetasPossiveis = ['sistema', 'orcamento', 'orcamentos', 'historico', 'pedido', 'pedidos', 'producao', 'expedicao', 'venda', 'vendas', 'crm', 'funil', 'financeiro', 'transacoes'];
+    const gavetasPossiveis = ['sistema', 'orcamento', 'orcamentos', 'historico', 'pedido', 'pedidos', 'producao', 'expedicao', 'entregues', 'venda', 'vendas', 'crm', 'funil', 'financeiro', 'transacoes'];
     window.dbCompleto = {};
     
     gavetasPossiveis.forEach(gaveta => {
@@ -56,7 +55,6 @@
     body { font-family: 'Inter', sans-serif; background: var(--bg-color); margin: 0; padding: 0; color: var(--text-main); font-size: 14px; overflow-x: hidden; }
     .app-layout { display: flex; height: 100vh; overflow: hidden; }
     
-    /* SIDEBAR ORIGINAL RECUPERADA */
     .sidebar { width: var(--sidebar-width); background: var(--sidebar-bg); color: #fff; display: flex; flex-direction: column; flex-shrink: 0; border-right: 1px solid var(--border); z-index:50;}
     .sidebar-brand { height: var(--header-height); display: flex; align-items: center; padding: 0 25px; font-size: 20px; font-weight: 800; border-bottom: 1px solid var(--border); color:var(--text-main);}
     .sidebar-brand i { margin-right: 15px; color: var(--text-main); width: 24px; height: 24px; }
@@ -241,7 +239,6 @@
 
         let todosObjetos = [];
         
-        // RASTREADOR: Agora ele anota na etiqueta de qual pasta exata (caminhoPasta) o orçamento veio
         function varrer(no, caminhoPasta) {
             if (!no || typeof no !== 'object') return;
             let keys = Object.keys(no).map(k => k.toLowerCase());
@@ -250,21 +247,22 @@
             let isFin = keys.includes('tipo') && keys.includes('status') && keys.includes('valor');
             
             if (hasValor || isFin || keys.includes('cliente') || keys.includes('empresa') || keys.includes('cliente_nome')) {
-                // Salva a pasta de onde ele tirou isso (Ex: "sistema/pedidos" ou "historico")
                 let objClean = { _caminho_gaveta: caminhoPasta.toLowerCase() }; 
                 for(let k in no) { objClean[k.toLowerCase()] = no[k]; }
+                
+                // Armazena o JSON completo do objeto para a IA ler depois e caçar a palavra PU
+                objClean._raw_text = JSON.stringify(no).toUpperCase();
+                
                 todosObjetos.push(objClean);
             } else {
                 for(let k in no) {
                     if (typeof no[k] === 'object') {
-                        // Desce para a próxima pasta e anota o nome dela
                         varrer(no[k], caminhoPasta + '/' + k.toLowerCase());
                     }
                 }
             }
         }
         
-        // Manda o rastreador ler o banco a partir da raiz
         for (let gaveta in window.dbCompleto) {
             varrer(window.dbCompleto[gaveta], gaveta);
         }
@@ -282,36 +280,55 @@
         todosObjetos.forEach(o => {
             let val = parseDinheiro(o.valortotal || o.total || o.valor_total || o.valorfinal || o.valor);
             let status = String(o.status || o.situacao || o.etapa || o.coluna || o.fase || '').toLowerCase();
-            let empresa = String(o.empresa || o.unidade || o.loja || 'MARBE').toUpperCase();
             let cliente = String(o.cliente_nome || o.cliente || o.nomecliente || o.nome_cliente || o.nome || 'Consumidor Final');
             let gavetaOndeEstava = o._caminho_gaveta || '';
 
-            // 1. É DO FINANCEIRO? (Proteção para não sujar o gráfico de Vendas)
+            // ====================================================
+            // 1. O FILTRO DO POLIURETANO (MARBE vs SB)
+            // ====================================================
+            // Lê o orçamento inteiro. Se achar PU ou POLIURETANO ou MARBE, é Marbe. Senão, é SB Borrachas.
+            let conteudoDoOrcamento = o._raw_text || '';
+            let pertenceAMarbe = /\bPU\b/.test(conteudoDoOrcamento) || conteudoDoOrcamento.includes('POLIURETANO') || conteudoDoOrcamento.includes('MARBE');
+
+            // 2. É DO FINANCEIRO?
             if (o.tipo && (status === 'pago' || status === 'recebido' || status === 'liquidado' || status === 'pendente' || status === 'atrasado')) {
                 if(status === 'pago' || status === 'recebido' || status === 'liquidado') {
                     let tipo = String(o.tipo).toUpperCase();
                     if(tipo === 'ENTRADA' || tipo === 'RECEITA') recPaga += val;
                     if(tipo === 'SAIDA' || tipo === 'DESPESA') despPaga += val;
                 }
-                return; // Pula pra próxima linha para não contar como Venda
+                return; 
             }
 
             // ====================================================
-            // A REGRA DE OURO DO MARCELO: CLASSIFICAÇÃO POR PASTA (GAVETA)
+            // 3. A TRAVA DOS "ENTREGUES" E CLASSIFICAÇÃO DE PASTAS
             // ====================================================
-            // Se está no Histórico / Orçamento -> É Funil / Em aberto
-            // Se está no Pedido / Produção / Expedição -> É Venda Fechada
-            
-            let isPastaVenda = gavetaOndeEstava.includes('pedido') || gavetaOndeEstava.includes('producao') || gavetaOndeEstava.includes('venda') || gavetaOndeEstava.includes('expedicao');
+            let isPastaVenda = gavetaOndeEstava.includes('pedido') || gavetaOndeEstava.includes('producao') || gavetaOndeEstava.includes('venda');
             let isPastaOrcamento = gavetaOndeEstava.includes('historico') || gavetaOndeEstava.includes('orcamento') || gavetaOndeEstava.includes('crm') || gavetaOndeEstava.includes('funil');
+            
+            // Verifica se está na expedição ou se tem tag de concluído (Trava do Entregue)
             let isPastaExpedicao = gavetaOndeEstava.includes('expedicao') || gavetaOndeEstava.includes('entregue');
+            let isFinalizado = status.includes('entregue') || status.includes('finaliza') || status.includes('conclui') || status.includes('pronto') || status.includes('enviad') || status.includes('faturad');
 
-            // Determina o status final baseado na pasta e no texto do status
             let recusado = status.includes('recusado') || status.includes('perdido') || status.includes('cancelado');
-            let aprovado = isPastaVenda || status.includes('aprovado') || status.includes('ganho') || status.includes('fechado') || status.includes('conclui');
-            let emProducao = (isPastaVenda && !isPastaExpedicao && !status.includes('entregue') && !status.includes('conclui'));
+            let aprovado = isPastaVenda || isPastaExpedicao || isFinalizado || status.includes('aprovado') || status.includes('ganho') || status.includes('fechado');
+            
+            // Só está em produção na fábrica se foi aprovado e AINDA NÃO FOI finalizado/entregue
+            let emProducao = aprovado && !isPastaExpedicao && !isFinalizado;
 
-            // 2. DISTRIBUIÇÃO VENDA / ORÇAMENTO
+            // Se o antigo sistema não escreveu um status, nós deduzimos pelas "pistas":
+            if(!aprovado && !recusado) {
+                let checkboxAprovado = o.aprovado === true || o.aprovado === 'true' || o.aprovado === 'sim';
+                let temNumeroDeOS = !!(o.os || o.numero_os || o.num_os || o.ordem_servico);
+                let estavaNaPastaCerta = (o._caminho_gaveta === 'venda' || o._caminho_gaveta === 'vendas' || o._caminho_gaveta === 'pedido' || o._caminho_gaveta === 'pedidos');
+                
+                if (checkboxAprovado || temNumeroDeOS || estavaNaPastaCerta) {
+                    aprovado = true;
+                    emProducao = !isPastaExpedicao && !isFinalizado; // Recalcula a produção
+                }
+            }
+
+            // 4. DISTRIBUIÇÃO VENDA / ORÇAMENTO
             if(val > 0 && !o.tipo) {
                 
                 if (recusado) {
@@ -323,10 +340,11 @@
                     vendasFechadasQtd++;
                     vendasFechadasVal += val;
                     
-                    if(empresa.includes('SB')) fatSB += val; else fatMarbe += val;
+                    if(pertenceAMarbe) fatMarbe += val; else fatSB += val;
 
+                    // TRAVA DOS ENTREGUES: Se estiver entregue, não entra na soma da OS aqui!
                     if(emProducao) {
-                        if(empresa.includes('SB')) osSB++; else osMarbe++;
+                        if(pertenceAMarbe) osMarbe++; else osSB++;
                     }
 
                     if(!clientesMap[cliente]) clientesMap[cliente] = 0;
