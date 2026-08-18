@@ -29,7 +29,7 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // MODO FORÇA BRUTA: Escaneia todas as gavetas possíveis do Firebase
+    // MODO FORÇA BRUTA (Sem faixa amarela)
     const gavetasPossiveis = ['sistema', 'orcamento', 'orcamentos', 'pedido', 'pedidos', 'venda', 'vendas', 'crm', 'funil', 'financeiro', 'transacoes'];
     window.dbCompleto = {};
     
@@ -71,10 +71,8 @@
     .tab-btn.active { background: var(--primary); color: #fff; font-weight: 600; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2); }
     .tab-btn.active i { color: #fff; }
 
-    /* HEADER E BARRA DE RAIO-X */
+    /* HEADER */
     .main-wrapper { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow-y:auto;}
-    #debugBar { background: var(--warning); color: #fff; padding: 12px 30px; font-size: 13px; font-weight: 700; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;}
-    
     .topbar { height: var(--header-height); background: var(--card-bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; flex-shrink: 0; }
     .view-title { font-size: 24px; font-weight: 700; color: var(--text-main); margin: 0; display:flex; align-items:center; gap:10px; }
     
@@ -128,11 +126,6 @@
   </aside>
 
   <main class="main-wrapper">
-      
-      <div id="debugBar">
-          <span><i data-lucide="activity" style="width:16px; vertical-align:middle; margin-right:5px;"></i> RAIO-X DE BUSCA ATIVADO (Vasculhando Banco de Dados...)</span>
-          <span id="debugCount">Aguardando conexão com o Firebase...</span>
-      </div>
 
       <header class="topbar">
           <div class="view-title"><i data-lucide="bar-chart-2" style="color:var(--primary);"></i> Centro de Comando Integrado</div>
@@ -237,7 +230,6 @@
     let chartClientesInst = null;
     let chartFinanceiroInst = null;
 
-    // Parse de dinheiro cego para evitar NaN
     function parseDinheiro(val) {
         if(typeof val === 'number') return val;
         if(!val) return 0;
@@ -253,39 +245,28 @@
     window.processarDadosDashboard = function() {
         if(!window.dbCompleto) return;
 
-        // Atualiza a barra de Raio-X para mostrar o que achou
-        let pastasEncontradas = Object.keys(window.dbCompleto).join(', ');
-        document.getElementById('debugCount').innerText = `Pastas encontradas: [ ${pastasEncontradas} ]`;
-
         let todosObjetos = [];
         
-        // Função Recursiva que vasculha CADA NÓ do Firebase até achar algo que pareça um orçamento ou transação
         function varrer(no) {
             if (!no || typeof no !== 'object') return;
             
             let keys = Object.keys(no).map(k => k.toLowerCase());
             
-            // É Orçamento/Venda? Tem que ter Valor + (Status ou Cliente)
             let hasValor = keys.some(k => k.includes('valor') || k === 'total');
-            let hasStatus = keys.some(k => k.includes('status') || k.includes('situa') || k.includes('etapa') || k === 'coluna' || k === 'fase');
+            let isFin = keys.includes('tipo') && keys.includes('status') && keys.includes('valor');
             
-            // É Financeiro?
-            let isFin = keys.includes('tipo') && keys.includes('status') && keys.includes('valor') && keys.includes('categoria');
-            
-            if ((hasValor && hasStatus) || isFin) {
-                // Achou! Clona transformando as chaves em letras minúsculas para não dar erro de leitura
+            // Pega o objeto se ele tem valor, status de financeiro, ou nome de cliente
+            if (hasValor || isFin || keys.includes('cliente') || keys.includes('empresa') || keys.includes('cliente_nome')) {
                 let objClean = {};
                 for(let k in no) { objClean[k.toLowerCase()] = no[k]; }
                 todosObjetos.push(objClean);
             } else {
-                // Se não é, desce mais um nível para procurar dentro (ex: entra na lista de clientes e olha as compras dele)
                 for(let k in no) {
                     if (typeof no[k] === 'object') varrer(no[k]);
                 }
             }
         }
         
-        // Roda o varredor na árvore toda que foi extraída
         varrer(window.dbCompleto);
 
         // ==========================================
@@ -301,37 +282,47 @@
         let crmAtivoQtd = 0; let crmAtivoVal = 0;
         let recPaga = 0; let despPaga = 0;
 
-        // PROCESSANDO OS DADOS ENCONTRADOS PELO RAIO-X
+        // PROCESSANDO OS DADOS
         todosObjetos.forEach(o => {
             let val = parseDinheiro(o.valortotal || o.total || o.valor_total || o.valorfinal || o.valor);
-            let status = (o.status || o.situacao || o.etapa || o.coluna || o.fase || '').toLowerCase();
-            let empresa = (o.empresa || o.unidade || o.loja || '').toUpperCase();
-            let cliente = o.cliente_nome || o.cliente || o.nomecliente || o.nome_cliente || o.nome || 'Consumidor Final';
+            
+            // SE NÃO TIVER STATUS GRAVADO NO BANCO, ASSUME QUE É UMA VENDA APROVADA E FECHADA!
+            let status = String(o.status || o.situacao || o.etapa || o.coluna || o.fase || 'aprovado').toLowerCase();
+            
+            // SE NÃO TIVER EMPRESA GRAVADA, ASSUME QUE É DA MARBE
+            let empresa = String(o.empresa || o.unidade || o.loja || 'MARBE').toUpperCase();
+            
+            let cliente = String(o.cliente_nome || o.cliente || o.nomecliente || o.nome_cliente || o.nome || 'Consumidor Final');
 
             // 1. É DO FINANCEIRO?
-            if (o.tipo && o.categoria && (status === 'pago' || status === 'recebido' || status === 'liquidado' || status === 'pendente')) {
-                if(status === 'pago' || status === 'recebido' || status === 'liquidado') {
+            if (o.tipo && (status === 'pago' || status === 'recebido' || status === 'liquidado' || status === 'pendente' || status === 'aprovado')) {
+                let s = status === 'aprovado' ? 'pago' : status; 
+                if(s === 'pago' || s === 'recebido' || s === 'liquidado') {
                     let tipo = String(o.tipo).toUpperCase();
                     if(tipo === 'ENTRADA' || tipo === 'RECEITA') recPaga += val;
                     if(tipo === 'SAIDA' || tipo === 'DESPESA') despPaga += val;
                 }
-                return; // Pula pra próxima linha para não contar como Venda
-            }
-
-            // 2. É DO CRM? (Tem coluna ou fase de funil)
-            if (o.coluna || o.fase) {
-                if(!status.includes('ganho') && !status.includes('perdido') && !status.includes('recusado') && !status.includes('conclui')) {
-                    crmAtivoQtd++;
-                    crmAtivoVal += val;
-                }
                 return; 
             }
 
-            // 3. É ORÇAMENTO / VENDA
-            if(val > 0 && status !== '') {
+            // 2. VENDA / ORÇAMENTO / CRM
+            if(val > 0 && !o.tipo) {
+                
+                // Tem cara de CRM e não está perdido nem ganho
+                if ((o.coluna || o.fase) && !status.includes('ganho') && !status.includes('perdido') && !status.includes('recusado')) {
+                    crmAtivoQtd++;
+                    crmAtivoVal += val;
+                    return;
+                }
+
+                // Orçamentos normais
                 orcamentosTotaisQtd++;
                 
-                if(status.includes('aprovado') || status.includes('produ') || status.includes('ganho') || status.includes('fechad') || status.includes('entregue') || status.includes('gerada') || status.includes('conclui')) {
+                if(status.includes('recusado') || status.includes('perdido') || status.includes('cancelado')) {
+                    perdasQtd++;
+                    perdasVal += val;
+                } else {
+                    // TUDO QUE NÃO FOR RECUSADO É CONSIDERADO VENDA APROVADA NESTA VERSÃO
                     vendasFechadasQtd++;
                     vendasFechadasVal += val;
                     
@@ -343,10 +334,6 @@
 
                     if(!clientesMap[cliente]) clientesMap[cliente] = 0;
                     clientesMap[cliente] += val;
-
-                } else if(status.includes('recusado') || status.includes('perdido') || status.includes('cancelado')) {
-                    perdasQtd++;
-                    perdasVal += val;
                 }
             }
         });
