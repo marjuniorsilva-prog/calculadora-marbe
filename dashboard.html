@@ -29,10 +29,11 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    onValue(ref(db, 'sistema/'), (snapshot) => {
+    // MUDANÇA FUNDAMENTAL: Lendo a RAIZ do banco de dados ('/') para não perder nenhum módulo antigo
+    onValue(ref(db, '/'), (snapshot) => {
       const data = snapshot.val();
       if (data) { 
-          window.marbeDB = data; 
+          window.dbCompleto = data; 
           window.processarDadosDashboard();
       }
     });
@@ -52,7 +53,7 @@
     .app-layout { display: flex; height: 100vh; overflow: hidden; }
     
     /* SIDEBAR ORIGINAL RECUPERADA */
-    .sidebar { width: var(--sidebar-width); background: var(--sidebar-bg); color: #fff; display: flex; flex-direction: column; flex-shrink: 0; border-right: 1px solid var(--border); }
+    .sidebar { width: var(--sidebar-width); background: var(--sidebar-bg); color: #fff; display: flex; flex-direction: column; flex-shrink: 0; border-right: 1px solid var(--border); z-index:50;}
     .sidebar-brand { height: var(--header-height); display: flex; align-items: center; padding: 0 25px; font-size: 20px; font-weight: 800; border-bottom: 1px solid var(--border); color:var(--text-main);}
     .sidebar-brand i { margin-right: 15px; color: var(--text-main); width: 24px; height: 24px; }
     .sidebar-nav { flex: 1; overflow-y: auto; padding: 20px 15px; display: flex; flex-direction: column; }
@@ -224,111 +225,123 @@
     let chartClientesInst = null;
     let chartFinanceiroInst = null;
 
-    // TRADUTOR UNIVERSAL: Transforma objetos obscuros do Firebase em listas limpas
+    // Converte de Objeto para Array com segurança
     function objToArray(obj) {
         if (!obj) return [];
         if (Array.isArray(obj)) return obj.filter(Boolean); 
         return Object.keys(obj).map(k => obj[k]).filter(Boolean);
     }
 
+    // Acessa subníveis (ex: sistema -> orçamentos) se existirem
+    function extrairListaSegura(noPrincipal) {
+        if(!noPrincipal || typeof noPrincipal !== 'object') return [];
+        if(noPrincipal.cards) return objToArray(noPrincipal.cards);
+        if(noPrincipal.transacoes) return objToArray(noPrincipal.transacoes);
+        if(noPrincipal.pedidos) return objToArray(noPrincipal.pedidos);
+        return objToArray(noPrincipal);
+    }
+
+    // Corrige números que foram salvos como texto (ex: "1.500,00" -> 1500.00)
+    function parseDinheiro(val) {
+        if(typeof val === 'number') return val;
+        if(!val) return 0;
+        let str = String(val).replace('R$', '').trim();
+        if(str.includes(',') && str.includes('.')) {
+            str = str.replace(/\./g, '').replace(',', '.');
+        } else if(str.includes(',')) {
+            str = str.replace(',', '.');
+        }
+        return parseFloat(str) || 0;
+    }
+
     window.processarDadosDashboard = function() {
-        if(!window.marbeDB) return;
+        let data = window.dbCompleto || {};
 
-        let vendasFechadasQtd = 0;
-        let vendasFechadasVal = 0;
-        let orcamentosTotaisQtd = 0;
+        // ==========================================
+        // 1. O "CÃO FAREJADOR" UNIVERSAL
+        // ==========================================
+        // Junta vendas de TODAS as pastas possíveis
+        let rawOrcamentos = [
+            ...extrairListaSegura(data.orcamentos), 
+            ...extrairListaSegura(data.vendas), 
+            ...extrairListaSegura(data.sistema?.orcamentos), 
+            ...extrairListaSegura(data.sistema?.vendas)
+        ];
         
-        let perdasQtd = 0;
-        let perdasVal = 0;
+        // Junta CRM de TODAS as pastas possíveis
+        let rawCrm = [
+            ...extrairListaSegura(data.crm), 
+            ...extrairListaSegura(data.sistema?.crm), 
+            ...extrairListaSegura(data.funil)
+        ];
         
-        let fatMarbe = 0;
-        let fatSB = 0;
-        
-        let osMarbe = 0;
-        let osSB = 0;
+        // Junta Financeiro de TODAS as pastas possíveis
+        let rawFin = [
+            ...extrairListaSegura(data.financeiro), 
+            ...extrairListaSegura(data.sistema?.financeiro)
+        ];
 
+        // Filtra para remover lixos e garantir que só passa objeto de verdade
+        let orcamentos = [...new Set(rawOrcamentos)].filter(o => typeof o === 'object' && (o.cliente || o.cliente_nome || o.valorTotal || o.total || o.situacao));
+        let crmCards = [...new Set(rawCrm)].filter(c => typeof c === 'object' && (c.coluna || c.fase || c.titulo));
+        let financeiro = [...new Set(rawFin)].filter(f => typeof f === 'object' && (f.tipo && f.status && f.valor));
+
+        // ==========================================
+        // 2. VARIÁVEIS DE CÁLCULO
+        // ==========================================
+        let osMarbe = 0; let osSB = 0;
+        let vendasFechadasQtd = 0; let vendasFechadasVal = 0;
+        let orcamentosTotaisQtd = orcamentos.length;
+        let perdasQtd = 0; let perdasVal = 0;
+        let fatMarbe = 0; let fatSB = 0;
         let clientesMap = {};
 
-        // 1. O "CÃO FAREJADOR" UNIVERSAL DE VENDAS
-        // Vai abrir todas as gavetas do banco de dados (exceto as internas)
-        Object.keys(window.marbeDB).forEach(gaveta => {
-            // Ignora módulos que não são de orçamento/venda para não misturar os números
-            if(['compras', 'financeiro', 'almoxarifado', 'producao', 'crm', 'config', 'funcionarios'].includes(gaveta.toLowerCase())) return;
-            
-            let itens = objToArray(window.marbeDB[gaveta]);
-            
-            itens.forEach(o => {
-                if (typeof o === 'object' && o !== null) {
-                    // Tenta adivinhar qual o nome do campo "Valor" e "Cliente" independente de quem criou
-                    let val = parseFloat(o.valorTotal || o.total || o.valor_total || o.valorFinal || o.valor || 0);
-                    let cliente = o.cliente_nome || o.cliente || o.nomeCliente || o.nome_cliente || o.nome || 'Consumidor Final';
-                    let status = (o.status || o.situacao || o.etapa || '').toLowerCase();
-                    let empresa = (o.empresa || o.unidade || o.loja || '').toUpperCase();
-                    
-                    // Se o item tem dinheiro envolvido e um status/cliente, tratamos como venda/orçamento!
-                    if(val > 0 && (o.cliente || o.cliente_nome || o.status || o.situacao)) {
-                        orcamentosTotaisQtd++;
+        // PROCESSAR VENDAS E ORÇAMENTOS
+        orcamentos.forEach(o => {
+            let val = parseDinheiro(o.valorTotal || o.total || o.valor_total || o.valorFinal || o.valor);
+            let status = (o.status || o.situacao || o.etapa || '').toLowerCase();
+            let empresa = (o.empresa || o.unidade || o.loja || '').toUpperCase();
+            let cliente = o.cliente_nome || o.cliente || o.nomeCliente || o.nome_cliente || o.nome || 'Consumidor Final';
 
-                        // STATUS APROVADOS (VENDA FECHADA)
-                        if(status.includes('aprovado') || status.includes('produ') || status.includes('ganho') || status.includes('fechado') || status.includes('entregue') || status.includes('os gerada') || status.includes('conclui')) {
-                            vendasFechadasQtd++;
-                            vendasFechadasVal += val;
-                            
-                            // Separa a grana por empresa
-                            if(empresa.includes('SB')) fatSB += val;
-                            else fatMarbe += val;
+            if(status.includes('aprovado') || status.includes('produ') || status.includes('ganho') || status.includes('fechad') || status.includes('entregue') || status.includes('os gerada') || status.includes('conclui')) {
+                vendasFechadasQtd++;
+                vendasFechadasVal += val;
+                
+                if(empresa.includes('SB')) fatSB += val; else fatMarbe += val;
 
-                            // OS Ativas na Fábrica (Se foi aprovada mas ainda não foi finalizada/entregue)
-                            if(!status.includes('entregue') && !status.includes('finalizado') && !status.includes('concluido')) {
-                                if(empresa.includes('SB')) osSB++;
-                                else osMarbe++;
-                            }
-
-                            // Alimenta Curva A (Top Clientes)
-                            if(!clientesMap[cliente]) clientesMap[cliente] = 0;
-                            clientesMap[cliente] += val;
-
-                        } 
-                        // STATUS PERDIDO/RECUSADO
-                        else if(status.includes('recusado') || status.includes('perdido') || status.includes('cancelado')) {
-                            perdasQtd++;
-                            perdasVal += val;
-                        }
-                    }
+                // OS em Produção (Tira o que já entregou)
+                if(!status.includes('entregue') && !status.includes('finalizado') && !status.includes('conclui')) {
+                    if(empresa.includes('SB')) osSB++; else osMarbe++;
                 }
-            });
+
+                if(!clientesMap[cliente]) clientesMap[cliente] = 0;
+                clientesMap[cliente] += val;
+
+            } else if(status.includes('recusado') || status.includes('perdido') || status.includes('cancelado')) {
+                perdasQtd++;
+                perdasVal += val;
+            }
         });
 
-        // 2. BUSCA DO CRM (FUNIL)
-        let crmAtivoQtd = 0;
-        let crmAtivoVal = 0;
-        // Tenta achar o CRM na gaveta certa
-        let crmData = window.marbeDB.crm ? (window.marbeDB.crm.cards || window.marbeDB.crm) : null;
-        if(!crmData) crmData = window.marbeDB.funil || window.marbeDB.pipeline || [];
-        
-        let crmCards = objToArray(crmData);
+        // PROCESSAR CRM
+        let crmAtivoQtd = 0; let crmAtivoVal = 0;
         crmCards.forEach(c => {
             let col = (c.coluna || c.fase || c.status || '').toLowerCase();
-            let val = parseFloat(c.valor || c.total || 0);
+            let val = parseDinheiro(c.valor || c.total);
             
-            // Negócios Ativos
             if(col && !col.includes('ganho') && !col.includes('perdido') && !col.includes('recusado')) {
                 crmAtivoQtd++;
                 crmAtivoVal += val;
             }
         });
 
-        // 3. BUSCA DO FINANCEIRO
-        let recPaga = 0;
-        let despPaga = 0;
-        let financeiroArray = objToArray(window.marbeDB.financeiro ? window.marbeDB.financeiro.transacoes : null);
-        
-        financeiroArray.forEach(t => {
-            let val = parseFloat(t.valor || 0);
+        // PROCESSAR FINANCEIRO (Apenas Pagos/Liquidados)
+        let recPaga = 0; let despPaga = 0;
+        financeiro.forEach(t => {
+            let val = parseDinheiro(t.valor);
             let status = (t.status || '').toUpperCase();
             let tipo = (t.tipo || '').toUpperCase();
             
-            // Lê só o que realmente foi pago/liquidado do Caixa
             if(status === 'PAGO' || status === 'RECEBIDO' || status === 'LIQUIDADO') {
                 if(tipo === 'ENTRADA' || tipo === 'RECEITA') recPaga += val;
                 if(tipo === 'SAIDA' || tipo === 'DESPESA') despPaga += val;
@@ -336,15 +349,12 @@
         });
 
         // ==========================================
-        // ALIMENTAÇÃO DA TELA
+        // 3. ALIMENTAÇÃO DA TELA (KPIS)
         // ==========================================
-        
-        // LINHA 1: PRODUÇÃO
         document.getElementById('kpiOsMarbe').innerText = osMarbe;
         document.getElementById('kpiOsSb').innerText = osSB;
         document.getElementById('kpiOsTotal').innerText = (osMarbe + osSB);
 
-        // LINHA 2: COMERCIAL E FINANCEIRO
         document.getElementById('kpiVendasVal').innerText = window.fmtMoney(vendasFechadasVal);
         document.getElementById('kpiVendasQtd').innerText = `${vendasFechadasQtd} Pedidos Aprovados`;
 
@@ -362,12 +372,12 @@
 
 
         // ==========================================
-        // GRÁFICOS (CHART.JS)
+        // 4. GRÁFICOS (CHART.JS)
         // ==========================================
         Chart.defaults.color = '#94a3b8';
         Chart.defaults.font.family = 'Inter';
 
-        // 1. GRÁFICO EMPRESAS
+        // GRÁFICO EMPRESAS
         if(chartEmpresasInst) chartEmpresasInst.destroy();
         const ctxEmpresas = document.getElementById('chartEmpresas').getContext('2d');
         chartEmpresasInst = new Chart(ctxEmpresas, {
@@ -384,7 +394,7 @@
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
         });
 
-        // 2. GRÁFICO TOP CLIENTES
+        // GRÁFICO TOP CLIENTES
         let clientesOrdenados = Object.keys(clientesMap).map(k => {
             return { nome: k, val: clientesMap[k] }
         }).sort((a,b) => b.val - a.val).slice(0, 5); 
@@ -411,7 +421,7 @@
             }
         });
 
-        // 3. GRÁFICO SAÚDE FINANCEIRA
+        // GRÁFICO SAÚDE FINANCEIRA
         if(chartFinanceiroInst) chartFinanceiroInst.destroy();
         const ctxFin = document.getElementById('chartFinanceiro').getContext('2d');
         chartFinanceiroInst = new Chart(ctxFin, {
