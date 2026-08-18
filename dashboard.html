@@ -29,15 +29,14 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // MODO RAIO-X: Lendo gavetas separadamente para evitar bloqueio de segurança na Raiz ('/')
-    const gavetas = ['sistema', 'orcamentos', 'pedidos', 'vendas', 'financeiro', 'crm', 'funil'];
+    // MODO FORÇA BRUTA: Escaneia todas as gavetas possíveis do Firebase
+    const gavetasPossiveis = ['sistema', 'orcamento', 'orcamentos', 'pedido', 'pedidos', 'venda', 'vendas', 'crm', 'funil', 'financeiro', 'transacoes'];
     window.dbCompleto = {};
     
-    gavetas.forEach(gaveta => {
-        onValue(ref(db, gaveta + '/'), (snapshot) => {
-            const data = snapshot.val();
-            if(data) {
-                window.dbCompleto[gaveta] = data;
+    gavetasPossiveis.forEach(gaveta => {
+        onValue(ref(db, gaveta), (snapshot) => {
+            if(snapshot.exists()) {
+                window.dbCompleto[gaveta] = snapshot.val();
                 window.processarDadosDashboard();
             }
         });
@@ -72,8 +71,10 @@
     .tab-btn.active { background: var(--primary); color: #fff; font-weight: 600; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2); }
     .tab-btn.active i { color: #fff; }
 
-    /* HEADER */
+    /* HEADER E BARRA DE RAIO-X */
     .main-wrapper { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow-y:auto;}
+    #debugBar { background: var(--warning); color: #fff; padding: 12px 30px; font-size: 13px; font-weight: 700; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;}
+    
     .topbar { height: var(--header-height); background: var(--card-bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; flex-shrink: 0; }
     .view-title { font-size: 24px; font-weight: 700; color: var(--text-main); margin: 0; display:flex; align-items:center; gap:10px; }
     
@@ -92,20 +93,12 @@
     .chart-panel h3 { margin: 0 0 20px 0; font-size: 15px; color: var(--text-main); display:flex; align-items:center; gap:8px;}
     .canvas-container { position: relative; height: 250px; width: 100%; }
 
-    /* MODO RAIO-X BARRA DE DEBUG */
-    #debugBar { background: var(--warning); color: #fff; padding: 12px 30px; font-size: 13px; font-weight: 700; display:flex; justify-content:space-between; align-items:center; }
-
     @media (max-width: 1024px) {
         .chart-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-
-<div id="debugBar">
-    <span><i data-lucide="activity" style="width:16px; vertical-align:middle; margin-right:5px;"></i> RAIO-X DE DADOS (Conectando ao Firebase...)</span>
-    <span id="debugCount">Aguardando dados...</span>
-</div>
 
 <div class="app-layout">
     
@@ -135,6 +128,12 @@
   </aside>
 
   <main class="main-wrapper">
+      
+      <div id="debugBar">
+          <span><i data-lucide="activity" style="width:16px; vertical-align:middle; margin-right:5px;"></i> RAIO-X DE BUSCA ATIVADO (Vasculhando Banco de Dados...)</span>
+          <span id="debugCount">Aguardando conexão com o Firebase...</span>
+      </div>
+
       <header class="topbar">
           <div class="view-title"><i data-lucide="bar-chart-2" style="color:var(--primary);"></i> Centro de Comando Integrado</div>
       </header>
@@ -238,32 +237,7 @@
     let chartClientesInst = null;
     let chartFinanceiroInst = null;
 
-    // --- FUNÇÕES DE LIMPEZA E FORMATAÇÃO (TRADUTOR UNIVERSAL) ---
-    function objToArray(obj) {
-        if (!obj) return [];
-        if (Array.isArray(obj)) return obj.filter(Boolean); 
-        return Object.keys(obj).map(k => obj[k]).filter(Boolean);
-    }
-
-    // A MÁGICA ESTÁ AQUI: Transforma chaves de Objetos para minúsculas (Cliente -> cliente)
-    function lowerKeys(obj) {
-        if (typeof obj !== 'object' || obj === null) return obj;
-        if (Array.isArray(obj)) return obj.map(lowerKeys);
-        let nObj = {};
-        for (let k in obj) {
-            nObj[k.toLowerCase()] = lowerKeys(obj[k]);
-        }
-        return nObj;
-    }
-
-    function extrairListaSegura(noPrincipal) {
-        if(!noPrincipal || typeof noPrincipal !== 'object') return [];
-        if(noPrincipal.cards) return objToArray(noPrincipal.cards);
-        if(noPrincipal.transacoes) return objToArray(noPrincipal.transacoes);
-        if(noPrincipal.pedidos) return objToArray(noPrincipal.pedidos);
-        return objToArray(noPrincipal);
-    }
-
+    // Parse de dinheiro cego para evitar NaN
     function parseDinheiro(val) {
         if(typeof val === 'number') return val;
         if(!val) return 0;
@@ -277,102 +251,108 @@
     }
 
     window.processarDadosDashboard = function() {
-        // Converte TODAS AS GAVETAS DO BANCO para minúsculo para garantir a leitura correta
-        let data = lowerKeys(window.dbCompleto || {});
+        if(!window.dbCompleto) return;
 
-        // 1. EXTRAÇÃO BLINDADA
-        let rawOrcamentos = [
-            ...extrairListaSegura(data.orcamentos), 
-            ...extrairListaSegura(data.pedidos), 
-            ...extrairListaSegura(data.vendas), 
-            ...extrairListaSegura(data.sistema?.orcamentos), 
-            ...extrairListaSegura(data.sistema?.pedidos),
-            ...extrairListaSegura(data.sistema?.vendas)
-        ];
+        // Atualiza a barra de Raio-X para mostrar o que achou
+        let pastasEncontradas = Object.keys(window.dbCompleto).join(', ');
+        document.getElementById('debugCount').innerText = `Pastas encontradas: [ ${pastasEncontradas} ]`;
+
+        let todosObjetos = [];
         
-        let rawCrm = [
-            ...extrairListaSegura(data.crm), 
-            ...extrairListaSegura(data.sistema?.crm), 
-            ...extrairListaSegura(data.funil)
-        ];
+        // Função Recursiva que vasculha CADA NÓ do Firebase até achar algo que pareça um orçamento ou transação
+        function varrer(no) {
+            if (!no || typeof no !== 'object') return;
+            
+            let keys = Object.keys(no).map(k => k.toLowerCase());
+            
+            // É Orçamento/Venda? Tem que ter Valor + (Status ou Cliente)
+            let hasValor = keys.some(k => k.includes('valor') || k === 'total');
+            let hasStatus = keys.some(k => k.includes('status') || k.includes('situa') || k.includes('etapa') || k === 'coluna' || k === 'fase');
+            
+            // É Financeiro?
+            let isFin = keys.includes('tipo') && keys.includes('status') && keys.includes('valor') && keys.includes('categoria');
+            
+            if ((hasValor && hasStatus) || isFin) {
+                // Achou! Clona transformando as chaves em letras minúsculas para não dar erro de leitura
+                let objClean = {};
+                for(let k in no) { objClean[k.toLowerCase()] = no[k]; }
+                todosObjetos.push(objClean);
+            } else {
+                // Se não é, desce mais um nível para procurar dentro (ex: entra na lista de clientes e olha as compras dele)
+                for(let k in no) {
+                    if (typeof no[k] === 'object') varrer(no[k]);
+                }
+            }
+        }
         
-        let rawFin = [
-            ...extrairListaSegura(data.financeiro), 
-            ...extrairListaSegura(data.sistema?.financeiro)
-        ];
-
-        // Filtra para remover lixos do banco
-        let orcamentos = [...new Set(rawOrcamentos)].filter(o => typeof o === 'object' && (o.cliente || o.cliente_nome || o.valortotal || o.total || o.situacao || o.status));
-        let crmCards = [...new Set(rawCrm)].filter(c => typeof c === 'object' && (c.coluna || c.fase || c.titulo));
-        let financeiro = [...new Set(rawFin)].filter(f => typeof f === 'object' && (f.tipo && f.status && f.valor));
-
-        // ATUALIZANDO O RAIO-X
-        document.getElementById('debugCount').innerText = `Lidos: ${orcamentos.length} Vendas | ${financeiro.length} Lanc. Financeiros`;
+        // Roda o varredor na árvore toda que foi extraída
+        varrer(window.dbCompleto);
 
         // ==========================================
-        // 2. VARIÁVEIS DE CÁLCULO
+        // VARIÁVEIS DE CÁLCULO
         // ==========================================
         let osMarbe = 0; let osSB = 0;
         let vendasFechadasQtd = 0; let vendasFechadasVal = 0;
-        let orcamentosTotaisQtd = orcamentos.length;
+        let orcamentosTotaisQtd = 0;
         let perdasQtd = 0; let perdasVal = 0;
         let fatMarbe = 0; let fatSB = 0;
         let clientesMap = {};
+        
+        let crmAtivoQtd = 0; let crmAtivoVal = 0;
+        let recPaga = 0; let despPaga = 0;
 
-        // PROCESSAR VENDAS E ORÇAMENTOS
-        orcamentos.forEach(o => {
+        // PROCESSANDO OS DADOS ENCONTRADOS PELO RAIO-X
+        todosObjetos.forEach(o => {
             let val = parseDinheiro(o.valortotal || o.total || o.valor_total || o.valorfinal || o.valor);
-            let status = (o.status || o.situacao || o.etapa || '').toLowerCase();
+            let status = (o.status || o.situacao || o.etapa || o.coluna || o.fase || '').toLowerCase();
             let empresa = (o.empresa || o.unidade || o.loja || '').toUpperCase();
             let cliente = o.cliente_nome || o.cliente || o.nomecliente || o.nome_cliente || o.nome || 'Consumidor Final';
 
-            if(status.includes('aprovado') || status.includes('produ') || status.includes('ganho') || status.includes('fechad') || status.includes('entregue') || status.includes('os gerada') || status.includes('conclui')) {
-                vendasFechadasQtd++;
-                vendasFechadasVal += val;
-                
-                if(empresa.includes('SB')) fatSB += val; else fatMarbe += val;
-
-                // OS em Produção (Tira o que já entregou)
-                if(!status.includes('entregue') && !status.includes('finalizado') && !status.includes('conclui')) {
-                    if(empresa.includes('SB')) osSB++; else osMarbe++;
+            // 1. É DO FINANCEIRO?
+            if (o.tipo && o.categoria && (status === 'pago' || status === 'recebido' || status === 'liquidado' || status === 'pendente')) {
+                if(status === 'pago' || status === 'recebido' || status === 'liquidado') {
+                    let tipo = String(o.tipo).toUpperCase();
+                    if(tipo === 'ENTRADA' || tipo === 'RECEITA') recPaga += val;
+                    if(tipo === 'SAIDA' || tipo === 'DESPESA') despPaga += val;
                 }
-
-                if(!clientesMap[cliente]) clientesMap[cliente] = 0;
-                clientesMap[cliente] += val;
-
-            } else if(status.includes('recusado') || status.includes('perdido') || status.includes('cancelado')) {
-                perdasQtd++;
-                perdasVal += val;
+                return; // Pula pra próxima linha para não contar como Venda
             }
-        });
 
-        // PROCESSAR CRM
-        let crmAtivoQtd = 0; let crmAtivoVal = 0;
-        crmCards.forEach(c => {
-            let col = (c.coluna || c.fase || c.status || '').toLowerCase();
-            let val = parseDinheiro(c.valor || c.total);
-            
-            if(col && !col.includes('ganho') && !col.includes('perdido') && !col.includes('recusado')) {
-                crmAtivoQtd++;
-                crmAtivoVal += val;
+            // 2. É DO CRM? (Tem coluna ou fase de funil)
+            if (o.coluna || o.fase) {
+                if(!status.includes('ganho') && !status.includes('perdido') && !status.includes('recusado') && !status.includes('conclui')) {
+                    crmAtivoQtd++;
+                    crmAtivoVal += val;
+                }
+                return; 
             }
-        });
 
-        // PROCESSAR FINANCEIRO
-        let recPaga = 0; let despPaga = 0;
-        financeiro.forEach(t => {
-            let val = parseDinheiro(t.valor);
-            let status = (t.status || '').toUpperCase();
-            let tipo = (t.tipo || '').toUpperCase();
-            
-            if(status === 'PAGO' || status === 'RECEBIDO' || status === 'LIQUIDADO') {
-                if(tipo === 'ENTRADA' || tipo === 'RECEITA') recPaga += val;
-                if(tipo === 'SAIDA' || tipo === 'DESPESA') despPaga += val;
+            // 3. É ORÇAMENTO / VENDA
+            if(val > 0 && status !== '') {
+                orcamentosTotaisQtd++;
+                
+                if(status.includes('aprovado') || status.includes('produ') || status.includes('ganho') || status.includes('fechad') || status.includes('entregue') || status.includes('gerada') || status.includes('conclui')) {
+                    vendasFechadasQtd++;
+                    vendasFechadasVal += val;
+                    
+                    if(empresa.includes('SB')) fatSB += val; else fatMarbe += val;
+
+                    if(!status.includes('entregue') && !status.includes('finalizado') && !status.includes('conclui')) {
+                        if(empresa.includes('SB')) osSB++; else osMarbe++;
+                    }
+
+                    if(!clientesMap[cliente]) clientesMap[cliente] = 0;
+                    clientesMap[cliente] += val;
+
+                } else if(status.includes('recusado') || status.includes('perdido') || status.includes('cancelado')) {
+                    perdasQtd++;
+                    perdasVal += val;
+                }
             }
         });
 
         // ==========================================
-        // 3. ALIMENTAÇÃO DA TELA (KPIS)
+        // ALIMENTAÇÃO DA TELA (KPIS)
         // ==========================================
         document.getElementById('kpiOsMarbe').innerText = osMarbe;
         document.getElementById('kpiOsSb').innerText = osSB;
@@ -393,9 +373,8 @@
         document.getElementById('kpiPerdasVal').innerText = window.fmtMoney(perdasVal);
         document.getElementById('kpiPerdasQtd').innerText = `${perdasQtd} Orçamentos Recusados`;
 
-
         // ==========================================
-        // 4. GRÁFICOS (CHART.JS)
+        // GRÁFICOS (CHART.JS)
         // ==========================================
         Chart.defaults.color = '#94a3b8';
         Chart.defaults.font.family = 'Inter';
