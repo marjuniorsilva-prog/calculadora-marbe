@@ -224,98 +224,119 @@
     let chartClientesInst = null;
     let chartFinanceiroInst = null;
 
-    // TRADUTOR UNIVERSAL: Converte Objetos do Firebase em Arrays puros
+    // TRADUTOR UNIVERSAL: Transforma objetos obscuros do Firebase em listas limpas
     function objToArray(obj) {
         if (!obj) return [];
-        if (Array.isArray(obj)) return obj.filter(Boolean); // Já é array
-        return Object.keys(obj).map(k => obj[k]).filter(Boolean); // É objeto, converte pra array
+        if (Array.isArray(obj)) return obj.filter(Boolean); 
+        return Object.keys(obj).map(k => obj[k]).filter(Boolean);
     }
 
     window.processarDadosDashboard = function() {
         if(!window.marbeDB) return;
 
-        // 1. EXTRAÇÃO BLINDADA (Usa o tradutor universal)
-        let orcamentos = objToArray(window.marbeDB.orcamentos);
-        let crmCards = window.marbeDB.crm ? objToArray(window.marbeDB.crm.cards) : [];
-        let financeiro = window.marbeDB.financeiro ? objToArray(window.marbeDB.financeiro.transacoes) : [];
-
-        // VARIÁVEIS - PRODUÇÃO E VENDAS
-        let osMarbe = 0;
-        let osSB = 0;
-        
         let vendasFechadasQtd = 0;
         let vendasFechadasVal = 0;
-        let orcamentosTotaisQtd = orcamentos.length;
+        let orcamentosTotaisQtd = 0;
         
         let perdasQtd = 0;
         let perdasVal = 0;
         
         let fatMarbe = 0;
         let fatSB = 0;
+        
+        let osMarbe = 0;
+        let osSB = 0;
 
         let clientesMap = {};
 
-        // PROCESSAR VENDAS E ORÇAMENTOS
-        orcamentos.forEach(o => {
-            let val = parseFloat(o.valorTotal || o.total || 0);
-            let status = (o.status || '').toLowerCase();
-            let empresa = (o.empresa || '').toUpperCase();
-            let cliente = o.cliente_nome || o.cliente || 'Consumidor Final';
+        // 1. O "CÃO FAREJADOR" UNIVERSAL DE VENDAS
+        // Vai abrir todas as gavetas do banco de dados (exceto as internas)
+        Object.keys(window.marbeDB).forEach(gaveta => {
+            // Ignora módulos que não são de orçamento/venda para não misturar os números
+            if(['compras', 'financeiro', 'almoxarifado', 'producao', 'crm', 'config', 'funcionarios'].includes(gaveta.toLowerCase())) return;
+            
+            let itens = objToArray(window.marbeDB[gaveta]);
+            
+            itens.forEach(o => {
+                if (typeof o === 'object' && o !== null) {
+                    // Tenta adivinhar qual o nome do campo "Valor" e "Cliente" independente de quem criou
+                    let val = parseFloat(o.valorTotal || o.total || o.valor_total || o.valorFinal || o.valor || 0);
+                    let cliente = o.cliente_nome || o.cliente || o.nomeCliente || o.nome_cliente || o.nome || 'Consumidor Final';
+                    let status = (o.status || o.situacao || o.etapa || '').toLowerCase();
+                    let empresa = (o.empresa || o.unidade || o.loja || '').toUpperCase();
+                    
+                    // Se o item tem dinheiro envolvido e um status/cliente, tratamos como venda/orçamento!
+                    if(val > 0 && (o.cliente || o.cliente_nome || o.status || o.situacao)) {
+                        orcamentosTotaisQtd++;
 
-            // Verifica se é uma OS APROVADA e EM PRODUÇÃO (Não finalizada ainda)
-            // Normalmente o status é 'aprovado' ou 'em producao'
-            if(status.includes('aprovado') || status.includes('produ') || status.includes('ganho')) {
-                // Soma nas OS em Produção
-                if(!status.includes('entregue') && !status.includes('finalizado')) {
-                    if(empresa.includes('SB')) osSB++;
-                    else osMarbe++;
+                        // STATUS APROVADOS (VENDA FECHADA)
+                        if(status.includes('aprovado') || status.includes('produ') || status.includes('ganho') || status.includes('fechado') || status.includes('entregue') || status.includes('os gerada') || status.includes('conclui')) {
+                            vendasFechadasQtd++;
+                            vendasFechadasVal += val;
+                            
+                            // Separa a grana por empresa
+                            if(empresa.includes('SB')) fatSB += val;
+                            else fatMarbe += val;
+
+                            // OS Ativas na Fábrica (Se foi aprovada mas ainda não foi finalizada/entregue)
+                            if(!status.includes('entregue') && !status.includes('finalizado') && !status.includes('concluido')) {
+                                if(empresa.includes('SB')) osSB++;
+                                else osMarbe++;
+                            }
+
+                            // Alimenta Curva A (Top Clientes)
+                            if(!clientesMap[cliente]) clientesMap[cliente] = 0;
+                            clientesMap[cliente] += val;
+
+                        } 
+                        // STATUS PERDIDO/RECUSADO
+                        else if(status.includes('recusado') || status.includes('perdido') || status.includes('cancelado')) {
+                            perdasQtd++;
+                            perdasVal += val;
+                        }
+                    }
                 }
-
-                // Soma no Faturamento Global de Vendas Fechadas
-                vendasFechadasQtd++;
-                vendasFechadasVal += val;
-                
-                // Divisão do Gráfico
-                if(empresa.includes('SB')) fatSB += val;
-                else fatMarbe += val;
-
-                // Curva A
-                if(!clientesMap[cliente]) clientesMap[cliente] = 0;
-                clientesMap[cliente] += val;
-
-            } else if(status.includes('recusado') || status.includes('perdido')) {
-                perdasQtd++;
-                perdasVal += val;
-            }
+            });
         });
 
-        // PROCESSAR CRM
+        // 2. BUSCA DO CRM (FUNIL)
         let crmAtivoQtd = 0;
         let crmAtivoVal = 0;
+        // Tenta achar o CRM na gaveta certa
+        let crmData = window.marbeDB.crm ? (window.marbeDB.crm.cards || window.marbeDB.crm) : null;
+        if(!crmData) crmData = window.marbeDB.funil || window.marbeDB.pipeline || [];
+        
+        let crmCards = objToArray(crmData);
         crmCards.forEach(c => {
-            let col = (c.coluna || '').toLowerCase();
-            if(!col.includes('ganho') && !col.includes('perdido') && !col.includes('recusado')) {
+            let col = (c.coluna || c.fase || c.status || '').toLowerCase();
+            let val = parseFloat(c.valor || c.total || 0);
+            
+            // Negócios Ativos
+            if(col && !col.includes('ganho') && !col.includes('perdido') && !col.includes('recusado')) {
                 crmAtivoQtd++;
-                crmAtivoVal += parseFloat(c.valor || 0);
+                crmAtivoVal += val;
             }
         });
 
-        // PROCESSAR FINANCEIRO (Apenas Liquidados/Pagos)
+        // 3. BUSCA DO FINANCEIRO
         let recPaga = 0;
         let despPaga = 0;
-        financeiro.forEach(t => {
+        let financeiroArray = objToArray(window.marbeDB.financeiro ? window.marbeDB.financeiro.transacoes : null);
+        
+        financeiroArray.forEach(t => {
             let val = parseFloat(t.valor || 0);
             let status = (t.status || '').toUpperCase();
             let tipo = (t.tipo || '').toUpperCase();
             
-            if(status === 'PAGO' || status === 'RECEBIDO') {
-                if(tipo === 'ENTRADA') recPaga += val;
-                if(tipo === 'SAIDA') despPaga += val;
+            // Lê só o que realmente foi pago/liquidado do Caixa
+            if(status === 'PAGO' || status === 'RECEBIDO' || status === 'LIQUIDADO') {
+                if(tipo === 'ENTRADA' || tipo === 'RECEITA') recPaga += val;
+                if(tipo === 'SAIDA' || tipo === 'DESPESA') despPaga += val;
             }
         });
 
         // ==========================================
-        // ALIMENTAÇÃO DA TELA (KPIS)
+        // ALIMENTAÇÃO DA TELA
         // ==========================================
         
         // LINHA 1: PRODUÇÃO
