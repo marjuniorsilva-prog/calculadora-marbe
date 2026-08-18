@@ -29,13 +29,18 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // MUDANÇA FUNDAMENTAL: Lendo a RAIZ do banco de dados ('/') para não perder nenhum módulo antigo
-    onValue(ref(db, '/'), (snapshot) => {
-      const data = snapshot.val();
-      if (data) { 
-          window.dbCompleto = data; 
-          window.processarDadosDashboard();
-      }
+    // MODO RAIO-X: Lendo gavetas separadamente para evitar bloqueio de segurança na Raiz ('/')
+    const gavetas = ['sistema', 'orcamentos', 'pedidos', 'vendas', 'financeiro', 'crm', 'funil'];
+    window.dbCompleto = {};
+    
+    gavetas.forEach(gaveta => {
+        onValue(ref(db, gaveta + '/'), (snapshot) => {
+            const data = snapshot.val();
+            if(data) {
+                window.dbCompleto[gaveta] = data;
+                window.processarDadosDashboard();
+            }
+        });
     });
 
     window.fmtMoney = (v) => { return parseFloat(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
@@ -87,12 +92,20 @@
     .chart-panel h3 { margin: 0 0 20px 0; font-size: 15px; color: var(--text-main); display:flex; align-items:center; gap:8px;}
     .canvas-container { position: relative; height: 250px; width: 100%; }
 
+    /* MODO RAIO-X BARRA DE DEBUG */
+    #debugBar { background: var(--warning); color: #fff; padding: 12px 30px; font-size: 13px; font-weight: 700; display:flex; justify-content:space-between; align-items:center; }
+
     @media (max-width: 1024px) {
         .chart-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
+
+<div id="debugBar">
+    <span><i data-lucide="activity" style="width:16px; vertical-align:middle; margin-right:5px;"></i> RAIO-X DE DADOS (Conectando ao Firebase...)</span>
+    <span id="debugCount">Aguardando dados...</span>
+</div>
 
 <div class="app-layout">
     
@@ -225,14 +238,24 @@
     let chartClientesInst = null;
     let chartFinanceiroInst = null;
 
-    // Converte de Objeto para Array com segurança
+    // --- FUNÇÕES DE LIMPEZA E FORMATAÇÃO (TRADUTOR UNIVERSAL) ---
     function objToArray(obj) {
         if (!obj) return [];
         if (Array.isArray(obj)) return obj.filter(Boolean); 
         return Object.keys(obj).map(k => obj[k]).filter(Boolean);
     }
 
-    // Acessa subníveis (ex: sistema -> orçamentos) se existirem
+    // A MÁGICA ESTÁ AQUI: Transforma chaves de Objetos para minúsculas (Cliente -> cliente)
+    function lowerKeys(obj) {
+        if (typeof obj !== 'object' || obj === null) return obj;
+        if (Array.isArray(obj)) return obj.map(lowerKeys);
+        let nObj = {};
+        for (let k in obj) {
+            nObj[k.toLowerCase()] = lowerKeys(obj[k]);
+        }
+        return nObj;
+    }
+
     function extrairListaSegura(noPrincipal) {
         if(!noPrincipal || typeof noPrincipal !== 'object') return [];
         if(noPrincipal.cards) return objToArray(noPrincipal.cards);
@@ -241,7 +264,6 @@
         return objToArray(noPrincipal);
     }
 
-    // Corrige números que foram salvos como texto (ex: "1.500,00" -> 1500.00)
     function parseDinheiro(val) {
         if(typeof val === 'number') return val;
         if(!val) return 0;
@@ -255,36 +277,37 @@
     }
 
     window.processarDadosDashboard = function() {
-        let data = window.dbCompleto || {};
+        // Converte TODAS AS GAVETAS DO BANCO para minúsculo para garantir a leitura correta
+        let data = lowerKeys(window.dbCompleto || {});
 
-        // ==========================================
-        // 1. O "CÃO FAREJADOR" UNIVERSAL
-        // ==========================================
-        // Junta vendas de TODAS as pastas possíveis
+        // 1. EXTRAÇÃO BLINDADA
         let rawOrcamentos = [
             ...extrairListaSegura(data.orcamentos), 
+            ...extrairListaSegura(data.pedidos), 
             ...extrairListaSegura(data.vendas), 
             ...extrairListaSegura(data.sistema?.orcamentos), 
+            ...extrairListaSegura(data.sistema?.pedidos),
             ...extrairListaSegura(data.sistema?.vendas)
         ];
         
-        // Junta CRM de TODAS as pastas possíveis
         let rawCrm = [
             ...extrairListaSegura(data.crm), 
             ...extrairListaSegura(data.sistema?.crm), 
             ...extrairListaSegura(data.funil)
         ];
         
-        // Junta Financeiro de TODAS as pastas possíveis
         let rawFin = [
             ...extrairListaSegura(data.financeiro), 
             ...extrairListaSegura(data.sistema?.financeiro)
         ];
 
-        // Filtra para remover lixos e garantir que só passa objeto de verdade
-        let orcamentos = [...new Set(rawOrcamentos)].filter(o => typeof o === 'object' && (o.cliente || o.cliente_nome || o.valorTotal || o.total || o.situacao));
+        // Filtra para remover lixos do banco
+        let orcamentos = [...new Set(rawOrcamentos)].filter(o => typeof o === 'object' && (o.cliente || o.cliente_nome || o.valortotal || o.total || o.situacao || o.status));
         let crmCards = [...new Set(rawCrm)].filter(c => typeof c === 'object' && (c.coluna || c.fase || c.titulo));
         let financeiro = [...new Set(rawFin)].filter(f => typeof f === 'object' && (f.tipo && f.status && f.valor));
+
+        // ATUALIZANDO O RAIO-X
+        document.getElementById('debugCount').innerText = `Lidos: ${orcamentos.length} Vendas | ${financeiro.length} Lanc. Financeiros`;
 
         // ==========================================
         // 2. VARIÁVEIS DE CÁLCULO
@@ -298,10 +321,10 @@
 
         // PROCESSAR VENDAS E ORÇAMENTOS
         orcamentos.forEach(o => {
-            let val = parseDinheiro(o.valorTotal || o.total || o.valor_total || o.valorFinal || o.valor);
+            let val = parseDinheiro(o.valortotal || o.total || o.valor_total || o.valorfinal || o.valor);
             let status = (o.status || o.situacao || o.etapa || '').toLowerCase();
             let empresa = (o.empresa || o.unidade || o.loja || '').toUpperCase();
-            let cliente = o.cliente_nome || o.cliente || o.nomeCliente || o.nome_cliente || o.nome || 'Consumidor Final';
+            let cliente = o.cliente_nome || o.cliente || o.nomecliente || o.nome_cliente || o.nome || 'Consumidor Final';
 
             if(status.includes('aprovado') || status.includes('produ') || status.includes('ganho') || status.includes('fechad') || status.includes('entregue') || status.includes('os gerada') || status.includes('conclui')) {
                 vendasFechadasQtd++;
@@ -335,7 +358,7 @@
             }
         });
 
-        // PROCESSAR FINANCEIRO (Apenas Pagos/Liquidados)
+        // PROCESSAR FINANCEIRO
         let recPaga = 0; let despPaga = 0;
         financeiro.forEach(t => {
             let val = parseDinheiro(t.valor);
@@ -377,7 +400,6 @@
         Chart.defaults.color = '#94a3b8';
         Chart.defaults.font.family = 'Inter';
 
-        // GRÁFICO EMPRESAS
         if(chartEmpresasInst) chartEmpresasInst.destroy();
         const ctxEmpresas = document.getElementById('chartEmpresas').getContext('2d');
         chartEmpresasInst = new Chart(ctxEmpresas, {
@@ -394,7 +416,6 @@
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
         });
 
-        // GRÁFICO TOP CLIENTES
         let clientesOrdenados = Object.keys(clientesMap).map(k => {
             return { nome: k, val: clientesMap[k] }
         }).sort((a,b) => b.val - a.val).slice(0, 5); 
@@ -421,7 +442,6 @@
             }
         });
 
-        // GRÁFICO SAÚDE FINANCEIRA
         if(chartFinanceiroInst) chartFinanceiroInst.destroy();
         const ctxFin = document.getElementById('chartFinanceiro').getContext('2d');
         chartFinanceiroInst = new Chart(ctxFin, {
