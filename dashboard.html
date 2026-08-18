@@ -29,7 +29,6 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // MODO FORÇA BRUTA: Escaneia todas as gavetas possíveis do Firebase
     const gavetasPossiveis = ['sistema', 'orcamento', 'orcamentos', 'pedido', 'pedidos', 'venda', 'vendas', 'crm', 'funil', 'financeiro', 'transacoes'];
     window.dbCompleto = {};
     
@@ -56,7 +55,6 @@
     body { font-family: 'Inter', sans-serif; background: var(--bg-color); margin: 0; padding: 0; color: var(--text-main); font-size: 14px; overflow-x: hidden; }
     .app-layout { display: flex; height: 100vh; overflow: hidden; }
     
-    /* SIDEBAR ORIGINAL RECUPERADA */
     .sidebar { width: var(--sidebar-width); background: var(--sidebar-bg); color: #fff; display: flex; flex-direction: column; flex-shrink: 0; border-right: 1px solid var(--border); z-index:50;}
     .sidebar-brand { height: var(--header-height); display: flex; align-items: center; padding: 0 25px; font-size: 20px; font-weight: 800; border-bottom: 1px solid var(--border); color:var(--text-main);}
     .sidebar-brand i { margin-right: 15px; color: var(--text-main); width: 24px; height: 24px; }
@@ -71,14 +69,12 @@
     .tab-btn.active { background: var(--primary); color: #fff; font-weight: 600; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2); }
     .tab-btn.active i { color: #fff; }
 
-    /* HEADER */
     .main-wrapper { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow-y:auto;}
     .topbar { height: var(--header-height); background: var(--card-bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; flex-shrink: 0; }
     .view-title { font-size: 24px; font-weight: 700; color: var(--text-main); margin: 0; display:flex; align-items:center; gap:10px; }
     
     .content-area { flex: 1; padding: 35px; background: var(--bg-color); }
 
-    /* GRIDS DO DASHBOARD */
     .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
     .kpi-card { background: var(--card-bg); padding: 25px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.1); display:flex; flex-direction:column; justify-content:center; position:relative; overflow:hidden;}
     .kpi-card h3 { margin: 0 0 10px 0; font-size: 13px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; display:flex; align-items:center; gap:8px;}
@@ -133,7 +129,6 @@
 
       <div class="content-area">
           
-          <!-- LINHA 1: PRODUÇÃO (OS ATIVAS) -->
           <h2 style="font-size:16px; margin:0 0 15px 0; color:var(--text-muted);">MÉTRICAS DE PRODUÇÃO (OS EM ANDAMENTO)</h2>
           <div class="kpi-grid">
               <div class="kpi-card" style="border-left: 4px solid var(--marbe);">
@@ -158,7 +153,6 @@
               </div>
           </div>
 
-          <!-- LINHA 2: COMERCIAL -->
           <h2 style="font-size:16px; margin:30px 0 15px 0; color:var(--text-muted);">MÉTRICAS COMERCIAIS E FINANCEIRAS</h2>
           <div class="kpi-grid">
               <div class="kpi-card" style="border-bottom: 4px solid var(--success);">
@@ -186,7 +180,6 @@
               </div>
           </div>
 
-          <!-- LINHA 3 DE GRÁFICOS -->
           <div class="chart-grid">
               <div class="chart-panel">
                   <h3><i data-lucide="pie-chart" style="color:var(--marbe);"></i> Distribuição de Faturamento (Grupo)</h3>
@@ -195,17 +188,16 @@
                   </div>
               </div>
               <div class="chart-panel">
-                  <h3><i data-lucide="award" style="color:var(--warning);"></i> Top Clientes (Faturamento Fechado)</h3>
+                  <h3><i data-lucide="award" style="color:var(--warning);"></i> Top 5 Clientes (Curva A)</h3>
                   <div class="canvas-container">
                       <canvas id="chartClientes"></canvas>
                   </div>
               </div>
           </div>
 
-          <!-- LINHA 4 DE GRÁFICOS -->
           <div class="chart-grid">
               <div class="chart-panel">
-                  <h3><i data-lucide="trending-up" style="color:var(--success);"></i> Saúde Financeira Global (Caixa Real)</h3>
+                  <h3><i data-lucide="trending-up" style="color:var(--success);"></i> Saúde Financeira Global (Entradas x Saídas)</h3>
                   <div class="canvas-container">
                       <canvas id="chartFinanceiro"></canvas>
                   </div>
@@ -230,24 +222,6 @@
     let chartClientesInst = null;
     let chartFinanceiroInst = null;
 
-    // Converte de Objeto para Array com segurança
-    function objToArray(obj) {
-        if (!obj) return [];
-        if (Array.isArray(obj)) return obj.filter(Boolean); 
-        return Object.keys(obj).map(k => obj[k]).filter(Boolean);
-    }
-
-    // A MÁGICA ESTÁ AQUI: Transforma chaves de Objetos para minúsculas
-    function lowerKeys(obj) {
-        if (typeof obj !== 'object' || obj === null) return obj;
-        if (Array.isArray(obj)) return obj.map(lowerKeys);
-        let nObj = {};
-        for (let k in obj) {
-            nObj[k.toLowerCase()] = lowerKeys(obj[k]);
-        }
-        return nObj;
-    }
-
     function parseDinheiro(val) {
         if(typeof val === 'number') return val;
         if(!val) return 0;
@@ -265,8 +239,7 @@
 
         let todosObjetos = [];
         
-        // Função Recursiva que vasculha CADA NÓ do Firebase
-        function varrer(no) {
+        function varrer(no, nomePastaOrigem) {
             if (!no || typeof no !== 'object') return;
             let keys = Object.keys(no).map(k => k.toLowerCase());
             
@@ -274,65 +247,74 @@
             let isFin = keys.includes('tipo') && keys.includes('status') && keys.includes('valor');
             
             if (hasValor || isFin || keys.includes('cliente') || keys.includes('empresa') || keys.includes('cliente_nome')) {
-                let objClean = {};
+                let objClean = { _origem: nomePastaOrigem }; // Etiqueta secreta com o nome da pasta
                 for(let k in no) { objClean[k.toLowerCase()] = no[k]; }
                 todosObjetos.push(objClean);
             } else {
                 for(let k in no) {
-                    if (typeof no[k] === 'object') varrer(no[k]);
+                    if (typeof no[k] === 'object') varrer(no[k], nomePastaOrigem);
                 }
             }
         }
         
-        varrer(window.dbCompleto);
+        // Manda o rastreador ler todas as pastas do banco
+        for (let pasta in window.dbCompleto) {
+            varrer(window.dbCompleto[pasta], pasta.toLowerCase());
+        }
 
-        // ==========================================
         // VARIÁVEIS DE CÁLCULO
-        // ==========================================
         let osMarbe = 0; let osSB = 0;
         let vendasFechadasQtd = 0; let vendasFechadasVal = 0;
         let orcamentosTotaisQtd = 0;
         let perdasQtd = 0; let perdasVal = 0;
         let fatMarbe = 0; let fatSB = 0;
         let clientesMap = {};
-        
         let crmAtivoQtd = 0; let crmAtivoVal = 0;
         let recPaga = 0; let despPaga = 0;
 
-        // PROCESSANDO OS DADOS ENCONTRADOS PELO RAIO-X
         todosObjetos.forEach(o => {
             let val = parseDinheiro(o.valortotal || o.total || o.valor_total || o.valorfinal || o.valor);
-            let statusOriginal = o.status || o.situacao || o.etapa || o.coluna || o.fase || '';
-            let status = String(statusOriginal).toLowerCase();
+            let status = String(o.status || o.situacao || o.etapa || o.coluna || o.fase || '').toLowerCase();
             let empresa = String(o.empresa || o.unidade || o.loja || 'MARBE').toUpperCase();
             let cliente = String(o.cliente_nome || o.cliente || o.nomecliente || o.nome_cliente || o.nome || 'Consumidor Final');
 
-            // 1. É DO FINANCEIRO? (Isola os dados para não poluir Vendas)
+            // 1. É DO FINANCEIRO?
             if (o.tipo && (status === 'pago' || status === 'recebido' || status === 'liquidado' || status === 'pendente' || status === 'atrasado')) {
                 if(status === 'pago' || status === 'recebido' || status === 'liquidado') {
                     let tipo = String(o.tipo).toUpperCase();
                     if(tipo === 'ENTRADA' || tipo === 'RECEITA') recPaga += val;
                     if(tipo === 'SAIDA' || tipo === 'DESPESA') despPaga += val;
                 }
-                return; // Pula pra próxima linha para não contar como Venda
+                return; 
             }
 
-            // REGRAS DE CLASSIFICAÇÃO (A MÁGICA QUE ARRUMOU O ERRO DOS 5 MILHÕES)
+            // ====================================================
+            // INTELIGÊNCIA ARTIFICIAL: CLASSIFICANDO DADOS ANTIGOS
+            // ====================================================
             let aprovado = status.includes('aprovado') || status.includes('produ') || status.includes('ganho') || status.includes('fechad') || status.includes('entregue') || status.includes('gerada') || status.includes('conclui');
             let recusado = status.includes('recusado') || status.includes('perdido') || status.includes('cancelado');
 
-            // 2. VENDA / ORÇAMENTO / CRM
+            // Se o antigo sistema não escreveu um status, nós deduzimos pelas "pistas":
+            if(!aprovado && !recusado) {
+                let checkboxAprovado = o.aprovado === true || o.aprovado === 'true' || o.aprovado === 'sim';
+                let temNumeroDeOS = !!(o.os || o.numero_os || o.num_os || o.ordem_servico);
+                let estavaNaPastaCerta = (o._origem === 'venda' || o._origem === 'vendas' || o._origem === 'pedido' || o._origem === 'pedidos');
+                
+                if (checkboxAprovado || temNumeroDeOS || estavaNaPastaCerta) {
+                    aprovado = true;
+                }
+            }
+
+            // 2. DISTRIBUIÇÃO VENDA / ORÇAMENTO / CRM
             if(val > 0 && !o.tipo) {
                 orcamentosTotaisQtd++;
                 
                 if (aprovado) {
-                    // É VENDA FECHADA
                     vendasFechadasQtd++;
                     vendasFechadasVal += val;
                     
                     if(empresa.includes('SB')) fatSB += val; else fatMarbe += val;
 
-                    // Verifica se está rodando na Fábrica
                     if(!status.includes('entregue') && !status.includes('finalizado') && !status.includes('conclui')) {
                         if(empresa.includes('SB')) osSB++; else osMarbe++;
                     }
@@ -341,11 +323,9 @@
                     clientesMap[cliente] += val;
 
                 } else if (recusado) {
-                    // É PERDA
                     perdasQtd++;
                     perdasVal += val;
                 } else {
-                    // SE NÃO ESTÁ APROVADO NEM RECUSADO, CAI AQUI NO CRM / EM NEGOCIAÇÃO
                     crmAtivoQtd++;
                     crmAtivoVal += val;
                 }
@@ -427,7 +407,7 @@
         chartFinanceiroInst = new Chart(ctxFin, {
             type: 'bar',
             data: {
-                labels: ['Receitas Liquidadas (Caixa Real)', 'Despesas Liquidadas'],
+                labels: ['Receitas Liquidadas', 'Despesas Liquidadas'],
                 datasets: [{
                     data: [recPaga, despPaga],
                     backgroundColor: ['#10b981', '#ef4444'],
