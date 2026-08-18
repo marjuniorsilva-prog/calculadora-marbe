@@ -29,7 +29,7 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // MODO FORÇA BRUTA (Sem faixa amarela)
+    // MODO FORÇA BRUTA: Escaneia todas as gavetas possíveis do Firebase
     const gavetasPossiveis = ['sistema', 'orcamento', 'orcamentos', 'pedido', 'pedidos', 'venda', 'vendas', 'crm', 'funil', 'financeiro', 'transacoes'];
     window.dbCompleto = {};
     
@@ -195,7 +195,7 @@
                   </div>
               </div>
               <div class="chart-panel">
-                  <h3><i data-lucide="award" style="color:var(--warning);"></i> Top 5 Clientes (Curva A)</h3>
+                  <h3><i data-lucide="award" style="color:var(--warning);"></i> Top Clientes (Faturamento Fechado)</h3>
                   <div class="canvas-container">
                       <canvas id="chartClientes"></canvas>
                   </div>
@@ -205,7 +205,7 @@
           <!-- LINHA 4 DE GRÁFICOS -->
           <div class="chart-grid">
               <div class="chart-panel">
-                  <h3><i data-lucide="trending-up" style="color:var(--success);"></i> Saúde Financeira Global (Entradas x Saídas)</h3>
+                  <h3><i data-lucide="trending-up" style="color:var(--success);"></i> Saúde Financeira Global (Caixa Real)</h3>
                   <div class="canvas-container">
                       <canvas id="chartFinanceiro"></canvas>
                   </div>
@@ -230,6 +230,24 @@
     let chartClientesInst = null;
     let chartFinanceiroInst = null;
 
+    // Converte de Objeto para Array com segurança
+    function objToArray(obj) {
+        if (!obj) return [];
+        if (Array.isArray(obj)) return obj.filter(Boolean); 
+        return Object.keys(obj).map(k => obj[k]).filter(Boolean);
+    }
+
+    // A MÁGICA ESTÁ AQUI: Transforma chaves de Objetos para minúsculas
+    function lowerKeys(obj) {
+        if (typeof obj !== 'object' || obj === null) return obj;
+        if (Array.isArray(obj)) return obj.map(lowerKeys);
+        let nObj = {};
+        for (let k in obj) {
+            nObj[k.toLowerCase()] = lowerKeys(obj[k]);
+        }
+        return nObj;
+    }
+
     function parseDinheiro(val) {
         if(typeof val === 'number') return val;
         if(!val) return 0;
@@ -247,15 +265,14 @@
 
         let todosObjetos = [];
         
+        // Função Recursiva que vasculha CADA NÓ do Firebase
         function varrer(no) {
             if (!no || typeof no !== 'object') return;
-            
             let keys = Object.keys(no).map(k => k.toLowerCase());
             
             let hasValor = keys.some(k => k.includes('valor') || k === 'total');
             let isFin = keys.includes('tipo') && keys.includes('status') && keys.includes('valor');
             
-            // Pega o objeto se ele tem valor, status de financeiro, ou nome de cliente
             if (hasValor || isFin || keys.includes('cliente') || keys.includes('empresa') || keys.includes('cliente_nome')) {
                 let objClean = {};
                 for(let k in no) { objClean[k.toLowerCase()] = no[k]; }
@@ -282,58 +299,55 @@
         let crmAtivoQtd = 0; let crmAtivoVal = 0;
         let recPaga = 0; let despPaga = 0;
 
-        // PROCESSANDO OS DADOS
+        // PROCESSANDO OS DADOS ENCONTRADOS PELO RAIO-X
         todosObjetos.forEach(o => {
             let val = parseDinheiro(o.valortotal || o.total || o.valor_total || o.valorfinal || o.valor);
-            
-            // SE NÃO TIVER STATUS GRAVADO NO BANCO, ASSUME QUE É UMA VENDA APROVADA E FECHADA!
-            let status = String(o.status || o.situacao || o.etapa || o.coluna || o.fase || 'aprovado').toLowerCase();
-            
-            // SE NÃO TIVER EMPRESA GRAVADA, ASSUME QUE É DA MARBE
+            let statusOriginal = o.status || o.situacao || o.etapa || o.coluna || o.fase || '';
+            let status = String(statusOriginal).toLowerCase();
             let empresa = String(o.empresa || o.unidade || o.loja || 'MARBE').toUpperCase();
-            
             let cliente = String(o.cliente_nome || o.cliente || o.nomecliente || o.nome_cliente || o.nome || 'Consumidor Final');
 
-            // 1. É DO FINANCEIRO?
-            if (o.tipo && (status === 'pago' || status === 'recebido' || status === 'liquidado' || status === 'pendente' || status === 'aprovado')) {
-                let s = status === 'aprovado' ? 'pago' : status; 
-                if(s === 'pago' || s === 'recebido' || s === 'liquidado') {
+            // 1. É DO FINANCEIRO? (Isola os dados para não poluir Vendas)
+            if (o.tipo && (status === 'pago' || status === 'recebido' || status === 'liquidado' || status === 'pendente' || status === 'atrasado')) {
+                if(status === 'pago' || status === 'recebido' || status === 'liquidado') {
                     let tipo = String(o.tipo).toUpperCase();
                     if(tipo === 'ENTRADA' || tipo === 'RECEITA') recPaga += val;
                     if(tipo === 'SAIDA' || tipo === 'DESPESA') despPaga += val;
                 }
-                return; 
+                return; // Pula pra próxima linha para não contar como Venda
             }
+
+            // REGRAS DE CLASSIFICAÇÃO (A MÁGICA QUE ARRUMOU O ERRO DOS 5 MILHÕES)
+            let aprovado = status.includes('aprovado') || status.includes('produ') || status.includes('ganho') || status.includes('fechad') || status.includes('entregue') || status.includes('gerada') || status.includes('conclui');
+            let recusado = status.includes('recusado') || status.includes('perdido') || status.includes('cancelado');
 
             // 2. VENDA / ORÇAMENTO / CRM
             if(val > 0 && !o.tipo) {
-                
-                // Tem cara de CRM e não está perdido nem ganho
-                if ((o.coluna || o.fase) && !status.includes('ganho') && !status.includes('perdido') && !status.includes('recusado')) {
-                    crmAtivoQtd++;
-                    crmAtivoVal += val;
-                    return;
-                }
-
-                // Orçamentos normais
                 orcamentosTotaisQtd++;
                 
-                if(status.includes('recusado') || status.includes('perdido') || status.includes('cancelado')) {
-                    perdasQtd++;
-                    perdasVal += val;
-                } else {
-                    // TUDO QUE NÃO FOR RECUSADO É CONSIDERADO VENDA APROVADA NESTA VERSÃO
+                if (aprovado) {
+                    // É VENDA FECHADA
                     vendasFechadasQtd++;
                     vendasFechadasVal += val;
                     
                     if(empresa.includes('SB')) fatSB += val; else fatMarbe += val;
 
+                    // Verifica se está rodando na Fábrica
                     if(!status.includes('entregue') && !status.includes('finalizado') && !status.includes('conclui')) {
                         if(empresa.includes('SB')) osSB++; else osMarbe++;
                     }
 
                     if(!clientesMap[cliente]) clientesMap[cliente] = 0;
                     clientesMap[cliente] += val;
+
+                } else if (recusado) {
+                    // É PERDA
+                    perdasQtd++;
+                    perdasVal += val;
+                } else {
+                    // SE NÃO ESTÁ APROVADO NEM RECUSADO, CAI AQUI NO CRM / EM NEGOCIAÇÃO
+                    crmAtivoQtd++;
+                    crmAtivoVal += val;
                 }
             }
         });
@@ -413,7 +427,7 @@
         chartFinanceiroInst = new Chart(ctxFin, {
             type: 'bar',
             data: {
-                labels: ['Receitas Liquidadas', 'Despesas Liquidadas'],
+                labels: ['Receitas Liquidadas (Caixa Real)', 'Despesas Liquidadas'],
                 datasets: [{
                     data: [recPaga, despPaga],
                     backgroundColor: ['#10b981', '#ef4444'],
