@@ -51,8 +51,11 @@
           window.marbeDB = data; 
           
           if (!window.marbeDB.compras) {
-              window.marbeDB.compras = { fornecedores: [], produtos: [], pedidos: [], seq: 1 };
+              window.marbeDB.compras = { fornecedores: [], produtos: [], pedidos: [], seq: 1, solicitacoes: [], seq_solicitacao: 1 };
           }
+          if (!window.marbeDB.compras.solicitacoes) window.marbeDB.compras.solicitacoes = [];
+          if (!Array.isArray(window.marbeDB.compras.solicitacoes)) window.marbeDB.compras.solicitacoes = Object.values(window.marbeDB.compras.solicitacoes);
+          if (!window.marbeDB.compras.seq_solicitacao) window.marbeDB.compras.seq_solicitacao = 1;
           if (!window.marbeDB.almoxarifado) {
               window.marbeDB.almoxarifado = { saldos: {}, movimentacoes: [] };
           }
@@ -250,7 +253,8 @@
           
           <!-- SUBMENUS DINÂMICOS -->
           <div class="sub-tabs" id="submenu-compras">
-              <button class="sub-tab-btn active" onclick="window.tabSection('tab-pedido', this)"><i data-lucide="shopping-bag" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Gerar Pedido de Compra</button>
+              <button id="btn-tab-solicitacao" class="sub-tab-btn active" onclick="window.tabSection('tab-solicitacao', this)"><i data-lucide="file-question" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Solicitação de Orçamento</button>
+              <button id="btn-tab-pedido" class="sub-tab-btn" onclick="window.tabSection('tab-pedido', this)"><i data-lucide="shopping-bag" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Pedido de Compra</button>
               <button id="btn-tab-historico" class="sub-tab-btn" onclick="window.tabSection('tab-historico', this)"><i data-lucide="history" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Histórico de Compras</button>
           </div>
           <div class="sub-tabs" id="submenu-cadastros" style="display:none;">
@@ -262,13 +266,73 @@
               <button class="sub-tab-btn active-estoque" onclick="window.tabSection('tab-extrato', this)"><i data-lucide="list" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Extrato de Movimentações</button>
           </div>
           <div class="sub-tabs" id="submenu-retirada" style="display:none;">
-              <button class="sub-tab-btn active-estoque active" onclick="window.tabSection('tab-baixa', this)"><i data-lucide="scan-barcode" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Realizar Baixa / Retirada</button>
+              <button id="btn-tab-baixa" class="sub-tab-btn active-estoque active" onclick="window.tabSection('tab-baixa', this)"><i data-lucide="scan-barcode" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Realizar Baixa / Retirada</button>
+              <button id="btn-tab-rel-retiradas" class="sub-tab-btn active-estoque" onclick="window.tabSection('tab-relatorio-retiradas', this)"><i data-lucide="clipboard-list" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Relatório de Retiradas</button>
+          </div>
+
+          <!-- ========================================== -->
+          <!-- ÁREA: SOLICITAÇÃO DE ORÇAMENTO AO FORNECEDOR -->
+          <!-- ========================================== -->
+          <div id="tab-solicitacao" class="section active">
+              <div class="card-panel" style="border-left:4px solid var(--info);">
+                  <div class="card-header" style="color:var(--info);"><i data-lucide="file-question"></i> Solicitação de Orçamento ao Fornecedor</div>
+                  <p style="margin:0; color:var(--text-muted); font-size:13px; line-height:1.6;"><strong style="color:var(--text-main);">Esta etapa é somente cotação.</strong> Não gera estoque, não gera contas a pagar e não confirma compra. O Pedido de Compra continua sendo emitido separadamente depois da aprovação da cotação.</p>
+              </div>
+
+              <div class="card-panel">
+                  <div class="card-header"><i data-lucide="building"></i> 1. Empresa Solicitante</div>
+                  <div class="empresa-selector">
+                      <div class="empresa-option active" id="orcBtnMarbe" onclick="window.selecionarEmpresaSolicitacao('MARBE')"><h3>GRUPO MARBE (PU)</h3><p>CNPJ: 41.755.585/0001-37</p></div>
+                      <div class="empresa-option" id="orcBtnSB" onclick="window.selecionarEmpresaSolicitacao('SB')"><h3>SB BORRACHAS</h3><p>CNPJ: 61.149.312/0001-56</p></div>
+                  </div>
+              </div>
+
+              <div class="card-panel">
+                  <div class="card-header"><i data-lucide="store"></i> 2. Fornecedor que receberá a cotação</div>
+                  <label>Fornecedor Cadastrado</label>
+                  <select id="selectFornecedorOrc" style="font-weight:600; color:var(--info);"><option value="">-- Carregando... --</option></select>
+              </div>
+
+              <div class="card-panel">
+                  <div class="card-header"><i data-lucide="list-plus"></i> 3. Materiais para Cotação</div>
+                  <div style="background:var(--bg-color); padding:20px; border-radius:10px; border:1px dashed var(--border); margin-bottom:20px;">
+                      <div class="row">
+                          <div class="col" style="flex:2"><label>Produto / Insumo</label><input type="text" id="orcItemNome" list="listaProdutosDatalist" placeholder="Ex: Cola PU" onchange="window.preencherUnidadeSolicitacao()"></div>
+                          <div class="col"><label>Quantidade</label><input type="number" step="0.01" min="0" id="orcItemQtd" placeholder="Ex: 10"></div>
+                          <div class="col"><label>Unidade</label><input type="text" id="orcItemUn" placeholder="Ex: KG, UN, M"></div>
+                      </div>
+                      <button class="btn btn-outline" style="width:100%; border-color:var(--info); color:var(--info);" onclick="window.adicionarItemSolicitacao()"><i data-lucide="plus"></i> ADICIONAR ITEM À SOLICITAÇÃO</button>
+                  </div>
+                  <div class="table-container">
+                      <table>
+                          <thead><tr><th>Material / Descrição</th><th style="text-align:center">Quantidade</th><th style="text-align:center">Unidade</th><th style="text-align:center">Remover</th></tr></thead>
+                          <tbody id="tabelaItensSolicitacao"><tr><td colspan="4" style="text-align:center; padding:30px; color:var(--text-muted);">Nenhum item adicionado.</td></tr></tbody>
+                      </table>
+                  </div>
+              </div>
+
+              <div class="card-panel">
+                  <div class="card-header"><i data-lucide="message-square-text"></i> 4. Informações para o Fornecedor</div>
+                  <div class="row">
+                      <div class="col"><label>Prazo desejado para retorno</label><input type="text" id="orcPrazoResposta" placeholder="Ex: Favor retornar até 22/08"></div>
+                      <div class="col"><label>Referência / Setor</label><input type="text" id="orcReferencia" placeholder="Ex: Compras / Marcelo"></div>
+                  </div>
+                  <label>Observações da Cotação</label>
+                  <textarea id="orcObs" rows="3" placeholder="Ex: Informar preço, prazo de entrega, frete, condição de pagamento e validade da proposta."></textarea>
+                  <div style="margin-top:24px; padding:15px; border-radius:10px; background:rgba(59,130,246,.08); border:1px solid rgba(59,130,246,.25); color:var(--text-muted); font-size:12px; line-height:1.6;"><strong style="color:var(--info);">Importante:</strong> o PDF desta solicitação não mostra preço interno da Marbe/SB. O fornecedor recebe campos para informar preço, frete, prazo e pagamento.</div>
+                  <button class="btn btn-primary" style="width:100%; margin-top:22px; padding:18px; font-size:15px; background:var(--info);" onclick="window.salvarSolicitacaoOrcamento()"><i data-lucide="file-down"></i> GERAR SOLICITAÇÃO DE ORÇAMENTO + PDF</button>
+              </div>
+
+              <div class="card-panel">
+                  <div class="card-header" style="color:var(--info);"><i data-lucide="history"></i> Solicitações de Orçamento Emitidas</div>
+                  <div id="listaSolicitacoesOrcamento"></div>
+              </div>
           </div>
 
           <!-- ========================================== -->
           <!-- ÁREA: COMPRAS (GERAR PEDIDO E HISTÓRICO) -->
           <!-- ========================================== -->
-          <div id="tab-pedido" class="section active">
+          <div id="tab-pedido" class="section">
               <div class="card-panel">
                   <div class="card-header"><i data-lucide="building"></i> 1. Empresa Compradora (Faturamento)</div>
                   <div class="empresa-selector">
@@ -484,6 +548,42 @@
               </div>
           </div>
 
+          <div id="tab-relatorio-retiradas" class="section">
+              <div class="card-panel" style="border-left:4px solid var(--estoque);">
+                  <div class="card-header" style="color:var(--estoque);"><i data-lucide="clipboard-list"></i> Relatório de Retiradas de Material</div>
+                  <p style="font-size:13px; color:var(--text-muted); margin-top:0;">Filtre por data/período, funcionário e material para conferir exatamente quem retirou cada item do almoxarifado.</p>
+                  <div class="row">
+                      <div class="col"><label>Data Inicial</label><input type="date" id="relRetDataIni"></div>
+                      <div class="col"><label>Data Final</label><input type="date" id="relRetDataFim"></div>
+                      <div class="col"><label>Funcionário</label><select id="relRetFuncionario"><option value="">Todos</option></select></div>
+                      <div class="col"><label>Material</label><select id="relRetMaterial"><option value="">Todos</option></select></div>
+                  </div>
+                  <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;">
+                      <button class="btn btn-outline" onclick="window.filtroRetiradasHoje()"><i data-lucide="calendar-days"></i> HOJE</button>
+                      <button class="btn btn-outline" onclick="window.filtroRetiradasMes()"><i data-lucide="calendar-range"></i> MÊS ATUAL</button>
+                      <button class="btn btn-estoque" onclick="window.renderRelatorioRetiradas()"><i data-lucide="search"></i> FILTRAR</button>
+                      <button class="btn btn-outline" onclick="window.limparFiltroRetiradas()"><i data-lucide="eraser"></i> LIMPAR</button>
+                      <button class="btn btn-outline" style="margin-left:auto; border-color:var(--estoque); color:var(--estoque);" onclick="window.gerarPDFRetiradas()"><i data-lucide="file-down"></i> GERAR PDF</button>
+                  </div>
+              </div>
+
+              <div class="dash-grid">
+                  <div class="dash-card" style="border-left:4px solid var(--danger);"><h3>Retiradas encontradas</h3><div class="value" id="relRetQtdMov">0</div></div>
+                  <div class="dash-card" style="border-left:4px solid var(--info);"><h3>Funcionários</h3><div class="value" id="relRetQtdFunc">0</div></div>
+                  <div class="dash-card" style="border-left:4px solid var(--estoque);"><h3>Materiais diferentes</h3><div class="value" id="relRetQtdItens">0</div></div>
+              </div>
+
+              <div class="card-panel">
+                  <div id="relRetResumo" style="font-size:12px; color:var(--text-muted); margin-bottom:12px;"></div>
+                  <div class="table-container">
+                      <table>
+                          <thead><tr><th>Data/Hora</th><th>Funcionário</th><th>Material</th><th style="text-align:center;">Quantidade</th><th>Uso / Destino</th></tr></thead>
+                          <tbody id="tabelaRelatorioRetiradas"></tbody>
+                      </table>
+                  </div>
+              </div>
+          </div>
+
       </div>
   </main>
 </div>
@@ -512,6 +612,9 @@
     let empresaSelecionada = 'MARBE';
     let itensPedidoAtual = [];
     let produtoSelecionadoNoCarrinho = null;
+    let empresaSolicitacaoSelecionada = 'MARBE';
+    let itensSolicitacaoAtual = [];
+    let relatorioRetiradasAtual = [];
 
     window.abrirModulo = function(modulo) {
         document.querySelectorAll('.local-menu .tab-btn').forEach(e => e.classList.remove('active', 'active-estoque'));
@@ -525,7 +628,7 @@
             document.getElementById('submenu-compras').style.display = 'flex';
             document.getElementById('mainTitle').innerText = 'Módulo Oficial de Compras';
             document.documentElement.style.setProperty('--primary', '#f97316');
-            window.tabSection('tab-pedido');
+            window.tabSection('tab-solicitacao', document.getElementById('btn-tab-solicitacao'));
         } else if(modulo === 'cadastros') {
             document.getElementById('btn-cadastros').classList.add('active');
             document.getElementById('submenu-cadastros').style.display = 'flex';
@@ -553,7 +656,7 @@
         
         document.getElementById(id).classList.add('active');
         if(btnElement) {
-            if(id.includes('saldos') || id.includes('extrato') || id.includes('baixa')) btnElement.classList.add('active-estoque');
+            if(id.includes('saldos') || id.includes('extrato') || id.includes('baixa') || id.includes('retiradas')) btnElement.classList.add('active-estoque');
             else btnElement.classList.add('active');
         }
         window.updateUI();
@@ -572,12 +675,17 @@
         window.renderFornecedores();
         window.renderProdutosCompra();
         window.renderHistoricoCompras();
+        window.renderSolicitacoesOrcamento();
         window.renderSaldosEstoque();
         window.renderExtratoEstoque();
+        window.popularFiltrosRetiradas();
+        if(!document.getElementById('relRetDataIni').value && !document.getElementById('relRetDataFim').value) window.filtroRetiradasMes(false);
+        else window.renderRelatorioRetiradas();
         
         let comboForn = `<option value="">-- Selecione um Fornecedor --</option>`;
         (window.marbeDB.compras.fornecedores || []).forEach(f => { comboForn += `<option value="${f.razao}">${f.razao}</option>`; });
         document.getElementById('selectFornecedor').innerHTML = comboForn;
+        document.getElementById('selectFornecedorOrc').innerHTML = comboForn;
 
         let listProd = '';
         (window.marbeDB.compras.produtos || []).forEach(p => { listProd += `<option value="${p.nome}">`; });
@@ -592,6 +700,126 @@
         }
         document.getElementById('baixaItem').innerHTML = comboBaixa;
     }
+
+    // --- SOLICITAÇÃO DE ORÇAMENTO AO FORNECEDOR ---
+    window.selecionarEmpresaSolicitacao = function(empresa) {
+        empresaSolicitacaoSelecionada = empresa;
+        document.getElementById('orcBtnMarbe').classList.toggle('active', empresa === 'MARBE');
+        document.getElementById('orcBtnSB').classList.toggle('active', empresa === 'SB');
+    };
+
+    window.preencherUnidadeSolicitacao = function() {
+        const nome = document.getElementById('orcItemNome').value.trim();
+        const prod = (window.marbeDB?.compras?.produtos || []).find(p => (p.nome || '').toLowerCase() === nome.toLowerCase());
+        if(prod && prod.unidade) document.getElementById('orcItemUn').value = prod.unidade;
+        else if(prod && prod.un) document.getElementById('orcItemUn').value = prod.un;
+    };
+
+    window.adicionarItemSolicitacao = function() {
+        const nome = document.getElementById('orcItemNome').value.trim();
+        const qtd = parseFloat(document.getElementById('orcItemQtd').value);
+        const un = document.getElementById('orcItemUn').value.trim().toUpperCase();
+        if(!nome) return alert('Informe o material/insumo que deseja cotar.');
+        if(!qtd || qtd <= 0) return alert('Informe uma quantidade válida.');
+        if(!un) return alert('Informe a unidade do material (ex.: KG, UN, M).');
+        itensSolicitacaoAtual.push({ n: nome, qtd, un });
+        document.getElementById('orcItemNome').value = '';
+        document.getElementById('orcItemQtd').value = '';
+        document.getElementById('orcItemUn').value = '';
+        window.renderItensSolicitacao();
+    };
+
+    window.removerItemSolicitacao = function(i) {
+        itensSolicitacaoAtual.splice(i, 1);
+        window.renderItensSolicitacao();
+    };
+
+    window.renderItensSolicitacao = function() {
+        let html = '';
+        itensSolicitacaoAtual.forEach((it, i) => {
+            html += `<tr><td><strong style="color:var(--info);">${it.n}</strong></td><td style="text-align:center; font-weight:800;">${Number(it.qtd).toLocaleString('pt-BR')}</td><td style="text-align:center;">${it.un}</td><td style="text-align:center;"><button class="btn btn-outline" style="padding:4px; color:var(--danger); border-color:var(--danger);" onclick="window.removerItemSolicitacao(${i})"><i data-lucide="trash-2" style="width:16px;"></i></button></td></tr>`;
+        });
+        document.getElementById('tabelaItensSolicitacao').innerHTML = html || '<tr><td colspan="4" style="text-align:center; padding:30px; color:var(--text-muted);">Nenhum item adicionado.</td></tr>';
+        lucide.createIcons();
+    };
+
+    window.salvarSolicitacaoOrcamento = function() {
+        try {
+            const fornecedor = document.getElementById('selectFornecedorOrc').value;
+            if(!fornecedor) return alert('Selecione o fornecedor que receberá a solicitação.');
+            if(itensSolicitacaoAtual.length === 0) return alert('Adicione pelo menos um material para cotação.');
+            if(!window.marbeDB.compras.solicitacoes) window.marbeDB.compras.solicitacoes = [];
+            if(!Array.isArray(window.marbeDB.compras.solicitacoes)) window.marbeDB.compras.solicitacoes = Object.values(window.marbeDB.compras.solicitacoes);
+            if(!window.marbeDB.compras.seq_solicitacao) window.marbeDB.compras.seq_solicitacao = 1;
+            const numero = window.marbeDB.compras.seq_solicitacao;
+            if(!confirm(`Emitir Solicitação de Orçamento SO-${String(numero).padStart(3,'0')}?\n\nFornecedor: ${fornecedor}\nItens: ${itensSolicitacaoAtual.length}\n\nEsta ação NÃO gera Pedido de Compra, estoque ou financeiro.`)) return;
+            const sol = {
+                so: numero,
+                empresa_solicitante: empresaSolicitacaoSelecionada,
+                fornecedor,
+                itens: JSON.parse(JSON.stringify(itensSolicitacaoAtual)),
+                prazo_resposta: document.getElementById('orcPrazoResposta').value.trim(),
+                referencia: document.getElementById('orcReferencia').value.trim(),
+                obs: document.getElementById('orcObs').value.trim(),
+                data_emissao: new Date().toISOString(),
+                status: 'COTAÇÃO SOLICITADA'
+            };
+            window.marbeDB.compras.seq_solicitacao++;
+            window.marbeDB.compras.solicitacoes.push(sol);
+            window.salvarNuvem(true);
+            window.gerarPDFSolicitacaoOrcamento(numero);
+            itensSolicitacaoAtual = [];
+            ['selectFornecedorOrc','orcPrazoResposta','orcReferencia','orcObs'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+            window.renderItensSolicitacao();
+            window.renderSolicitacoesOrcamento();
+            alert(`Solicitação de Orçamento SO-${String(numero).padStart(3,'0')} registrada.\n\nNenhuma movimentação de estoque ou financeiro foi criada.`);
+        } catch(e) {
+            alert('Erro ao gerar a Solicitação de Orçamento: ' + e.message);
+        }
+    };
+
+    window.renderSolicitacoesOrcamento = function() {
+        const lista = [...(window.marbeDB?.compras?.solicitacoes || [])].reverse();
+        let html = '';
+        lista.forEach(sol => {
+            const data = sol.data_emissao ? new Date(sol.data_emissao).toLocaleDateString('pt-BR') : '-';
+            const numero = String(sol.so || 0).padStart(3,'0');
+            html += `<div class="card-list" style="border-left-color:var(--info);"><div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;"><div><strong style="color:var(--text-main);">SO-${numero} — ${sol.fornecedor || '-'}</strong><br><span style="font-size:12px;color:var(--text-muted);">Emitida em ${data} • ${(sol.itens || []).length} item(ns)</span></div><span style="font-size:10px;font-weight:800;padding:5px 8px;border-radius:6px;background:rgba(59,130,246,.15);color:#60a5fa;">${sol.status || 'COTAÇÃO SOLICITADA'}</span></div><div style="margin-top:12px;text-align:right;"><button class="btn btn-outline" style="border-color:var(--info);color:var(--info);" onclick="window.gerarPDFSolicitacaoOrcamento(${Number(sol.so)})"><i data-lucide="printer"></i> GERAR PDF</button></div></div>`;
+        });
+        const alvo = document.getElementById('listaSolicitacoesOrcamento');
+        if(alvo) alvo.innerHTML = html || '<div style="text-align:center;padding:25px;color:var(--text-muted);">Nenhuma solicitação de orçamento emitida.</div>';
+        lucide.createIcons();
+    };
+
+    window.gerarPDFSolicitacaoOrcamento = function(numeroSO) {
+        const sol = (window.marbeDB?.compras?.solicitacoes || []).find(x => Number(x.so) === Number(numeroSO));
+        if(!sol) return alert('Solicitação não encontrada.');
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const isMarbe = sol.empresa_solicitante === 'MARBE';
+        const razao = isMarbe ? 'GRUPO MARBE POLIURETANO ALTA PERFORMANCE LTDA' : 'SB COMERCIO DE BORRACHAS E SERVICOS LTDA';
+        const cnpj = isMarbe ? '41.755.585/0001-37' : '61.149.312/0001-56';
+        const forn = (window.marbeDB.compras.fornecedores || []).find(f => f.razao === sol.fornecedor);
+        const numero = String(sol.so || 0).padStart(3,'0');
+        doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.text('SOLICITAÇÃO DE ORÇAMENTO',105,18,{align:'center'});
+        doc.setFontSize(11); doc.setTextColor(37,99,235); doc.text(`SO-${numero}`,105,25,{align:'center'}); doc.setTextColor(0,0,0);
+        doc.setLineWidth(.4); doc.line(18,30,192,30);
+        doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.text('EMPRESA SOLICITANTE:',18,39); doc.setFont('helvetica','normal');
+        doc.text(`${razao} | CNPJ: ${cnpj}`,18,45); doc.text('Entrega/Faturamento: Rua São Carlos, 84 - Vila Mariana - Ribeirão Preto/SP',18,50);
+        doc.setFont('helvetica','bold'); doc.text('FORNECEDOR:',18,60); doc.setFont('helvetica','normal'); doc.text(`${sol.fornecedor || '-'}`,18,66);
+        if(forn) { doc.text(`CNPJ: ${forn.cnpj || '-'} | Contato: ${forn.contato || '-'} | Tel: ${forn.telefone || '-'}`,18,71); if(forn.email) doc.text(`E-mail: ${forn.email}`,18,76); }
+        const body = (sol.itens || []).map(it => [String(it.n || '').toUpperCase(), Number(it.qtd || 0).toLocaleString('pt-BR'), it.un || '', '', '']);
+        doc.autoTable({ startY: forn && forn.email ? 84 : 79, head:[['MATERIAL / DESCRIÇÃO','QTD','UN','PREÇO UNIT.','TOTAL']], body, theme:'grid', headStyles:{fillColor:[37,99,235]}, styles:{fontSize:8.5,cellPadding:3}, columnStyles:{1:{halign:'center'},2:{halign:'center'},3:{halign:'right'},4:{halign:'right'}} });
+        let y = doc.lastAutoTable.finalY + 10;
+        doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.text('FAVOR INFORMAR NA PROPOSTA:',18,y); doc.setFont('helvetica','normal');
+        y+=6; doc.text('• Preço unitário e total  • Prazo de entrega  • Frete  • Condição de pagamento  • Validade da proposta',18,y);
+        if(sol.prazo_resposta) { y+=7; doc.setFont('helvetica','bold'); doc.text(`PRAZO DE RETORNO SOLICITADO: ${sol.prazo_resposta}`,18,y); }
+        if(sol.referencia) { y+=7; doc.setFont('helvetica','normal'); doc.text(`Referência/Contato: ${sol.referencia}`,18,y); }
+        if(sol.obs) { y+=8; doc.setFont('helvetica','bold'); doc.text('OBSERVAÇÕES:',18,y); doc.setFont('helvetica','normal'); const obs=doc.splitTextToSize(sol.obs,170); doc.text(obs,18,y+5); }
+        const emissao = sol.data_emissao ? new Date(sol.data_emissao).toLocaleString('pt-BR') : new Date().toLocaleString('pt-BR');
+        doc.setFontSize(8); doc.setTextColor(100); doc.text(`Emitido em ${emissao}. Documento de cotação — não constitui Pedido de Compra.`,105,286,{align:'center'});
+        window.abrirPDFMobile(doc.output('blob'), `SOLICITACAO_ORCAMENTO_SO${numero}_${sol.fornecedor}`);
+    };
 
     // --- CADASTRO FORNECEDORES ---
     window.buscaCNPJFornecedor = async function(v) {
@@ -895,6 +1123,104 @@
         let cat = document.getElementById('baixaCategoria').value; if(cat === 'Matéria-Prima') document.getElementById('blocoOSDestino').style.display = 'block'; else document.getElementById('blocoOSDestino').style.display = 'none';
     };
 
+    window._dataLocalMov = function(valor) {
+        const d = new Date(valor);
+        if(Number.isNaN(d.getTime())) return '';
+        const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+        return `${y}-${m}-${day}`;
+    };
+
+    window.popularFiltrosRetiradas = function() {
+        const saidas = (window.marbeDB?.almoxarifado?.movimentacoes || []).filter(m => m.tipo === 'SAÍDA');
+        const funcs = [...new Set(saidas.map(m => (m.funcionario || m.origem || '').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+        const mats = [...new Set(saidas.map(m => (m.item || '').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+        const elF = document.getElementById('relRetFuncionario'), elM = document.getElementById('relRetMaterial');
+        if(!elF || !elM) return;
+        const atualF = elF.value, atualM = elM.value;
+        elF.innerHTML = '<option value="">Todos</option>' + funcs.map(x=>`<option value="${x.replace(/"/g,'&quot;')}">${x}</option>`).join('');
+        elM.innerHTML = '<option value="">Todos</option>' + mats.map(x=>`<option value="${x.replace(/"/g,'&quot;')}">${x}</option>`).join('');
+        if(funcs.includes(atualF)) elF.value = atualF;
+        if(mats.includes(atualM)) elM.value = atualM;
+    };
+
+    window._hojeLocal = function() {
+        if(window.MarbeDate?.today) return window.MarbeDate.today();
+        const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    };
+
+    window.filtroRetiradasHoje = function(renderizar=true) {
+        const hoje = window._hojeLocal();
+        document.getElementById('relRetDataIni').value = hoje;
+        document.getElementById('relRetDataFim').value = hoje;
+        if(renderizar) window.renderRelatorioRetiradas();
+    };
+
+    window.filtroRetiradasMes = function(renderizar=true) {
+        const hoje = window._hojeLocal();
+        document.getElementById('relRetDataIni').value = hoje.slice(0,7) + '-01';
+        document.getElementById('relRetDataFim').value = hoje;
+        if(renderizar) window.renderRelatorioRetiradas();
+    };
+
+    window.limparFiltroRetiradas = function() {
+        ['relRetDataIni','relRetDataFim','relRetFuncionario','relRetMaterial'].forEach(id=>document.getElementById(id).value='');
+        window.renderRelatorioRetiradas();
+    };
+
+    window.renderRelatorioRetiradas = function() {
+        const ini = document.getElementById('relRetDataIni')?.value || '';
+        const fim = document.getElementById('relRetDataFim')?.value || '';
+        const func = document.getElementById('relRetFuncionario')?.value || '';
+        const mat = document.getElementById('relRetMaterial')?.value || '';
+        if(ini && fim && ini > fim) return alert('A Data Inicial não pode ser maior que a Data Final.');
+        let saidas = (window.marbeDB?.almoxarifado?.movimentacoes || []).filter(m => m.tipo === 'SAÍDA');
+        saidas = saidas.filter(m => {
+            const data = window._dataLocalMov(m.data);
+            const funcionario = (m.funcionario || m.origem || '').trim();
+            if(ini && (!data || data < ini)) return false;
+            if(fim && (!data || data > fim)) return false;
+            if(func && funcionario !== func) return false;
+            if(mat && (m.item || '') !== mat) return false;
+            return true;
+        }).sort((a,b) => new Date(b.data) - new Date(a.data));
+        relatorioRetiradasAtual = saidas;
+        let html='';
+        saidas.forEach(m => {
+            const d = new Date(m.data); const dataFmt = Number.isNaN(d.getTime()) ? '-' : d.toLocaleString('pt-BR');
+            const funcionario = m.funcionario || m.origem || '-';
+            html += `<tr><td style="font-size:12px;color:var(--text-muted);white-space:nowrap;">${dataFmt}</td><td><strong style="color:var(--text-main);">${funcionario}</strong></td><td>${m.item || '-'}</td><td style="text-align:center;font-weight:800;color:var(--danger);">${Number(m.qtd || 0).toLocaleString('pt-BR')} ${m.un || ''}</td><td>${m.destino || m.categoria || '-'}</td></tr>`;
+        });
+        document.getElementById('tabelaRelatorioRetiradas').innerHTML = html || '<tr><td colspan="5" style="text-align:center;padding:35px;color:var(--text-muted);">Nenhuma retirada encontrada para os filtros informados.</td></tr>';
+        const funcionarios = new Set(saidas.map(m => m.funcionario || m.origem).filter(Boolean));
+        const materiais = new Set(saidas.map(m => m.item).filter(Boolean));
+        document.getElementById('relRetQtdMov').innerText = saidas.length;
+        document.getElementById('relRetQtdFunc').innerText = funcionarios.size;
+        document.getElementById('relRetQtdItens').innerText = materiais.size;
+        const periodo = ini || fim ? `${ini ? new Date(ini+'T12:00:00').toLocaleDateString('pt-BR') : 'início'} até ${fim ? new Date(fim+'T12:00:00').toLocaleDateString('pt-BR') : 'hoje'}` : 'todo o histórico';
+        document.getElementById('relRetResumo').innerHTML = `<strong>Período:</strong> ${periodo}${func ? ` &nbsp;•&nbsp; <strong>Funcionário:</strong> ${func}` : ''}${mat ? ` &nbsp;•&nbsp; <strong>Material:</strong> ${mat}` : ''}`;
+        lucide.createIcons();
+    };
+
+    window.gerarPDFRetiradas = function() {
+        window.renderRelatorioRetiradas();
+        const lista = relatorioRetiradasAtual || [];
+        if(lista.length === 0) return alert('Não há retiradas no filtro atual para gerar o relatório.');
+        const ini = document.getElementById('relRetDataIni').value, fim = document.getElementById('relRetDataFim').value;
+        const func = document.getElementById('relRetFuncionario').value, mat = document.getElementById('relRetMaterial').value;
+        const { jsPDF } = window.jspdf; const doc = new jsPDF('landscape');
+        doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.text('RELATÓRIO DE RETIRADAS DE MATERIAL',148,16,{align:'center'});
+        doc.setFontSize(9); doc.setFont('helvetica','normal');
+        const periodo = ini || fim ? `${ini ? new Date(ini+'T12:00:00').toLocaleDateString('pt-BR') : 'início'} a ${fim ? new Date(fim+'T12:00:00').toLocaleDateString('pt-BR') : 'hoje'}` : 'Todo o histórico';
+        doc.text(`Período: ${periodo} | Funcionário: ${func || 'Todos'} | Material: ${mat || 'Todos'}`,14,24);
+        const funcs = new Set(lista.map(m=>m.funcionario || m.origem).filter(Boolean));
+        doc.text(`Retiradas: ${lista.length} | Funcionários: ${funcs.size}`,14,30);
+        const body = lista.map(m => {
+            const d=new Date(m.data); return [Number.isNaN(d.getTime())?'-':d.toLocaleString('pt-BR'), m.funcionario || m.origem || '-', m.item || '-', `${Number(m.qtd || 0).toLocaleString('pt-BR')} ${m.un || ''}`, m.destino || m.categoria || '-'];
+        });
+        doc.autoTable({startY:36, head:[['DATA/HORA','FUNCIONÁRIO','MATERIAL','QTD','USO / DESTINO']], body, theme:'grid', headStyles:{fillColor:[139,92,246]}, styles:{fontSize:8,cellPadding:2.5}, columnStyles:{0:{cellWidth:42},1:{cellWidth:52},3:{halign:'center',cellWidth:35}}});
+        const hoje=window._hojeLocal(); window.abrirPDFMobile(doc.output('blob'), `RELATORIO_RETIRADAS_${ini || 'INICIO'}_${fim || hoje}`);
+    };
+
     window.registrarSaida = function() {
         try {
             let nomeItem = document.getElementById('baixaItem').value; let qtd = parseFloat(document.getElementById('baixaQtd').value); let funcionario = document.getElementById('baixaFuncionario').value.trim(); let categoria = document.getElementById('baixaCategoria').value; let osDestino = document.getElementById('baixaOS').value.trim();
@@ -907,7 +1233,7 @@
             if(!window.marbeDB.almoxarifado.movimentacoes) window.marbeDB.almoxarifado.movimentacoes = [];
             if(!Array.isArray(window.marbeDB.almoxarifado.movimentacoes)) window.marbeDB.almoxarifado.movimentacoes = Object.values(window.marbeDB.almoxarifado.movimentacoes);
 
-            window.marbeDB.almoxarifado.movimentacoes.push({ data: new Date().toISOString(), tipo: 'SAÍDA', item: nomeItem, qtd: qtd, un: saldoObj.un, origem: funcionario, destino: categoria === 'Matéria-Prima' ? `OS: ${osDestino}` : 'Consumo Geral' });
+            window.marbeDB.almoxarifado.movimentacoes.push({ data: new Date().toISOString(), tipo: 'SAÍDA', item: nomeItem, qtd: qtd, un: saldoObj.un, origem: funcionario, funcionario: funcionario, categoria: categoria, os: categoria === 'Matéria-Prima' ? osDestino : '', destino: categoria === 'Matéria-Prima' ? `OS: ${osDestino}` : 'Consumo Geral' });
             window.salvarNuvem(true); alert(`Retirada autorizada.`);
             ['baixaItem','baixaQtd','baixaFuncionario','baixaOS'].forEach(id=>document.getElementById(id).value=''); document.getElementById('avisoSaldoBaixa').innerText = ''; window.updateUI(); window.tabSection('tab-saldos', document.getElementById('btn-tab-saldos'));
         } catch(e) {
