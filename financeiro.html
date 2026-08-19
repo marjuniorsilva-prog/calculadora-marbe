@@ -285,7 +285,7 @@
                   
                   <div class="dash-grid" style="margin-top:20px;">
                       <div class="dash-card" style="background:rgba(16, 185, 129, 0.05); border-color:var(--success);">
-                          <h3 style="color:var(--success)">Total de Entradas (Pagas)</h3>
+                          <h3 style="color:var(--success)">Total de Entradas (Recebidas)</h3>
                           <div class="value" id="dreEntradas" style="color:var(--success); font-size:24px;">R$ 0,00</div>
                       </div>
                       <div class="dash-card" style="background:rgba(239, 68, 68, 0.05); border-color:var(--danger);">
@@ -298,7 +298,17 @@
                       </div>
                   </div>
 
-                  <h3 style="margin-top:40px; margin-bottom:15px; color:var(--text-main); font-size:16px;"><i data-lucide="list"></i> Extrato de Contas Pagas/Recebidas (No Mês Selecionado)</h3>
+                  <div style="margin-top:40px; margin-bottom:15px; display:flex; align-items:end; justify-content:space-between; gap:15px; flex-wrap:wrap;">
+                      <h3 style="margin:0; color:var(--text-main); font-size:16px;"><i data-lucide="list"></i> Extrato de Contas Pagas/Recebidas (No Mês Selecionado)</h3>
+                      <div style="min-width:245px;">
+                          <label style="font-size:11px; margin-bottom:5px; color:var(--text-muted);">Exibir no extrato</label>
+                          <select id="filtroExtratoTipo" onchange="window.renderDRE()" style="margin:0; padding:9px;">
+                              <option value="TODOS">Todos os movimentos</option>
+                              <option value="SAIDA">Somente contas pagas</option>
+                              <option value="ENTRADA">Somente contas recebidas</option>
+                          </select>
+                      </div>
+                  </div>
                   <div class="table-container">
                       <table>
                           <thead><tr><th>Data Pagamento</th><th>Descrição / Categoria</th><th style="text-align:center;">Status</th><th style="text-align:right;">Valor</th><th style="text-align:center;">Ações</th></tr></thead>
@@ -538,61 +548,111 @@
         document.getElementById('kpiAPagar').innerText = window.fmtMoney(aPagar);
     };
 
+    // --- DATAS FINANCEIRAS: COMPATIBILIDADE COM LANÇAMENTOS NOVOS E ANTIGOS ---
+    function normalizarDataFinanceira(valor) {
+        if(valor === null || valor === undefined || valor === '') return '';
+
+        if(typeof valor === 'number' || /^\d{10,13}$/.test(String(valor).trim())) {
+            let n = Number(valor);
+            if(Number.isFinite(n)) {
+                if(n > 0 && n < 100000000000) n *= 1000; // timestamp em segundos
+                const d = new Date(n);
+                if(!Number.isNaN(d.getTime())) return window.MarbeDate.date(d);
+            }
+        }
+
+        const s = String(valor).trim();
+        let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); // AAAA-MM-DD ou ISO com hora
+        if(m) return `${m[1]}-${m[2]}-${m[3]}`;
+
+        m = s.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})(?:\D|$)/); // DD/MM/AAAA ou DD-MM-AAAA
+        if(m) return `${m[3]}-${m[2]}-${m[1]}`;
+
+        m = s.match(/^(\d{4})\/(\d{2})\/(\d{2})(?:\D|$)/); // AAAA/MM/DD
+        if(m) return `${m[1]}-${m[2]}-${m[3]}`;
+
+        const d = new Date(s);
+        return Number.isNaN(d.getTime()) ? '' : window.MarbeDate.date(d);
+    }
+
+    function dataLiquidacaoFinanceira(t) {
+        // Alguns lançamentos antigos usavam nomes de campos diferentes.
+        const candidatos = [
+            t.data_pagamento, t.data_baixa, t.dataBaixa, t.dataPagamento,
+            t.data_recebimento, t.data_recebido, t.dataRecebimento,
+            t.vencimento, t.data
+        ];
+        for(const valor of candidatos) {
+            const normalizada = normalizarDataFinanceira(valor);
+            if(normalizada) return normalizada;
+        }
+        return '';
+    }
+
     // --- RENDERIZAR DRE E EXTRATO (SOMENTE CONTAS LIQUIDADAS) ---
     window.renderDRE = function() {
-        let filtroMesAno = document.getElementById('filtroMesAno').value; // YYYY-MM
-        if(!filtroMesAno) return;
+        const filtroMesAno = document.getElementById('filtroMesAno').value; // YYYY-MM
+        if(!filtroMesAno || !window.marbeDB?.financeiro) return;
 
+        const filtroExtrato = document.getElementById('filtroExtratoTipo')?.value || 'TODOS';
         let totalEntradas = 0;
         let totalSaidas = 0;
         let htmlExtrato = '';
+        let movimentosNoMes = 0;
+        let movimentosExibidos = 0;
 
-        // Ordenar por data de pagamento
-        let transacoesOrdenadas = [...window.marbeDB.financeiro.transacoes].map((t, idx) => ({...t, originalIdx: idx}));
-        transacoesOrdenadas.sort((a,b) => {
-            let dA = a.data_pagamento || a.vencimento;
-            let dB = b.data_pagamento || b.vencimento;
-            return dA.localeCompare(dB);
-        });
+        // Ordena pela data REAL de liquidação, aceitando também formatos antigos de data.
+        const transacoesOrdenadas = [...(window.marbeDB.financeiro.transacoes || [])]
+            .map((t, idx) => ({...t, originalIdx: idx, _dataLiquidacao: dataLiquidacaoFinanceira(t)}))
+            .sort((a,b) => String(a._dataLiquidacao || '9999-12-31').localeCompare(String(b._dataLiquidacao || '9999-12-31')));
 
         transacoesOrdenadas.forEach(t => {
-            // DRE SÓ LÊ O QUE FOI PAGO DE VERDADE
-            if(t.status === 'PAGO' || t.status === 'RECEBIDO') {
-                let dataReferencia = t.data_pagamento || t.vencimento || t.data; // Pega a data que foi pago
-                
-                if(dataReferencia && dataReferencia.startsWith(filtroMesAno)) {
-                    let val = parseFloat(t.valor) || 0;
-                    
-                    if(t.tipo === 'ENTRADA') totalEntradas += val;
-                    if(t.tipo === 'SAIDA') totalSaidas += val;
+            if(t.status !== 'PAGO' && t.status !== 'RECEBIDO') return;
 
-                    let isEntrada = t.tipo === 'ENTRADA';
-                    let corTexto = isEntrada ? 'var(--success)' : 'var(--danger)';
-                    let sinal = isEntrada ? '+' : '-';
-                    let dtFmt = dataReferencia.split('-').reverse().join('/');
+            const dataReferencia = t._dataLiquidacao;
+            if(!dataReferencia || !dataReferencia.startsWith(filtroMesAno)) return;
 
-                    htmlExtrato += `<tr>
-                        <td style="font-weight:600; color:var(--text-muted);">${dtFmt}</td>
-                        <td><strong style="color:var(--text-main); font-size:14px;">${t.descricao}</strong><br><span style="font-size:11px; color:var(--text-muted);">${t.categoria}</span>${t.tipo === 'ENTRADA' && t.valor_previsto && Math.abs(Number(t.valor_previsto)-Number(t.valor)) > 0.009 ? `<br><span style="font-size:11px; color:var(--warning);">Previsto: ${window.fmtMoney(t.valor_previsto)} | Diferença: ${window.fmtMoney(Number(t.valor_previsto)-Number(t.valor))}</span>` : ''}</td>
-                        <td style="text-align:center;"><span class="badge-status badge-pago"><i data-lucide="check" style="width:12px; vertical-align:middle;"></i> LIQUIDADO</span></td>
-                        <td style="text-align:right; font-weight:800; font-size:15px; color:${corTexto};">${sinal} ${window.fmtMoney(val)}</td>
-                        <td style="text-align:center;">
-                            <button class="btn btn-outline" style="padding:4px; color:var(--danger); border:none;" title="Cancelar lançamento" onclick="window.cancelarTransacao(${t.originalIdx})"><i data-lucide="ban" style="width:16px;"></i></button>
-                        </td>
-                    </tr>`;
-                }
-            }
+            movimentosNoMes++;
+            const val = parseFloat(t.valor) || 0;
+            if(t.tipo === 'ENTRADA') totalEntradas += val;
+            if(t.tipo === 'SAIDA') totalSaidas += val;
+
+            // O filtro abaixo altera apenas o extrato. Os cartões do DRE continuam mostrando o mês completo.
+            if(filtroExtrato !== 'TODOS' && t.tipo !== filtroExtrato) return;
+            movimentosExibidos++;
+
+            const isEntrada = t.tipo === 'ENTRADA';
+            const corTexto = isEntrada ? 'var(--success)' : 'var(--danger)';
+            const sinal = isEntrada ? '+' : '-';
+            const dtFmt = dataReferencia.split('-').reverse().join('/');
+            const statusLabel = isEntrada ? 'RECEBIDO' : 'PAGO';
+            const categoria = t.categoria || 'Sem categoria';
+            const descricao = t.descricao || 'Movimentação financeira';
+
+            htmlExtrato += `<tr>
+                <td style="font-weight:600; color:var(--text-muted);">${dtFmt}</td>
+                <td><strong style="color:var(--text-main); font-size:14px;">${escHtml(descricao)}</strong><br><span style="font-size:11px; color:var(--text-muted);">${escHtml(categoria)}</span>${t.tipo === 'ENTRADA' && t.valor_previsto && Math.abs(Number(t.valor_previsto)-Number(t.valor)) > 0.009 ? `<br><span style="font-size:11px; color:var(--warning);">Previsto: ${window.fmtMoney(t.valor_previsto)} | Diferença: ${window.fmtMoney(Number(t.valor_previsto)-Number(t.valor))}</span>` : ''}</td>
+                <td style="text-align:center;"><span class="badge-status badge-pago"><i data-lucide="check" style="width:12px; vertical-align:middle;"></i> ${statusLabel}</span></td>
+                <td style="text-align:right; font-weight:800; font-size:15px; color:${corTexto};">${sinal} ${window.fmtMoney(val)}</td>
+                <td style="text-align:center;">
+                    <button class="btn btn-outline" style="padding:4px; color:var(--danger); border:none;" title="Cancelar lançamento" onclick="window.cancelarTransacao(${t.originalIdx})"><i data-lucide="ban" style="width:16px;"></i></button>
+                </td>
+            </tr>`;
         });
 
         document.getElementById('dreEntradas').innerText = window.fmtMoney(totalEntradas);
         document.getElementById('dreSaidas').innerText = window.fmtMoney(totalSaidas);
-        
-        let resultado = totalEntradas - totalSaidas;
-        let resultEl = document.getElementById('dreResultado');
+
+        const resultado = totalEntradas - totalSaidas;
+        const resultEl = document.getElementById('dreResultado');
         resultEl.innerText = window.fmtMoney(resultado);
         resultEl.style.color = resultado >= 0 ? 'var(--success)' : 'var(--danger)';
 
-        document.getElementById('tabelaExtrato').innerHTML = htmlExtrato || '<tr><td colspan="5" style="text-align:center; padding:30px; color:var(--text-muted);">Nenhuma movimentação liquidada neste mês.</td></tr>';
+        let vazio = 'Nenhuma movimentação liquidada neste mês.';
+        if(movimentosNoMes > 0 && movimentosExibidos === 0) {
+            vazio = filtroExtrato === 'SAIDA' ? 'Não há contas pagas neste mês para este filtro.' : 'Não há contas recebidas neste mês para este filtro.';
+        }
+        document.getElementById('tabelaExtrato').innerHTML = htmlExtrato || `<tr><td colspan="5" style="text-align:center; padding:30px; color:var(--text-muted);">${vazio}</td></tr>`;
         lucide.createIcons();
     };
 
@@ -946,16 +1006,16 @@
         if(t.status === 'CANCELADO') return 'CANCELADO';
         if(t.status === 'AGUARDANDO_PROGRAMACAO') return 'AGUARDANDO_PROGRAMACAO';
         if(t.status === 'PENDENTE') {
-            const v = t.vencimento || t.data || '';
+            const v = normalizarDataFinanceira(t.vencimento || t.data || '');
             return v && v < window.MarbeDate.today() ? 'ATRASADO' : 'PENDENTE';
         }
         return t.status || 'OUTRO';
     }
 
     function relFinDataReferencia(t) {
-        if(t.status === 'PAGO' || t.status === 'RECEBIDO') return t.data_pagamento || t.vencimento || t.data || '';
-        if(t.status === 'CANCELADO') return t.data_cancelamento || t.vencimento || t.data || '';
-        return t.vencimento || t.data || t.data_recebimento || '';
+        if(t.status === 'PAGO' || t.status === 'RECEBIDO') return dataLiquidacaoFinanceira(t);
+        if(t.status === 'CANCELADO') return normalizarDataFinanceira(t.data_cancelamento || t.vencimento || t.data || '');
+        return normalizarDataFinanceira(t.vencimento || t.data || t.data_recebimento || '');
     }
 
     function relFinLabelStatus(st) {
