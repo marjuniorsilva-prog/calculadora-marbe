@@ -13,9 +13,12 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   
   <!-- Core Logic e Firebase (INTOCÁVEL) -->
+    <script src="marbe_guard.js"></script>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { loginWithGoogle, logoutFirebase, observeAuthorizedUser, applyUserProfile, authErrorMessage } from "./marbe_auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyATu_V6e1shKRpgBOkX1lw2beyzUEZUCo0",
@@ -35,22 +38,102 @@
         carregarRascunho();
     });
 
-    onValue(ref(db, 'sistema/'), (snapshot) => {
-      const data = snapshot.val();
-      if (data) { 
-          window.marbeDB = data; 
-          if(!window.filtrosIniciados) {
-              let hoje = new Date();
-              let seteAtras = new Date(); seteAtras.setDate(hoje.getDate() - 7);
-              document.getElementById('filtroInicio').value = seteAtras.toISOString().split('T')[0];
-              document.getElementById('filtroFim').value = hoje.toISOString().split('T')[0];
-              window.filtrosIniciados = true;
-          }
-          updateUI(); 
+    let marbeDbListenerStarted = false;
+    function iniciarLeituraBancoAutenticada() {
+      if (marbeDbListenerStarted) return;
+      marbeDbListenerStarted = true;
+      onValue(ref(db, 'sistema/'), (snapshot) => {
+        const data = snapshot.val();
+        if (data) { 
+            window.marbeDB = data; 
+            if(!window.filtrosIniciados) {
+                let hoje = new Date();
+                let seteAtras = new Date(); seteAtras.setDate(hoje.getDate() - 7);
+                const inicio = document.getElementById('filtroInicio');
+                const fim = document.getElementById('filtroFim');
+                if(inicio) inicio.value = seteAtras.toISOString().split('T')[0];
+                if(fim) fim.value = hoje.toISOString().split('T')[0];
+                window.filtrosIniciados = true;
+            }
+            updateUI(); 
+        }
+      }, (error) => {
+        console.error('Firebase Realtime Database:', error);
+        alert('O Firebase recusou o acesso ao banco. Confira se as regras de segurança foram publicadas e se você entrou com a conta autorizada.');
+      });
+    }
+
+    function mostrarAplicacaoAutenticada(user) {
+      const run = () => {
+        applyUserProfile(user);
+        if (typeof window.iniciarSessao === 'function') window.iniciarSessao();
+        else {
+          const login = document.getElementById('loginScreen');
+          const appEl = document.getElementById('appContainer');
+          if(login) login.style.display = 'none';
+          if(appEl) appEl.style.display = 'flex';
+        }
+      };
+      if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run, {once:true}); else run();
+    }
+
+    function mostrarLoginFirebase(mensagem = '') {
+      const run = () => {
+        const login = document.getElementById('loginScreen');
+        const appEl = document.getElementById('appContainer');
+        const msg = document.getElementById('loginFirebaseMsg');
+        if(login) login.style.display = 'flex';
+        if(appEl) appEl.style.display = 'none';
+        if(msg && mensagem) msg.textContent = mensagem;
+      };
+      if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run, {once:true}); else run();
+    }
+
+    window.marbeFirebaseLogin = async function() {
+      const btn = document.getElementById('btnGoogleLogin');
+      const msg = document.getElementById('loginFirebaseMsg');
+      try {
+        if(btn) { btn.disabled = true; btn.textContent = 'ABRINDO GOOGLE...'; }
+        if(msg) msg.textContent = 'Use a conta Google autorizada para entrar.';
+        const user = await loginWithGoogle(app);
+        if(!user) return;
+        const retorno = new URLSearchParams(window.location.search).get('return');
+        if(retorno && !(window.MarbeGuard && window.MarbeGuard.isBlocked())) window.location.href = retorno;
+      } catch(error) {
+        console.error(error);
+        if(msg) msg.textContent = authErrorMessage(error);
+        alert(authErrorMessage(error));
+      } finally {
+        if(btn) { btn.disabled = false; btn.innerHTML = 'ENTRAR COM GOOGLE'; }
+      }
+    };
+
+    window.marbeFirebaseLogout = async function() {
+      try { await logoutFirebase(app); }
+      finally { if(window.MarbeGuard) window.MarbeGuard.logout(); }
+    };
+
+    observeAuthorizedUser(app, ({status, user, error}) => {
+      if(status === 'authorized') {
+        window.MarbeCurrentUser = { email: user.email, displayName: user.displayName, uid: user.uid };
+        if(window.MarbeGuard) window.MarbeGuard.markLoggedIn();
+        iniciarLeituraBancoAutenticada();
+        mostrarAplicacaoAutenticada(user);
+        return;
+      }
+      if(window.MarbeGuard) window.MarbeGuard.logout();
+      if(status === 'denied') {
+        mostrarLoginFirebase('Conta Google sem permissão para este sistema.');
+      } else if(status === 'error') {
+        mostrarLoginFirebase(authErrorMessage(error));
+      } else {
+        const motivo = new URLSearchParams(window.location.search).get('auth');
+        mostrarLoginFirebase(motivo === 'denied' ? 'A conta usada não está autorizada.' : 'Entre com a conta Google autorizada.');
       }
     });
 
-    window.salvarNuvem = function() { 
+    window.salvarNuvem = function() {
+        if (window.MarbeGuard && !window.MarbeGuard.ensureWritable()) return; 
         set(ref(db, 'sistema/'), window.marbeDB)
             .then(() => { console.log("Salvo com sucesso!"); })
             .catch((error) => { alert("Erro ao salvar: " + error.message); });
@@ -124,6 +207,13 @@
     
     .nav-label { font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; margin: 15px 0 8px 10px; letter-spacing: 1px; white-space: nowrap; overflow: hidden; }
     .sidebar.collapsed .nav-label { display: none; }
+    .menu-group { margin: 4px 0; }
+    .menu-group summary { list-style:none; cursor:pointer; color:#64748b; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:1px; padding:12px 10px 8px; display:flex; align-items:center; justify-content:space-between; white-space:nowrap; overflow:hidden; }
+    .menu-group summary::-webkit-details-marker { display:none; }
+    .menu-group summary::after { content:'›'; font-size:17px; transition:transform .2s; }
+    .menu-group[open] summary::after { transform:rotate(90deg); }
+    .sidebar.collapsed .menu-group summary { display:none; }
+    .sidebar.collapsed .menu-group { margin:0; }
     
     .tab-btn { display: flex; align-items: center; padding: 12px 15px; color: #94a3b8; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 14px; transition: all 0.2s; white-space: nowrap; border: none; background: transparent; width: 100%; cursor: pointer; text-align: left; margin-bottom: 4px; }
     .tab-btn i { width: 20px; height: 20px; margin-right: 15px; flex-shrink: 0; color: #64748b; transition: 0.2s; }
@@ -223,12 +313,13 @@
     <div class="login-box">
         <div style="font-size: 36px; font-weight: 800; color: var(--text-main); margin-bottom: 25px; letter-spacing: -1px;">MARBE<span style="color:var(--accent)">ERP</span></div>
         <h2 style="color:var(--text-muted); font-size: 16px; margin-top:0; margin-bottom: 35px; font-weight:500;">Acesso Restrito ao Sistema</h2>
-        <label style="text-align: left;">Usuário de Acesso</label>
-        <input type="text" id="loginUser" class="login-input" placeholder="Admin">
-        <label style="text-align: left; margin-top: 5px;">Senha</label>
-        <input type="password" id="loginPass" class="login-input" placeholder="••••••••">
-        <button class="login-btn" onclick="fazerLogin()">ACESSAR ERP</button>
-        <p style="font-size:12px; color:var(--text-muted); margin-top:30px; font-weight:500;">Versão Dark Mode 35.2 (Fixo)</p>
+        <div style="text-align:left; background:#0f172a; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:16px; color:var(--text-muted); line-height:1.5;">
+            Acesso protegido pelo <strong style="color:var(--text-main);">Firebase Authentication</strong>.<br>
+            Entre usando a conta Google autorizada.
+        </div>
+        <button class="login-btn" id="btnGoogleLogin" onclick="fazerLogin()">ENTRAR COM GOOGLE</button>
+        <p id="loginFirebaseMsg" style="font-size:12px; color:var(--text-muted); margin:16px 0 0; line-height:1.5;">Somente contas autorizadas têm acesso ao banco de dados.</p>
+        <p style="font-size:12px; color:var(--text-muted); margin-top:26px; font-weight:500;">MARBE ERP • Versão 2026.08.18.3</p>
     </div>
 </div>
 
@@ -238,27 +329,28 @@
       <div class="sidebar-brand"><i data-lucide="layers"></i><span>Marbe OS</span></div>
       
       <div class="sidebar-nav">
-          <div class="nav-label">Visão Geral</div>
           <button class="tab-btn" onclick="window.location.href='dashboard.html'"><i data-lucide="layout-dashboard"></i> <span>Dashboard</span></button>
 
-          <div class="nav-label">Comercial</div>
+          <div class="nav-label">Vendas e Orçamentos</div>
           <button class="tab-btn active" onclick="tab('calc')"><i data-lucide="calculator"></i> <span>Calculadora</span></button>
-          <button class="tab-btn" onclick="tab('orc')"><i data-lucide="file-edit"></i> <span>Edição OS</span></button>
+          <button class="tab-btn" onclick="tab('orc')"><i data-lucide="file-edit"></i> <span>Edição da OS</span></button>
           <button class="tab-btn" onclick="window.location.href='crm.html'"><i data-lucide="pie-chart"></i> <span>CRM Vendas</span></button>
+
+          <div class="nav-label">Clientes e Consultas</div>
           <button class="tab-btn" onclick="tab('clientesTab')"><i data-lucide="users"></i> <span>Clientes B2B</span></button>
           <button class="tab-btn" onclick="tab('historico')"><i data-lucide="history"></i> <span>Histórico Geral</span></button>
-
-          <div class="nav-label">Consultas e Dados</div>
           <button class="tab-btn" onclick="window.location.href='pesquisa_descricao.html'"><i data-lucide="search"></i> <span>Pesquisa Avançada</span></button>
 
-          <div class="nav-label">Operação & Fábrica</div>
+          <div class="nav-label">Fábrica e Expedição</div>
           <button class="tab-btn" onclick="tab('producao')"><i data-lucide="hammer"></i> <span>Produção</span></button>
+          <button class="tab-btn" onclick="window.location.href='fap.html'"><i data-lucide="factory"></i> <span>FAP / Apontamentos</span></button>
           <button class="tab-btn" onclick="window.location.href='pedido_entregue.html'"><i data-lucide="package-check"></i> <span>Expedição</span></button>
-          <button class="tab-btn" onclick="tab('suprimentos')"><i data-lucide="boxes"></i> <span>Estoque / Suprimentos</span></button>
-          
+          <button class="tab-btn" onclick="window.location.href='PEDIDO%20DE%20COMPRAS.html'"><i data-lucide="shopping-cart"></i> <span>Compras e Estoque</span></button>
+
           <div class="nav-label">Administração</div>
           <button class="tab-btn" onclick="window.location.href='financeiro.html'"><i data-lucide="circle-dollar-sign"></i> <span>Financeiro</span></button>
           <button class="tab-btn" onclick="tab('cfg')"><i data-lucide="settings"></i> <span>Tabelas de Custo</span></button>
+          <button class="tab-btn" onclick="window.location.href='ABEL%20LIMA.html'"><i data-lucide="wallet"></i> <span>Controle Particular</span></button>
       </div>
       
       <div class="sidebar-footer">
@@ -270,15 +362,8 @@
       <header class="topbar">
           <div class="topbar-left">
               <button class="btn-toggle" onclick="toggleSidebar()"><i data-lucide="menu"></i></button>
-              <div class="search-bar">
-                  <i data-lucide="search"></i>
-                  <input type="text" placeholder="Buscar OS, cliente ou CNPJ...">
-              </div>
           </div>
           <div class="topbar-right">
-              <button class="btn-toggle" style="position:relative;">
-                  <i data-lucide="bell"></i><span style="position:absolute; top:4px; right:6px; width:8px; height:8px; background:var(--danger); border-radius:50%;"></span>
-              </button>
               <div class="user-profile">
                   <div class="avatar">AD</div>
                   <div class="user-info"><span class="user-name">Administrador</span><span class="user-role">Acesso Total</span></div>
@@ -614,18 +699,18 @@
 
 <div id="modal-fechar">
     <div class="modal-content">
-        <h3 style="margin-top:0; font-size:22px; font-weight:800; border-bottom:1px solid var(--border); padding-bottom:20px; margin-bottom:25px;">Aprovação de OP</h3>
-        <p style="font-size:14px; color:var(--text-muted); margin-bottom:30px;">Insira a Ordem de Serviço na fila de produção definindo as datas marco.</p>
+        <h3 style="margin-top:0; font-size:22px; font-weight:800; border-bottom:1px solid var(--border); padding-bottom:20px; margin-bottom:25px;">Iniciar Produção da OS</h3>
+        <p style="font-size:14px; color:var(--text-muted); margin-bottom:30px;">Confirme as datas para colocar esta OS na fila de produção.</p>
         
-        <label>Data de Entrada na Fábrica</label>
+        <label>Data de Entrada na Produção</label>
         <input type="date" id="modal-data-entrada">
         
-        <label>Deadline (Prazo Máximo do Cliente)</label>
+        <label>Data de Entrega Prometida ao Cliente</label>
         <input type="date" id="modal-data-limite">
         
         <div style="display:flex; gap:20px; margin-top:35px;">
             <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('modal-fechar').style.display='none'">CANCELAR</button>
-            <button class="btn btn-success" style="flex:1;" onclick="confirmarFechamento()">LIBERAR OP</button>
+            <button class="btn btn-success" style="flex:1;" onclick="confirmarFechamento()">CONFIRMAR E ENVIAR À PRODUÇÃO</button>
         </div>
     </div>
 </div>
@@ -642,36 +727,48 @@
   }
   
   function fazerLogin() {
-      const u = document.getElementById('loginUser').value; const p = document.getElementById('loginPass').value;
-      if (u === 'Abel' && p === '201000') { localStorage.setItem('marbe_logado', 'true'); iniciarSessao(); } else { alert("Acesso Negado: Credenciais inválidas."); }
+      if (typeof window.marbeFirebaseLogin === 'function') window.marbeFirebaseLogin();
+      else alert('O módulo de autenticação ainda está carregando. Tente novamente.');
   }
   
-  function fazerLogout() { 
-      localStorage.removeItem('marbe_logado'); 
+  async function fazerLogout() { 
+      if(!confirm('Encerrar sua sessão do MARBE ERP neste navegador?')) return;
+      if (typeof window.marbeFirebaseLogout === 'function') await window.marbeFirebaseLogout();
+      if (window.MarbeGuard) window.MarbeGuard.logout();
       document.getElementById('loginScreen').style.display = 'flex'; 
-      document.getElementById('appContainer').style.display = 'none'; 
-      document.getElementById('loginUser').value = ''; document.getElementById('loginPass').value = ''; 
+      document.getElementById('appContainer').style.display = 'none';
+      const msg = document.getElementById('loginFirebaseMsg');
+      if(msg) msg.textContent = 'Sessão encerrada. Entre novamente com a conta Google autorizada.';
   }
   
-  if (localStorage.getItem('marbe_logado') === 'true') { iniciarSessao(); }
-  window.addEventListener('popstate', function(event) { if (localStorage.getItem('marbe_logado') === 'true') { addHistoryState(); } });
+  window.addEventListener('popstate', function() { if (window.MarbeGuard && window.MarbeGuard.isLoggedIn()) addHistoryState(); });
 
   function toggleSidebar() {
-      document.getElementById('sidebar').classList.toggle('collapsed');
+      const sidebar = document.getElementById('sidebar');
+      sidebar.classList.toggle('collapsed');
   }
 
   function tab(id) {
     document.querySelectorAll('.section, .tab-btn').forEach(e => e.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
+    const alvo = document.getElementById(id);
+    if (!alvo) return;
+    alvo.classList.add('active');
     document.querySelectorAll('.tab-btn').forEach(btn => { 
         if(btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(`('${id}')`)) { 
-            btn.classList.add('active'); 
+            btn.classList.add('active');
         } 
     });
     if(id === 'suprimentos') renderSuprimentos();
     if(id === 'producao') renderProducao();
     if(id === 'clientesTab') renderListaClientes();
   }
+
+  // Permite que o menu mestre abra diretamente qualquer aba do ERP, inclusive vindo de outra página.
+  setTimeout(() => {
+      const abaUrl = new URLSearchParams(window.location.search).get('tab');
+      const abasPermitidas = ['calc','orc','clientesTab','historico','producao','suprimentos','cfg'];
+      if (abaUrl && abasPermitidas.includes(abaUrl)) tab(abaUrl);
+  }, 0);
 
   window.salvarRascunho = function() {
       if (idEdicao) return; 
@@ -1131,10 +1228,10 @@
                 <div style="font-size:22px; font-weight:800; color:var(--success); margin:15px 0;">${window.fmtMoney(o.total)}</div>
                 <div style="display:flex; gap:12px; margin-top:20px; flex-wrap:wrap;">
                     <button class="btn btn-outline" style="flex:1;" onclick="gerarPDF('CLIENTE', ${i}, 'orçamentos')"><i data-lucide="file-text" style="width:18px;"></i> PDF Cliente</button>
-                    <button class="btn btn-outline" style="flex:1;" onclick="gerarPDF('PRODUCAO', ${i}, 'orçamentos')"><i data-lucide="factory" style="width:18px;"></i> PDF Prod</button>
+                    <button class="btn btn-outline" style="flex:1;" onclick="gerarPDF('PRODUCAO', ${i}, 'orçamentos')"><i data-lucide="factory" style="width:18px;"></i> PDF Produção</button>
                     <button class="btn" style="background:#451a03; border:1px solid #b45309; color:#fde68a; flex:1;" onclick="gerarGarantia(${i})"><i data-lucide="refresh-ccw" style="width:18px;"></i> Garantia</button>
                     <button class="btn btn-outline" style="flex:1;" onclick="editarExistente('orçamentos', ${i})"><i data-lucide="edit-3" style="width:18px;"></i> Editar</button>
-                    <button class="btn btn-primary" style="flex:1;" onclick="fecharPedido(${i})"><i data-lucide="check-circle" style="width:18px;"></i> Aprovar</button>
+                    <button class="btn btn-primary" style="flex:1;" onclick="fecharPedido(${i})"><i data-lucide="check-circle" style="width:18px;"></i> APROVAR / ENVIAR PRODUÇÃO</button>
                 </div>
             </div>`;
         }
@@ -1182,10 +1279,16 @@
   }
 
   function confirmarFechamento() {
+      const entrada = document.getElementById('modal-data-entrada').value;
+      const limite = document.getElementById('modal-data-limite').value;
+      if(!entrada) return alert('Informe a data de entrada na produção.');
+      if(!limite && !confirm('Esta OS ficará SEM PRAZO no Dashboard. Deseja enviar para a produção mesmo assim?')) return;
       let orc = window.marbeDB.orçamentos.splice(idxFechar, 1)[0];
-      orc.data_entrada = document.getElementById('modal-data-entrada').value; orc.data_limite = document.getElementById('modal-data-limite').value;
+      orc.data_entrada = entrada; orc.data_limite = limite;
       if(!window.marbeDB.pedidos) window.marbeDB.pedidos = []; window.marbeDB.pedidos.push(orc); window.salvarNuvem();
-      document.getElementById('modal-fechar').style.display = 'none'; tab('producao');
+      document.getElementById('modal-fechar').style.display = 'none';
+      alert(`OS ${orc.os} enviada para a Produção com sucesso.`);
+      tab('producao');
   }
 
   function gerarPDFCronograma(tipo) {
@@ -1353,12 +1456,12 @@
             <td style="text-align:center; white-space: nowrap; display:flex; justify-content:center; gap:10px;">
                 <button class="btn btn-outline" style="padding:8px 12px; height:36px;" onclick="gerarPDF('PRODUCAO', ${i}, 'pedidos')" title="PDF Produção"><i data-lucide="printer"></i></button>
                 <button class="btn btn-outline" style="padding:8px 12px; height:36px; color:var(--info); border-color:var(--info);" onclick="editarExistente('pedidos', ${i})" title="Editar"><i data-lucide="edit-3"></i></button>
-                <button class="btn btn-outline" style="padding:8px 12px; height:36px; color:var(--danger); border-color:var(--danger);" onclick="cancelarPedido(${i})" title="Cancelar Pedido"><i data-lucide="x-circle"></i></button>
+                <button class="btn btn-outline" style="padding:8px 12px; height:36px; color:var(--danger); border-color:var(--danger);" onclick="cancelarPedido(${i})" title="Cancelar produção e devolver a OS ao CRM"><i data-lucide="x-circle"></i></button>
                 <button class="btn btn-success" style="padding:8px 15px; height:36px; font-size:12px;" onclick="liberarExpedicao(${i})">LIBERAR EXPEDIÇÃO <i data-lucide="arrow-right" style="width:16px; margin-left:6px;"></i></button>
             </td>
         </tr>`;
     });
-    htmlCron += `</tbody></table>`; document.getElementById('dashboardCronograma').innerHTML = (window.marbeDB.pedidos && window.marbeDB.pedidos.length) ? htmlCron : "<div style='text-align:center; padding:40px; background:var(--card-bg); border-radius:12px; border:1px dashed var(--border); color:var(--text-muted);'><i data-lucide='factory' style='width:40px; height:40px; opacity:0.5; margin-bottom:15px;'></i><p>Nenhum pedido ativo no cronograma.</p></div>";
+    htmlCron += `</tbody></table>`; document.getElementById('dashboardCronograma').innerHTML = (window.marbeDB.pedidos && window.marbeDB.pedidos.length) ? htmlCron : "<div style='text-align:center; padding:40px; background:var(--card-bg); border-radius:12px; border:1px dashed var(--border); color:var(--text-muted);'><i data-lucide='factory' style='width:40px; height:40px; opacity:0.5; margin-bottom:15px;'></i><p>Nenhuma OS ativa na produção.</p></div>";
 
     let htmlTempos = `<table><thead><tr><th>OS - Cliente</th><th>Item</th><th style="text-align:center">Qtd</th><th>Tempo Unit.</th><th>Tempo Total</th></tr></thead><tbody>`;
     let totalGeralMinutos = 0;

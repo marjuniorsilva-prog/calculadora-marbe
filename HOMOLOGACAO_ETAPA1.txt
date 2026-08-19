@@ -1,0 +1,15 @@
+MARBE ERP - HOMOLOGAÇÃO ETAPA 1
+Versão 2026.08.18.3
+
+Alterações consolidadas:
+- Proteção contra uso simultâneo em duas abas.
+- Firebase Authentication com login Google.
+- Conta autorizada: mar.junior.silva@gmail.com.
+- Páginas internas exigem autenticação Firebase antes de ler o banco.
+- Regras do Realtime Database incluídas para bloquear leitura/gravação sem autenticação e sem o e-mail autorizado.
+- Removidos busca decorativa e sino sem função.
+- Textos, confirmações, mensagens críticas e caminhos operacionais revisados.
+- Dashboard mantém backup do banco, backup das OS em PDF e backup completo.
+- Compras PRESERVADO no fluxo aprovado: Pedido de Compra -> Material Recebido -> Estoque + Financeiro.
+
+Antes de publicar as regras, leia CONFIGURAR_FIREBASE_AUTH.txt.

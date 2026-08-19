@@ -1,0 +1,8 @@
+AJUSTE MENU MESTRE - GRUPO MARBE / SB
+
+- Menu completo e igual em todas as principais telas do ERP.
+- Títulos mantidos como separadores visuais, sem abrir/fechar categorias.
+- Nenhum grupo desaparece ao navegar.
+- Acesso direto entre páginas e abas internas do index via ?tab=.
+- Financeiro, FAP e Compras mantêm seus comandos próprios em "nesta área".
+- Dashboard operacional anterior preservado; alteração nesta tela foi apenas no menu.

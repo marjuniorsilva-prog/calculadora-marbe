@@ -10,9 +10,12 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   
   <!-- Firebase -->
+    <script src="marbe_guard.js"></script>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { requireAuthorizedUser, applyUserProfile, redirectToLogin } from "./marbe_auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyATu_V6e1shKRpgBOkX1lw2beyzUEZUCo0",
@@ -24,6 +27,18 @@
     };
 
     const app = initializeApp(firebaseConfig);
+    try {
+      const marbeUser = await requireAuthorizedUser(app);
+      window.MarbeCurrentUser = { email: marbeUser.email, displayName: marbeUser.displayName, uid: marbeUser.uid };
+      if (window.MarbeGuard) window.MarbeGuard.markLoggedIn();
+      applyUserProfile(marbeUser);
+    } catch (authError) {
+      console.warn('Acesso Firebase bloqueado:', authError);
+      if (window.MarbeGuard) window.MarbeGuard.logout();
+      redirectToLogin(authError?.code === 'marbe/not-authorized' ? 'denied' : 'required');
+      throw authError;
+    }
+
     const db = getDatabase(app);
     window.marbeDB = null;
 
@@ -37,7 +52,8 @@
       }
     });
 
-    window.salvarNuvem = function(silencioso = false) { 
+    window.salvarNuvem = function(silencioso = false) {
+        if (window.MarbeGuard && !window.MarbeGuard.ensureWritable()) return; 
         set(ref(db, 'sistema/'), window.marbeDB)
             .then(() => { if(!silencioso) alert("Expedição atualizada!"); })
             .catch((error) => { alert("Erro ao salvar: " + error.message); });
@@ -187,7 +203,7 @@
     };
 
     window.arquivarOS = function(index) {
-        if(!confirm("Tem certeza? Isso vai limpar a OS da expedição e movê-la para os Arquivados permanentes.")) return;
+        if(!confirm("Confirmar entrega ao cliente? Esta OS sairá da Expedição e irá para o Histórico de Entregues/Arquivados.")) return;
         
         let osEntregue = window.marbeDB.expedidos.splice(index, 1)[0];
         

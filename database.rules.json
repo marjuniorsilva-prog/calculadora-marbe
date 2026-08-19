@@ -1,0 +1,14 @@
+{
+  "rules": {
+    "sistema": {
+      ".read": "auth != null && auth.token.email_verified == true && auth.token.email == 'mar.junior.silva@gmail.com'",
+      ".write": "auth != null && auth.token.email_verified == true && auth.token.email == 'mar.junior.silva@gmail.com'"
+    },
+    "controle_particular": {
+      "abel": {
+        ".read": "auth != null && auth.token.email_verified == true && auth.token.email == 'mar.junior.silva@gmail.com'",
+        ".write": "auth != null && auth.token.email_verified == true && auth.token.email == 'mar.junior.silva@gmail.com'"
+      }
+    }
+  }
+}

@@ -3,18 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Dashboard Diretoria - ERP Marbe</title>
+  <title>Dashboard Central - ERP Marbe</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- MOTOR DE GRÁFICOS -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+  <!-- BACKUP COMPLETO DO SISTEMA (carregado apenas para gerar o ZIP local) -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   
+    <script src="marbe_guard.js"></script>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { requireAuthorizedUser, applyUserProfile, redirectToLogin } from "./marbe_auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyATu_V6e1shKRpgBOkX1lw2beyzUEZUCo0",
@@ -26,17 +34,31 @@
     };
 
     const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+    try {
+      const marbeUser = await requireAuthorizedUser(app);
+      window.MarbeCurrentUser = { email: marbeUser.email, displayName: marbeUser.displayName, uid: marbeUser.uid };
+      if (window.MarbeGuard) window.MarbeGuard.markLoggedIn();
+      applyUserProfile(marbeUser);
+    } catch (authError) {
+      console.warn('Acesso Firebase bloqueado:', authError);
+      if (window.MarbeGuard) window.MarbeGuard.logout();
+      redirectToLogin(authError?.code === 'marbe/not-authorized' ? 'denied' : 'required');
+      throw authError;
+    }
 
-    // Lemos a raiz, mas o JavaScript vai filtrar cirurgicamente apenas as pastas que importam
-    onValue(ref(db, '/'), (snapshot) => {
-        if(snapshot.exists()) {
-            window.dbCompleto = snapshot.val();
-            window.processarDiretoria();
-        }
+    const db = getDatabase(app);
+    window.marbeDB = null;
+
+    // Dashboard operacional: usa a mesma raiz de dados dos demais módulos.
+    // Produção ativa = sistema/pedidos. Ao liberar a OS, ela sai de pedidos e vai para expedidos.
+    onValue(ref(db, 'sistema/'), (snapshot) => {
+        window.marbeDB = snapshot.val() || {};
+        window.processarDadosDashboard();
     });
 
-    window.fmtMoney = (v) => { return parseFloat(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+    window.fmtMoney = (v) => {
+        return (parseFloat(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    };
   </script>
 
   <style>
@@ -50,7 +72,6 @@
     body { font-family: 'Inter', sans-serif; background: var(--bg-color); margin: 0; padding: 0; color: var(--text-main); font-size: 14px; overflow-x: hidden; }
     .app-layout { display: flex; height: 100vh; overflow: hidden; }
     
-    /* SIDEBAR */
     .sidebar { width: var(--sidebar-width); background: var(--sidebar-bg); color: #fff; display: flex; flex-direction: column; flex-shrink: 0; border-right: 1px solid var(--border); z-index:50;}
     .sidebar-brand { height: var(--header-height); display: flex; align-items: center; padding: 0 25px; font-size: 20px; font-weight: 800; border-bottom: 1px solid var(--border); color:var(--text-main);}
     .sidebar-brand i { margin-right: 15px; color: var(--text-main); width: 24px; height: 24px; }
@@ -61,6 +82,7 @@
     .tab-btn { display: flex; align-items: center; padding: 14px 15px; color: #94a3b8; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 14px; transition: all 0.2s; border: none; background: transparent; width: 100%; cursor: pointer; text-align: left; margin-bottom: 6px; }
     .tab-btn i { width: 20px; height: 20px; margin-right: 15px; flex-shrink: 0; color: #64748b; transition: 0.2s; }
     .tab-btn:hover { background: rgba(255,255,255,0.05); color: #f8fafc; }
+    .tab-btn:hover i { color: #f8fafc; }
     .tab-btn.active { background: var(--primary); color: #fff; font-weight: 600; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2); }
     .tab-btn.active i { color: #fff; }
 
@@ -70,45 +92,61 @@
     
     .content-area { flex: 1; padding: 35px; background: var(--bg-color); }
 
-    /* SISTEMA DE OCULTAR VALORES (BLUR) */
-    .blur-mode { filter: blur(8px); user-select: none; transition: filter 0.3s; }
-    .btn-eye { background: transparent; border: none; color: var(--text-muted); cursor: pointer; transition: 0.2s; padding: 5px; border-radius: 6px; }
-    .btn-eye:hover { color: var(--text-main); background: rgba(255,255,255,0.1); }
-
-    /* GRIDS */
-    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px; }
-    .kpi-card { background: var(--card-bg); padding: 25px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.1); display:flex; flex-direction:column; position:relative; overflow:hidden;}
-    .kpi-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; z-index:2;}
-    .kpi-header h3 { margin: 0; font-size: 13px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; display:flex; align-items:center; gap:8px;}
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .kpi-card { background: var(--card-bg); padding: 25px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.1); display:flex; flex-direction:column; justify-content:center; position:relative; overflow:hidden;}
+    .kpi-card h3 { margin: 0 0 10px 0; font-size: 13px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; display:flex; align-items:center; gap:8px;}
     .kpi-card .value { font-size: 32px; font-weight: 800; color: var(--text-main); z-index:2;}
-    .kpi-card .subtitle { font-size: 13px; font-weight:600; color: var(--text-muted); margin-top: 5px; z-index:2;}
+    .kpi-card .subtitle { font-size: 12px; color: var(--text-muted); margin-top: 5px; z-index:2;}
     .kpi-icon-bg { position:absolute; right:-15px; bottom:-15px; width:100px; height:100px; opacity:0.05; z-index:1;}
 
-    .panel-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 30px; }
-    @media (max-width: 1024px) { .panel-grid { grid-template-columns: 1fr; } }
-    
-    .panel { background: var(--card-bg); padding: 25px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-    .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 15px;}
-    .panel-header h3 { margin: 0; font-size: 16px; color: var(--text-main); display:flex; align-items:center; gap:8px;}
+    .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+    .production-grid { grid-template-columns:minmax(0, 1.25fr) minmax(320px, .75fr); }
+    .chart-panel { background: var(--card-bg); padding: 25px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .chart-panel h3 { margin: 0 0 20px 0; font-size: 15px; color: var(--text-main); display:flex; align-items:center; gap:8px;}
+    .canvas-container { position: relative; height: 300px; width: 100%; }
+    .kpi-card .value.money { font-size: 27px; line-height: 1.15; }
+    .dashboard-note { color: var(--text-muted); font-size: 12px; margin-top: 6px; }
+    .menu-group { margin: 5px 0; }
+    .menu-group summary { list-style:none; cursor:pointer; color:#64748b; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:1px; padding:12px 10px 8px; display:flex; align-items:center; justify-content:space-between; }
+    .menu-group summary::-webkit-details-marker { display:none; }
+    .menu-group summary::after { content:'›'; font-size:17px; transition:transform .2s; }
+    .menu-group[open] summary::after { transform:rotate(90deg); }
+    .menu-group .tab-btn { margin-left:4px; width:calc(100% - 4px); }
 
-    /* LISTA TOP CLIENTES */
-    .top-client-list { list-style: none; padding: 0; margin: 0; }
-    .top-client-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px dashed var(--border); }
-    .top-client-item:last-child { border-bottom: none; }
-    .cl-info { display: flex; flex-direction: column; }
-    .cl-name { font-weight: 700; color: var(--text-main); font-size:14px; display:flex; align-items:center; gap:8px;}
-    .cl-os { font-size: 11px; color: var(--text-muted); font-weight:600; margin-top:4px;}
-    .cl-val { font-weight: 800; font-size: 15px; color: var(--success); }
+    .urgency-panel, .detail-panel, .backup-panel { background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:22px; box-shadow:0 4px 6px rgba(0,0,0,.1); margin-bottom:30px; }
+    .section-panel-title { display:flex; align-items:center; justify-content:space-between; gap:15px; margin-bottom:15px; }
+    .section-panel-title h3 { margin:0; font-size:15px; display:flex; align-items:center; gap:8px; }
+    .section-panel-title p { margin:4px 0 0; color:var(--text-muted); font-size:12px; }
+    .dashboard-table-wrap { overflow-x:auto; border:1px solid var(--border); border-radius:10px; }
+    .dashboard-table { width:100%; border-collapse:collapse; min-width:760px; }
+    .dashboard-table th { text-align:left; padding:11px 13px; font-size:11px; text-transform:uppercase; letter-spacing:.45px; color:var(--text-muted); background:#111c31; border-bottom:1px solid var(--border); }
+    .dashboard-table td { padding:12px 13px; border-bottom:1px solid rgba(51,65,85,.7); vertical-align:middle; }
+    .dashboard-table tr:last-child td { border-bottom:none; }
+    .dashboard-table .money-cell { text-align:right; font-weight:800; white-space:nowrap; }
+    .urgency-row.overdue { background:rgba(239,68,68,.08); }
+    .urgency-row.today { background:rgba(245,158,11,.10); }
+    .urgency-row.soon { background:rgba(139,92,246,.07); }
+    .status-pill { display:inline-flex; align-items:center; border-radius:999px; padding:6px 9px; font-size:10px; font-weight:800; text-transform:uppercase; white-space:nowrap; }
+    .status-overdue { color:#fecaca; background:#7f1d1d; }
+    .status-today { color:#fde68a; background:#78350f; }
+    .status-soon { color:#ddd6fe; background:#4c1d95; }
+    .status-ok { color:#a7f3d0; background:#064e3b; }
+    .status-nodate { color:#cbd5e1; background:#334155; }
+    .detail-toggle { margin-top:14px; width:max-content; border:1px solid var(--border); background:rgba(255,255,255,.035); color:var(--text-main); border-radius:8px; padding:8px 11px; font-size:11px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:7px; }
+    .detail-toggle:hover { background:rgba(255,255,255,.08); }
+    .detail-panel { display:none; }
+    .detail-panel.open { display:block; }
+    .empty-detail { padding:22px; text-align:center; color:var(--text-muted); border:1px dashed var(--border); border-radius:9px; }
+    .backup-actions { display:flex; flex-wrap:wrap; gap:12px; margin-top:15px; }
+    .backup-btn { border:none; border-radius:9px; padding:11px 15px; color:white; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+    .backup-btn.database { background:var(--primary); }
+    .backup-btn.full { background:var(--success); }
+    .backup-meta { display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; color:var(--text-muted); font-size:11px; }
+    .backup-meta span { background:#111c31; border:1px solid var(--border); border-radius:999px; padding:6px 9px; }
 
-    /* TABELA OS PRODUCAO */
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    table th { background: var(--bg-color); border-bottom: 1px solid var(--border); padding: 12px; text-align: left; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 11px; }
-    table td { border-bottom: 1px solid var(--border); padding: 12px; color: var(--text-main); vertical-align: middle; }
-    .badge-prazo { padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size:11px;}
-    .prazo-ok { background: rgba(16, 185, 129, 0.1); color: var(--success); }
-    .prazo-urgente { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
-    
-    .chart-container { position: relative; height: 300px; width: 100%; }
+    @media (max-width: 1024px) {
+        .chart-grid, .production-grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -116,146 +154,161 @@
 <div class="app-layout">
     
   <aside class="sidebar">
-      <div class="sidebar-brand"><i data-lucide="layout-dashboard"></i><span>Marbe OS</span></div>
+      <div class="sidebar-brand"><i data-lucide="layers"></i><span>Marbe OS</span></div>
       
       <div class="sidebar-nav">
-          <div class="nav-label">Visão Geral</div>
-          <button class="tab-btn active" onclick="window.location.href='dashboard.html'"><i data-lucide="layout-dashboard"></i> <span>Dashboard Diretoria</span></button>
+          <button class="tab-btn active" onclick="window.location.href='dashboard.html'"><i data-lucide="layout-dashboard"></i> <span>Dashboard</span></button>
 
-          <div class="nav-label">Comercial</div>
-          <button class="tab-btn" onclick="window.location.href='index.html'"><i data-lucide="calculator"></i> <span>Calculadora / Orçamentos</span></button>
+          <div class="nav-label">Vendas e Orçamentos</div>
+          <button class="tab-btn" onclick="window.location.href='index.html?tab=calc'"><i data-lucide="calculator"></i> <span>Calculadora</span></button>
+          <button class="tab-btn" onclick="window.location.href='index.html?tab=orc'"><i data-lucide="file-edit"></i> <span>Edição da OS</span></button>
           <button class="tab-btn" onclick="window.location.href='crm.html'"><i data-lucide="pie-chart"></i> <span>CRM Vendas</span></button>
 
-          <div class="nav-label">Consultas e Dados</div>
-          <button class="tab-btn" onclick="window.location.href='pesquisa.html'"><i data-lucide="search"></i> <span>Pesquisa Avançada</span></button>
+          <div class="nav-label">Clientes e Consultas</div>
+          <button class="tab-btn" onclick="window.location.href='index.html?tab=clientesTab'"><i data-lucide="users"></i> <span>Clientes B2B</span></button>
+          <button class="tab-btn" onclick="window.location.href='index.html?tab=historico'"><i data-lucide="history"></i> <span>Histórico Geral</span></button>
+          <button class="tab-btn" onclick="window.location.href='pesquisa_descricao.html'"><i data-lucide="search"></i> <span>Pesquisa Avançada</span></button>
 
-          <div class="nav-label">Operação & Fábrica</div>
-          <button class="tab-btn" onclick="window.location.href='fap.html'"><i data-lucide="factory"></i> <span>FAP (Chão de Fábrica)</span></button>
+          <div class="nav-label">Fábrica e Expedição</div>
+          <button class="tab-btn" onclick="window.location.href='index.html?tab=producao'"><i data-lucide="hammer"></i> <span>Produção</span></button>
+          <button class="tab-btn" onclick="window.location.href='fap.html'"><i data-lucide="factory"></i> <span>FAP / Apontamentos</span></button>
           <button class="tab-btn" onclick="window.location.href='pedido_entregue.html'"><i data-lucide="package-check"></i> <span>Expedição</span></button>
-          
+          <button class="tab-btn" onclick="window.location.href='PEDIDO%20DE%20COMPRAS.html'"><i data-lucide="shopping-cart"></i> <span>Compras e Estoque</span></button>
+
           <div class="nav-label">Administração</div>
-          <button class="tab-btn" onclick="window.location.href='compras.html'"><i data-lucide="shopping-cart"></i> <span>Compras e Estoque</span></button>
-          <button class="tab-btn" onclick="window.location.href='financeiro.html'"><i data-lucide="circle-dollar-sign"></i> <span>Financeiro Global</span></button>
-          <button class="tab-btn" onclick="window.location.href='prolabore_abel.html'"><i data-lucide="wallet"></i> <span>Controle Particular</span></button>
+          <button class="tab-btn" onclick="window.location.href='financeiro.html'"><i data-lucide="circle-dollar-sign"></i> <span>Financeiro</span></button>
+          <button class="tab-btn" onclick="window.location.href='index.html?tab=cfg'"><i data-lucide="settings"></i> <span>Tabelas de Custo</span></button>
+          <button class="tab-btn" onclick="window.location.href='ABEL%20LIMA.html'"><i data-lucide="wallet"></i> <span>Controle Particular</span></button>
       </div>
   </aside>
 
   <main class="main-wrapper">
+
       <header class="topbar">
-          <div class="view-title"><i data-lucide="briefcase" style="color:var(--primary);"></i> Painel da Diretoria</div>
+          <div class="view-title"><i data-lucide="bar-chart-2" style="color:var(--primary);"></i> Dashboard Operacional</div>
       </header>
 
       <div class="content-area">
-          
-          <!-- BLOCO 1: FÁBRICA / PRODUÇÃO (MARBE E SB) -->
-          <h2 style="font-size:14px; margin:0 0 15px 0; color:var(--text-muted); font-weight:700;"><i data-lucide="factory" style="width:16px; vertical-align:middle;"></i> OS EM PRODUÇÃO (CHÃO DE FÁBRICA)</h2>
+          <h2 style="font-size:16px; margin:0 0 15px 0; color:var(--text-muted);">PRODUÇÃO ATIVA — SOMENTE OS EM ANDAMENTO</h2>
           <div class="kpi-grid">
-              
               <div class="kpi-card" style="border-left: 4px solid var(--marbe);">
                   <i data-lucide="settings" class="kpi-icon-bg" style="color:var(--marbe);"></i>
-                  <div class="kpi-header">
-                      <h3 style="color:var(--marbe)">PRODUÇÃO MARBE (PU)</h3>
-                      <button class="btn-eye" onclick="toggleBlur('valMarbe', this)"><i data-lucide="eye"></i></button>
-                  </div>
-                  <div class="value" id="valMarbe">R$ 0,00</div>
-                  <div class="subtitle" id="qtdMarbe">0 OS em andamento</div>
+                  <h3 style="color:var(--marbe)">Marbe — PU</h3>
+                  <div class="value" id="kpiOsMarbe">0</div>
+                  <div class="subtitle">OS ativas com Poliuretano</div>
               </div>
-
+              
               <div class="kpi-card" style="border-left: 4px solid var(--sb);">
                   <i data-lucide="settings" class="kpi-icon-bg" style="color:var(--sb);"></i>
-                  <div class="kpi-header">
-                      <h3 style="color:var(--sb)">PRODUÇÃO SB BORRACHAS</h3>
-                      <button class="btn-eye" onclick="toggleBlur('valSb', this)"><i data-lucide="eye"></i></button>
-                  </div>
-                  <div class="value" id="valSb">R$ 0,00</div>
-                  <div class="subtitle" id="qtdSb">0 OS em andamento</div>
+                  <h3 style="color:var(--sb)">SB Borrachas</h3>
+                  <div class="value" id="kpiOsSb">0</div>
+                  <div class="subtitle">OS ativas dos demais produtos</div>
               </div>
 
-          </div>
-
-          <!-- BLOCO 2: FLUXO DE CAIXA DO DIA (FINANCEIRO) -->
-          <h2 style="font-size:14px; margin:30px 0 15px 0; color:var(--text-muted); font-weight:700;"><i data-lucide="calendar" style="width:16px; vertical-align:middle;"></i> FLUXO DE CAIXA (SITUAÇÃO DE HOJE)</h2>
-          <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-              
-              <div class="kpi-card" style="background:rgba(239, 68, 68, 0.05); border-color:var(--danger);">
-                  <div class="kpi-header">
-                      <h3 style="color:var(--danger)">BOLETOS VENCIDOS!</h3>
-                      <button class="btn-eye" onclick="toggleBlur('valVencidos', this)"><i data-lucide="eye"></i></button>
-                  </div>
-                  <div class="value" id="valVencidos" style="color:var(--danger);">R$ 0,00</div>
-                  <div class="subtitle" id="qtdVencidos" style="color:var(--danger);">Contas em atraso</div>
-              </div>
-
-              <div class="kpi-card" style="background:rgba(245, 158, 11, 0.05); border-color:var(--warning);">
-                  <div class="kpi-header">
-                      <h3 style="color:var(--warning)">A PAGAR HOJE</h3>
-                      <button class="btn-eye" onclick="toggleBlur('valPagarHoje', this)"><i data-lucide="eye"></i></button>
-                  </div>
-                  <div class="value" id="valPagarHoje" style="color:var(--warning);">R$ 0,00</div>
-                  <div class="subtitle" id="qtdPagarHoje">Vencem no dia de hoje</div>
-              </div>
-
-              <div class="kpi-card" style="background:rgba(16, 185, 129, 0.05); border-color:var(--success);">
-                  <div class="kpi-header">
-                      <h3 style="color:var(--success)">A RECEBER HOJE</h3>
-                      <button class="btn-eye" onclick="toggleBlur('valReceberHoje', this)"><i data-lucide="eye"></i></button>
-                  </div>
-                  <div class="value" id="valReceberHoje" style="color:var(--success);">R$ 0,00</div>
-                  <div class="subtitle" id="qtdReceberHoje">Faturamentos para hoje</div>
-              </div>
-
-          </div>
-
-          <!-- BLOCO 3: PAINEL DE TABELAS -->
-          <div class="panel-grid">
-              
-              <!-- FILA DE PRODUÇÃO -->
-              <div class="panel">
-                  <div class="panel-header">
-                      <h3><i data-lucide="hammer" style="color:var(--primary);"></i> Fila de Produção & Prazos</h3>
-                      <button class="btn-eye" onclick="toggleBlur('tabProducao', this)"><i data-lucide="eye"></i></button>
-                  </div>
-                  <div style="max-height: 400px; overflow-y:auto;" id="tabProducao">
-                      <table>
-                          <thead>
-                              <tr>
-                                  <th>OS / Fábrica</th>
-                                  <th>Cliente / Descrição</th>
-                                  <th style="text-align:right;">Valor</th>
-                                  <th>Prazo</th>
-                              </tr>
-                          </thead>
-                          <tbody id="listaOsProducao">
-                              <tr><td colspan="4" style="text-align:center;">Carregando Produção...</td></tr>
-                          </tbody>
-                      </table>
-                  </div>
-              </div>
-
-              <!-- TOP 10 CLIENTES (RANKING DE PRODUÇÃO) -->
-              <div class="panel">
-                  <div class="panel-header">
-                      <h3><i data-lucide="award" style="color:var(--warning);"></i> Top 10 Clientes (Por Valor)</h3>
-                      <button class="btn-eye" onclick="toggleBlur('listaClientes', this)"><i data-lucide="eye"></i></button>
-                  </div>
-                  <ul class="top-client-list" id="listaClientes">
-                      <li class="top-client-item" style="justify-content:center; color:var(--text-muted);">Carregando Ranking...</li>
-                  </ul>
-              </div>
-
-          </div>
-
-          <!-- BLOCO 4: GRÁFICO PROFISSIONAL (ENTRADA X SAÍDA HOJE/MÊS) -->
-          <div class="panel">
-              <div class="panel-header">
-                  <h3><i data-lucide="bar-chart-2" style="color:var(--success);"></i> Desempenho do Caixa Real (Liquidados / Pagos)</h3>
-                  <button class="btn-eye" onclick="toggleBlur('containerGrafico', this)"><i data-lucide="eye"></i></button>
-              </div>
-              <div class="chart-container" id="containerGrafico">
-                  <canvas id="chartFluxo"></canvas>
+              <div class="kpi-card" style="border-left: 4px solid var(--success); background:rgba(16, 185, 129, 0.05);">
+                  <i data-lucide="factory" class="kpi-icon-bg" style="color:var(--success);"></i>
+                  <h3 style="color:var(--success)">Total em Produção</h3>
+                  <div class="value" id="kpiOsTotal">0</div>
+                  <div class="subtitle">Somente sistema/pedidos</div>
               </div>
           </div>
 
+          <div class="chart-grid production-grid">
+              <div class="chart-panel">
+                  <h3><i data-lucide="pie-chart" style="color:var(--marbe);"></i> Valor da Produção Ativa por Empresa</h3>
+                  <div class="canvas-container">
+                      <canvas id="chartEmpresas"></canvas>
+                  </div>
+                  <div class="dashboard-note">O gráfico considera apenas os itens das OS que ainda estão em produção. PU = Marbe; qualquer outro produto = SB Borrachas.</div>
+              </div>
+              <div style="display:grid; gap:20px; align-content:start;">
+                  <div class="kpi-card" style="border-left:4px solid var(--marbe);">
+                      <h3 style="color:var(--marbe)">Valor Marbe — PU</h3>
+                      <div class="value money" id="kpiValorMarbe">R$ 0,00</div>
+                      <div class="subtitle">Itens PU em produção</div>
+                  </div>
+                  <div class="kpi-card" style="border-left:4px solid var(--sb);">
+                      <h3 style="color:var(--sb)">Valor SB Borrachas</h3>
+                      <div class="value money" id="kpiValorSb">R$ 0,00</div>
+                      <div class="subtitle">Demais itens em produção</div>
+                  </div>
+                  <div class="kpi-card">
+                      <h3>Valor Total em Produção</h3>
+                      <div class="value money" id="kpiValorTotal">R$ 0,00</div>
+                      <div class="subtitle">Marbe + SB</div>
+                  </div>
+              </div>
+          </div>
+
+          <div class="urgency-panel">
+              <div class="section-panel-title">
+                  <div>
+                      <h3><i data-lucide="alarm-clock" style="color:var(--warning);"></i> Ordem de Entrega — Prioridade da Produção</h3>
+                      <p>Somente OS atualmente em produção, ordenadas pelo prazo de entrega.</p>
+                  </div>
+              </div>
+              <div id="listaUrgenciaProducao"></div>
+          </div>
+
+          <h2 style="font-size:16px; margin:30px 0 15px 0; color:var(--text-muted);">FINANCEIRO — PENDÊNCIAS E VENCIMENTOS ATUAIS</h2>
+          <div class="kpi-grid">
+              <div class="kpi-card" style="border-bottom:4px solid var(--danger);">
+                  <h3 style="color:var(--danger)"><i data-lucide="circle-alert" style="width:16px;"></i> Contas a Pagar Vencidas</h3>
+                  <div class="value money" id="kpiPagarVencidas">R$ 0,00</div>
+                  <div class="subtitle" id="kpiPagarVencidasQtd">0 títulos pendentes</div>
+                  <button class="detail-toggle" onclick="toggleDetalhesFinanceiro('pagarVencidas')"><i data-lucide="list"></i> EXIBIR COMPROMISSOS</button>
+              </div>
+              <div class="kpi-card" style="border-bottom:4px solid var(--warning);">
+                  <h3 style="color:var(--warning)"><i data-lucide="calendar-clock" style="width:16px;"></i> Contas a Pagar Hoje</h3>
+                  <div class="value money" id="kpiPagarHoje">R$ 0,00</div>
+                  <div class="subtitle" id="kpiPagarHojeQtd">0 títulos vencendo hoje</div>
+                  <button class="detail-toggle" onclick="toggleDetalhesFinanceiro('pagarHoje')"><i data-lucide="list"></i> EXIBIR COMPROMISSOS</button>
+              </div>
+              <div class="kpi-card" style="border-bottom:4px solid var(--primary);">
+                  <h3 style="color:var(--primary)"><i data-lucide="calendar-range" style="width:16px;"></i> Contas a Receber no Mês</h3>
+                  <div class="value money" id="kpiReceberMes">R$ 0,00</div>
+                  <div class="subtitle" id="kpiReceberMesQtd">0 títulos no mês atual</div>
+                  <button class="detail-toggle" onclick="toggleDetalhesFinanceiro('receberMes')"><i data-lucide="list"></i> EXIBIR COMPROMISSOS</button>
+              </div>
+              <div class="kpi-card" style="border-bottom:4px solid var(--success);">
+                  <h3 style="color:var(--success)"><i data-lucide="badge-dollar-sign" style="width:16px;"></i> Contas a Receber Hoje</h3>
+                  <div class="value money" id="kpiReceberHoje">R$ 0,00</div>
+                  <div class="subtitle" id="kpiReceberHojeQtd">0 títulos vencendo hoje</div>
+                  <button class="detail-toggle" onclick="toggleDetalhesFinanceiro('receberHoje')"><i data-lucide="list"></i> EXIBIR COMPROMISSOS</button>
+              </div>
+          </div>
+
+          <div class="detail-panel" id="financeDetailPanel">
+              <div class="section-panel-title">
+                  <div>
+                      <h3 id="financeDetailTitle"><i data-lucide="list-checks" style="color:var(--primary);"></i> Compromissos Financeiros</h3>
+                      <p id="financeDetailSubtitle">Detalhamento por nome, valor e vencimento.</p>
+                  </div>
+                  <button class="detail-toggle" style="margin-top:0;" onclick="fecharDetalhesFinanceiro()"><i data-lucide="x"></i> FECHAR</button>
+              </div>
+              <div id="financeDetailContent"></div>
+          </div>
+
+          <div class="backup-panel">
+              <div class="section-panel-title">
+                  <div>
+                      <h3><i data-lucide="shield-check" style="color:var(--success);"></i> Backup e Segurança</h3>
+                      <p>Gere uma cópia do banco atual ou um pacote da versão do sistema junto com o banco de dados.</p>
+                  </div>
+              </div>
+              <div class="backup-actions">
+                  <button class="backup-btn database" onclick="baixarBackupBanco()"><i data-lucide="database-backup"></i> BACKUP DO BANCO (.JSON)</button>
+                  <button class="backup-btn full" onclick="baixarBackupPdfsOs()"><i data-lucide="files"></i> BACKUP DAS OS EM PDF (.ZIP)</button>
+                  <button class="backup-btn full" onclick="baixarBackupCompleto()"><i data-lucide="archive"></i> BACKUP COMPLETO (.ZIP)</button>
+              </div>
+              <div class="dashboard-note" id="backupPdfStatus" style="margin-top:10px;">O backup de PDFs inclui Orçamento de Cliente e, quando aplicável, Via de Produção.</div>
+              <div class="backup-meta">
+                  <span id="versaoSistemaLabel">Versão: MARBE ERP 2026.08.18.3</span>
+                  <span>Banco: Firebase / sistema</span>
+                  <span id="ultimoBackupLabel">Último backup nesta máquina: ainda não realizado</span>
+              </div>
+              <div class="dashboard-note" style="margin-top:12px;">O backup não altera nem apaga nenhum dado. A restauração não é automática para evitar substituição acidental do banco.</div>
+          </div>
       </div>
   </main>
 </div>
@@ -263,247 +316,497 @@
 <script>
     lucide.createIcons();
 
-    // Toggle de Blur para esconder valores
-    window.toggleBlur = function(elementId, btn) {
-        let el = document.getElementById(elementId);
-        let icon = btn.querySelector('i');
-        if(el.classList.contains('blur-mode')) {
-            el.classList.remove('blur-mode');
-            icon.setAttribute('data-lucide', 'eye');
-        } else {
-            el.classList.add('blur-mode');
-            icon.setAttribute('data-lucide', 'eye-off');
-        }
-        lucide.createIcons();
-    }
-
-    let chartFluxoInst = null;
+    let chartEmpresasInst = null;
 
     function parseDinheiro(val) {
-        if(typeof val === 'number') return val;
-        if(!val) return 0;
-        let str = String(val).replace('R$', '').trim();
-        if(str.includes(',') && str.includes('.')) str = str.replace(/\./g, '').replace(',', '.');
-        else if(str.includes(',')) str = str.replace(',', '.');
+        if (typeof val === 'number') return Number.isFinite(val) ? val : 0;
+        if (!val) return 0;
+        let str = String(val).replace(/R\$/gi, '').trim();
+        if (str.includes(',') && str.includes('.')) str = str.replace(/\./g, '').replace(',', '.');
+        else if (str.includes(',')) str = str.replace(',', '.');
         return parseFloat(str) || 0;
     }
 
-    window.processarDiretoria = function() {
-        if(!window.dbCompleto) return;
+    function asArray(valor) {
+        if (!valor) return [];
+        return Array.isArray(valor) ? valor : Object.values(valor);
+    }
 
-        // Hoje para controle diário
-        const dataHojeObj = new Date();
-        const hojeStr = dataHojeObj.toISOString().split('T')[0]; // Ex: "2026-08-18"
-        const mesAtualStr = hojeStr.substring(0, 7); // Ex: "2026-08"
+    function textoItem(item) {
+        return [item?.mat, item?.material, item?.n, item?.nome, item?.descricao, item?.descrição]
+            .filter(Boolean).join(' ').toUpperCase();
+    }
 
-        // Variáveis de Produção
-        let valProducaoMarbe = 0; let qtdProducaoMarbe = 0;
-        let valProducaoSb = 0; let qtdProducaoSb = 0;
-        let listaProducao = [];
-        let topClientesMap = {}; // Apenas clientes com OS ativas na produção
+    function itemEhPU(item) {
+        const txt = textoItem(item);
+        return /(^|[^A-Z0-9])PU([^A-Z0-9]|$)/i.test(txt) || txt.includes('POLIURETANO');
+    }
 
-        // Variáveis do Financeiro (Fluxo do Dia)
-        let valAtrasado = 0; let qtdAtrasado = 0;
-        let valPagarHoje = 0; let qtdPagarHoje = 0;
-        let valReceberHoje = 0; let qtdReceberHoje = 0;
+    function valorItem(item) {
+        const qtd = parseDinheiro(item?.q ?? item?.qtd ?? item?.quantidade ?? 1) || 1;
+        const unit = parseDinheiro(item?.v ?? item?.valor ?? item?.valor_unitario ?? item?.preco ?? item?.preço);
+        const totalInformado = parseDinheiro(item?.total ?? item?.valor_total);
+        return totalInformado > 0 ? totalInformado : (unit * qtd);
+    }
 
-        // Gráfico (Caixa do Mês)
-        let entradasPagas = 0; let saidasPagas = 0;
+    function dataYMD(valor) {
+        if (!valor) return '';
+        const txt = String(valor).trim();
+        const iso = txt.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+        const br = txt.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+        if (br) return `${br[3]}-${br[2]}-${br[1]}`;
+        return '';
+    }
 
-        // 1. LENDO APENAS AS PASTAS ESTRITAS DE PRODUÇÃO
-        // O sistema foi instruído a IGNORAR a pasta "Histórico". Só puxa do PCP/Produção.
-        const chavesProducao = ['producao', 'produção', 'chao_de_fabrica', 'fap', 'pcp'];
-        
-        for (let gaveta in window.dbCompleto) {
-            let nomeGaveta = gaveta.toLowerCase();
-            
-            // SE É A GAVETA DE PRODUÇÃO
-            if (chavesProducao.includes(nomeGaveta)) {
-                let nodeProducao = window.dbCompleto[gaveta];
-                if(typeof nodeProducao === 'object') {
-                    Object.values(nodeProducao).forEach(os => {
-                        if(typeof os === 'object' && os !== null) {
-                            
-                            let val = parseDinheiro(os.valortotal || os.total || os.valor_total || os.valorfinal || os.valor);
-                            let cliente = String(os.cliente_nome || os.cliente || os.nome || 'Consumidor Final');
-                            let rawText = JSON.stringify(os).toUpperCase();
-                            
-                            // A REGRA DA MARBE (PU) vs SB (Borrachas)
-                            let isMarbe = rawText.includes('PU') || rawText.includes('POLIURETANO') || rawText.includes('MARBE');
-                            
-                            if (val > 0) {
-                                if (isMarbe) {
-                                    valProducaoMarbe += val;
-                                    qtdProducaoMarbe++;
-                                } else {
-                                    valProducaoSb += val;
-                                    qtdProducaoSb++;
-                                }
+    function plural(qtd, singular, pluralTxt) {
+        return `${qtd} ${qtd === 1 ? singular : pluralTxt}`;
+    }
 
-                                // Ranking Top 10 Clientes (apenas os que estão em produção agora, somando o VALOR VENDIDO)
-                                if(!topClientesMap[cliente]) topClientesMap[cliente] = { val: 0, qtd: 0 };
-                                topClientesMap[cliente].val += val;
-                                topClientesMap[cliente].qtd += 1;
+    function escapeHtml(valor) {
+        return String(valor ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+    }
 
-                                // Fila de Produção
-                                let prazo = os.prazo || os.data_entrega || os.vencimento || 'Sem Prazo';
-                                listaProducao.push({
-                                    os: os.os || os.numero_os || 'S/N',
-                                    fabrica: isMarbe ? 'MARBE (PU)' : 'SB Borrachas',
-                                    corFab: isMarbe ? 'var(--marbe)' : 'var(--sb)',
-                                    cli: cliente,
-                                    desc: String(os.descricao || os.peca || os.servico || 'Serviço').substring(0, 40),
-                                    val: val,
-                                    prazo: prazo
-                                });
-                            }
-                        }
-                    });
+    function dataBR(valor) {
+        const ymd = dataYMD(valor);
+        if (!ymd) return 'Sem data';
+        const [a,m,d] = ymd.split('-');
+        return `${d}/${m}/${a}`;
+    }
+
+    function diferencaDias(dataAlvo, hoje) {
+        if (!dataAlvo || !hoje) return null;
+        const [ay,am,ad] = dataAlvo.split('-').map(Number);
+        const [hy,hm,hd] = hoje.split('-').map(Number);
+        return Math.round((Date.UTC(ay,am-1,ad) - Date.UTC(hy,hm-1,hd)) / 86400000);
+    }
+
+    function renderUrgenciaProducao(pedidosAtivos, hoje) {
+        const container = document.getElementById('listaUrgenciaProducao');
+        if (!container) return;
+        if (!pedidosAtivos.length) {
+            container.innerHTML = '<div class="empty-detail">Nenhuma OS ativa em produção.</div>';
+            return;
+        }
+
+        const ordenados = [...pedidosAtivos].sort((a,b) => {
+            const da = dataYMD(a?.data_limite) || '9999-12-31';
+            const db = dataYMD(b?.data_limite) || '9999-12-31';
+            if (da !== db) return da.localeCompare(db);
+            return String(a?.os ?? '').localeCompare(String(b?.os ?? ''), 'pt-BR', {numeric:true});
+        });
+
+        const linhas = ordenados.map(p => {
+            const prazo = dataYMD(p?.data_limite);
+            const entrada = dataYMD(p?.data_entrada);
+            const dias = prazo ? diferencaDias(prazo, hoje) : null;
+            let classeLinha = '', classeStatus = 'status-nodate', status = 'SEM PRAZO', urgencia = 'Definir prazo';
+
+            if (prazo) {
+                if (dias < 0) {
+                    classeLinha = 'overdue'; classeStatus = 'status-overdue'; status = 'ATRASADO';
+                    urgencia = `${Math.abs(dias)} ${Math.abs(dias) === 1 ? 'dia' : 'dias'} atrasado`;
+                } else if (dias === 0) {
+                    classeLinha = 'today'; classeStatus = 'status-today'; status = 'ENTREGAR HOJE'; urgencia = 'HOJE';
+                } else if (dias <= 3) {
+                    classeLinha = 'soon'; classeStatus = 'status-soon'; status = 'URGENTE'; urgencia = `${dias} ${dias === 1 ? 'dia' : 'dias'}`;
+                } else {
+                    classeStatus = 'status-ok'; status = 'NO PRAZO'; urgencia = `${dias} dias`;
                 }
             }
 
-            // 2. LENDO APENAS A GAVETA DO FINANCEIRO
-            if (nomeGaveta === 'financeiro' || nomeGaveta === 'transacoes') {
-                let nodeFin = window.dbCompleto[gaveta];
-                let transacoes = [];
-                if(nodeFin.transacoes) transacoes = Object.values(nodeFin.transacoes);
-                else transacoes = Object.values(nodeFin);
+            return `<tr class="urgency-row ${classeLinha}">
+                <td><strong>OS ${escapeHtml(p?.os || 'N/D')}</strong></td>
+                <td><strong>${escapeHtml(p?.cliente || 'Cliente não informado')}</strong></td>
+                <td>${entrada ? dataBR(entrada) : 'N/D'}</td>
+                <td><strong>${prazo ? dataBR(prazo) : 'Sem prazo definido'}</strong></td>
+                <td><span class="status-pill ${classeStatus}">${status}</span></td>
+                <td><strong>${urgencia}</strong></td>
+            </tr>`;
+        }).join('');
 
-                transacoes.forEach(t => {
-                    if (typeof t === 'object' && t !== null && t.valor) {
-                        let val = parseDinheiro(t.valor);
-                        let tipo = String(t.tipo).toUpperCase();
-                        let status = String(t.status).toUpperCase();
-                        let dataVenc = t.vencimento || t.data || '';
-                        let dataPagto = t.data_pagamento || t.vencimento || t.data || '';
+        container.innerHTML = `<div class="dashboard-table-wrap"><table class="dashboard-table">
+            <thead><tr><th>OS</th><th>Cliente</th><th>Entrada Produção</th><th>Data de Entrega</th><th>Status</th><th>Urgência</th></tr></thead>
+            <tbody>${linhas}</tbody>
+        </table></div>`;
+    }
 
-                        // Cálculos de Caixa Pagos no Mês Atual (Para o Gráfico)
-                        if (status === 'PAGO' || status === 'RECEBIDO' || status === 'LIQUIDADO') {
-                            if (dataPagto.startsWith(mesAtualStr)) {
-                                if (tipo === 'ENTRADA' || tipo === 'RECEITA') entradasPagas += val;
-                                if (tipo === 'SAIDA' || tipo === 'DESPESA') saidasPagas += val;
-                            }
-                        } 
-                        // Cálculos de Fluxo Diário e Atrasados (Para os Cards)
-                        else if (status === 'PENDENTE' || status === 'ATRASADO') {
-                            if (tipo === 'SAIDA' || tipo === 'DESPESA') {
-                                if (dataVenc < hojeStr) {
-                                    valAtrasado += val;
-                                    qtdAtrasado++;
-                                } else if (dataVenc === hojeStr) {
-                                    valPagarHoje += val;
-                                    qtdPagarHoje++;
-                                }
-                            } else if (tipo === 'ENTRADA' || tipo === 'RECEITA') {
-                                if (dataVenc === hojeStr || dataVenc < hojeStr) {
-                                    valReceberHoje += val;
-                                    qtdReceberHoje++;
-                                }
+    window.dashboardDetalhesFinanceiros = { pagarVencidas: [], pagarHoje: [], receberMes: [], receberHoje: [] };
+    window.dashboardDetalheAberto = null;
+
+    function nomeFinanceiro(t) {
+        return t?.cliente || t?.fornecedor || t?.razao || t?.razao_social || t?.nome || t?.descricao || 'Sem identificação';
+    }
+
+    window.toggleDetalhesFinanceiro = function(tipo) {
+        const painel = document.getElementById('financeDetailPanel');
+        if (window.dashboardDetalheAberto === tipo && painel.classList.contains('open')) {
+            window.fecharDetalhesFinanceiro();
+            return;
+        }
+        window.dashboardDetalheAberto = tipo;
+        renderDetalhesFinanceiro(tipo);
+        painel.classList.add('open');
+        painel.scrollIntoView({behavior:'smooth', block:'nearest'});
+    };
+
+    window.fecharDetalhesFinanceiro = function() {
+        document.getElementById('financeDetailPanel')?.classList.remove('open');
+        window.dashboardDetalheAberto = null;
+    };
+
+    function renderDetalhesFinanceiro(tipo) {
+        const titulos = {
+            pagarVencidas: ['Contas a Pagar Vencidas', 'Compromissos pendentes com vencimento anterior a hoje.'],
+            pagarHoje: ['Contas a Pagar Hoje', 'Pagamentos que vencem na data de hoje.'],
+            receberMes: ['Contas a Receber no Mês', 'Recebimentos pendentes com vencimento no mês atual.'],
+            receberHoje: ['Contas a Receber Hoje', 'Recebimentos previstos para a data de hoje.']
+        };
+        const [titulo, subtitulo] = titulos[tipo] || ['Compromissos Financeiros', 'Detalhamento por nome, valor e vencimento.'];
+        const itens = [...(window.dashboardDetalhesFinanceiros[tipo] || [])].sort((a,b) => (a.vencimento || '').localeCompare(b.vencimento || ''));
+        document.getElementById('financeDetailTitle').innerHTML = `<i data-lucide="list-checks" style="color:var(--primary);"></i> ${titulo}`;
+        document.getElementById('financeDetailSubtitle').innerText = subtitulo;
+
+        if (!itens.length) {
+            document.getElementById('financeDetailContent').innerHTML = '<div class="empty-detail">Nenhum compromisso encontrado nesta categoria.</div>';
+            lucide.createIcons();
+            return;
+        }
+
+        const total = itens.reduce((acc, x) => acc + x.valor, 0);
+        const linhas = itens.map(x => `<tr>
+            <td><strong>${escapeHtml(x.nome)}</strong>${x.descricao && x.descricao !== x.nome ? `<br><span style="color:var(--text-muted); font-size:11px;">${escapeHtml(x.descricao)}</span>` : ''}</td>
+            <td>${escapeHtml(x.categoria || 'Sem categoria')}</td>
+            <td><strong>${dataBR(x.vencimento)}</strong></td>
+            <td><span class="status-pill ${x.atrasado ? 'status-overdue' : x.hoje ? 'status-today' : 'status-ok'}">${x.atrasado ? 'ATRASADO' : x.hoje ? 'HOJE' : 'PENDENTE'}</span></td>
+            <td class="money-cell">${window.fmtMoney(x.valor)}</td>
+        </tr>`).join('');
+
+        document.getElementById('financeDetailContent').innerHTML = `<div class="dashboard-table-wrap"><table class="dashboard-table">
+            <thead><tr><th>Nome / Compromisso</th><th>Categoria</th><th>Data</th><th>Situação</th><th style="text-align:right;">Valor</th></tr></thead>
+            <tbody>${linhas}</tbody>
+            <tfoot><tr><td colspan="4" style="text-align:right; font-weight:800;">TOTAL</td><td class="money-cell">${window.fmtMoney(total)}</td></tr></tfoot>
+        </table></div>`;
+        lucide.createIcons();
+    }
+
+    const VERSAO_SISTEMA = 'MARBE ERP 2026.08.18.3';
+    const ARQUIVOS_SISTEMA_BACKUP = [
+        'index.html','dashboard.html','crm.html','financeiro.html','fap.html','pedido.html','pedido_entregue.html',
+        'PEDIDO DE COMPRAS.html','pesquisa_descricao.html','ABEL LIMA.html','logo.jpg','README.md','AJUSTE_MENU_MESTRE.txt','marbe_guard.js','marbe_auth.js','database.rules.json','CONFIGURAR_FIREBASE_AUTH.txt'
+    ];
+
+    function nomeDataHoraBackup() {
+        const d = new Date();
+        const pad = n => String(n).padStart(2,'0');
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}`;
+    }
+
+    function payloadBackupBanco() {
+        return {
+            metadata: {
+                versao_sistema: VERSAO_SISTEMA,
+                gerado_em: new Date().toISOString(),
+                caminho_firebase: 'sistema/'
+            },
+            sistema: window.marbeDB || {}
+        };
+    }
+
+    function baixarBlob(blob, nomeArquivo) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = nomeArquivo; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
+
+    function registrarBackupLocal() {
+        const data = new Date().toLocaleString('pt-BR');
+        try { localStorage.setItem('marbeUltimoBackup', data); } catch(e) {}
+        const el = document.getElementById('ultimoBackupLabel');
+        if (el) el.innerText = `Último backup nesta máquina: ${data}`;
+    }
+
+    window.baixarBackupBanco = function() {
+        if (!window.marbeDB) return alert('O banco ainda está carregando. Tente novamente em alguns segundos.');
+        const json = JSON.stringify(payloadBackupBanco(), null, 2);
+        baixarBlob(new Blob([json], {type:'application/json;charset=utf-8'}), `MARBE_BANCO_${nomeDataHoraBackup()}.json`);
+        registrarBackupLocal();
+    };
+
+
+    function cleanPdfText(t) {
+        return t ? String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase() : '';
+    }
+
+    function gerarPdfOsBlob(tipo, d) {
+        if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('Biblioteca jsPDF indisponível');
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const clean = cleanPdfText;
+
+        if (tipo === 'CLIENTE') {
+            doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.text('GRUPO MARBE POLIURETANO E SB BORRACHAS', 105, 12, {align:'center'});
+            doc.setFontSize(8); doc.text('GRUPO MARBE - CNPJ: 41.755.585/0001-37   |   SB BORRACHAS - CNPJ: 61.149.312/0001-56', 105, 17, {align:'center'});
+            doc.setFont('helvetica', 'normal'); doc.text('RUA SAO CARLOS, 84 - VILA MARIANA - RIBEIRAO PRETO / SP', 105, 22, {align:'center'});
+            doc.text('SETOR REVESTIMENTO (BORRACHA): vendas@sbborrachas.com.br | Tel: (16) 2525-0701', 105, 26, {align:'center'});
+            doc.text('SETOR PU ALTA PERFORMANCE: vendas@marbeborrachas.com.br | Tel: (16) 2525-0294', 105, 30, {align:'center'});
+            doc.setFont('helvetica', 'bold'); doc.text('CELULAR CENTRAL / URGENCIA: (16) 99447-2314 ou (16) 98808-6686', 105, 34, {align:'center'});
+            doc.setLineWidth(.5); doc.line(20,37,190,37);
+            doc.setFontSize(10); doc.text(`ORCAMENTO - OS: ${d.os || 'N/D'} | DATA: ${new Date().toLocaleDateString('pt-BR')}`,20,44);
+            doc.text(`CLIENTE: ${clean(d.cliente)}`,20,49); doc.text(`CNPJ: ${d.cnpj || ''}`,20,54);
+            doc.text(`CONTATO: ${clean(d.contato || '')}   |   TELEFONE: ${clean(d.telefone || '')}`,20,59);
+            doc.text('ENDERECO:',20,64); const splitEnd = doc.splitTextToSize(clean(d.endereco),140); doc.text(splitEnd,45,64);
+            let tableY = 72; if(splitEnd.length > 1) tableY += (splitEnd.length - 1) * 4;
+            doc.autoTable({startY:tableY, head:[['DESCRICAO','MATERIAL','QTD','V. UNIT','V. TOTAL']], body:asArray(d.itens).map(i=>[clean(i.n),clean(i.mat),i.q,window.fmtMoney(i.v),window.fmtMoney((parseFloat(i.v)||0)*(parseFloat(i.q)||0))]), theme:'striped', columnStyles:{0:{cellWidth:'auto'},1:{cellWidth:30},2:{cellWidth:15,halign:'center'},3:{cellWidth:30,halign:'right'},4:{cellWidth:30,halign:'right'}}, styles:{fontSize:9,cellPadding:2}});
+            const fY = doc.lastAutoTable.finalY + 10; doc.setFontSize(12); doc.text(`TOTAL GERAL: ${window.fmtMoney(d.total)}`,190,fY,{align:'right'}); doc.setFontSize(8); doc.text(`FRETE: ${clean(d.frete)} | PRAZO: ${clean(d.prazo)}`,20,fY+5); doc.text(`PAGAMENTO: ${clean(d.pagamento)}`,20,fY+10);
+        } else {
+            doc.setFontSize(14); doc.setFont('helvetica','bold'); doc.text('S B COMERCIO DE BORRACHAS E SERVICOS LTDA',105,15,{align:'center'});
+            doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.text('RUA SAO CARLOS, 84 - VILA MARIANA - RIBEIRAO PRETO / SP',105,20,{align:'center'}); doc.text('CNPJ: 61.149.312/0001-56',105,24,{align:'center'}); doc.setLineWidth(.5); doc.line(20,27,190,27);
+            doc.text(`VIA PRODUCAO - OS: ${d.os || 'N/D'}`,20,35); doc.text(`PRAZO ENTREGA: ${clean(d.prazo)}`,20,40);
+            let totalTempoMin=0,totalPesoBase=0; const formatT=m=>{ if(!m) return 'N/D'; let hh=Math.floor(m/60), mm=Math.round(m%60); return hh>0?`${hh}h ${mm}m`:`${mm}m`; }; let mantas=[];
+            doc.autoTable({startY:45,head:[['ITEM','MAT.','QTD','T. UNIT','T. TOTAL','PESO UNIT. COBRADO']],body:asArray(d.itens).map(i=>{let q=parseFloat(i.q)||1,tUnit=parseFloat(i.tempo_min)||0,tTot=tUnit*q;totalTempoMin+=tTot;let pBase=parseFloat(i.kg_unit)||0;totalPesoBase+=pBase*q;if(i.meta&&i.meta.tipo==='revestimento') mantas.push({n:i.n,mat:i.mat,meta:i.meta,qtd_pedida:q});return[clean(i.n),clean(i.mat),q,formatT(tUnit),formatT(tTot),pBase.toFixed(3)+' KG'];}),theme:'grid',styles:{fontSize:8,cellPadding:2}});
+            let finalY=doc.lastAutoTable.finalY+10;
+            if(mantas.length){doc.setFillColor(245,245,245);doc.rect(20,finalY,170,8,'F');doc.setFontSize(10);doc.setFont('helvetica','bold');doc.text('CORTE DE MATERIAL (FABRICA) - INSTRUCOES OPERACIONAIS',22,finalY+5.5);finalY+=12;mantas.forEach(r=>{const {dFerro,dAcabado,lRolo}=r.meta;const espBase=(dAcabado-dFerro)/2,sobra=espBase<=30?5:10,espFinal=espBase+sobra;let qtd=1;if(espBase>30&&espBase<=49)qtd=2;else if(espBase>=50)qtd=3;const espM=espFinal/qtd,larg=lRolo*1.10,comp=((dFerro+espFinal)*Math.PI)*1.10,totalM=qtd*r.qtd_pedida;doc.setFont('helvetica','bold');doc.setFontSize(8);doc.text(`Ref: ${clean(r.n)} (${clean(r.mat)})`,20,finalY);finalY+=4;doc.setFont('helvetica','normal');doc.text(`Pedir a Fabrica: ${totalM} manta(s) de ${espM.toFixed(1)}mm de espessura.`,25,finalY);finalY+=4;doc.text(`Medida p/ Corte: Largura ${larg.toFixed(1)}mm  x  Comprimento (Perimetro) ${comp.toFixed(1)}mm.`,25,finalY);finalY+=8;});}
+            finalY+=5;doc.setFontSize(10);doc.setFont('helvetica','bold');doc.text('RESUMO DA ORDEM DE SERVICO:',20,finalY);doc.setFont('helvetica','normal');doc.text(`TEMPO TOTAL DE MAQUINA: ${formatT(totalTempoMin)}`,20,finalY+6);doc.text(`PESO TOTAL COBRADO (CLIENTE): ${totalPesoBase.toFixed(3)} KG`,20,finalY+12);doc.setFont('helvetica','bold');doc.setTextColor(111,66,193);doc.text(`PESO P/ SEPARACAO (+20% SOBRA): ${(totalPesoBase*1.20).toFixed(3)} KG`,20,finalY+18);doc.setTextColor(0,0,0);
+        }
+        return doc.output('blob');
+    }
+
+    function nomeSeguroPdf(valor) {
+        return String(valor || 'N_D').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]+/g,'_').slice(0,90);
+    }
+
+    async function adicionarPdfsOsAoZip(zip) {
+        const status = document.getElementById('backupPdfStatus');
+        const mapa = new Map();
+        const bases = [
+            ['ORCAMENTOS', asArray(window.marbeDB?.orçamentos)],
+            ['PRODUCAO', asArray(window.marbeDB?.pedidos)],
+            ['EXPEDICAO', asArray(window.marbeDB?.expedidos)],
+            ['ARQUIVADOS', asArray(window.marbeDB?.arquivados)]
+        ];
+        bases.forEach(([etapa, arr]) => arr.filter(Boolean).forEach(d => mapa.set(String(d.os ?? `${etapa}_${Math.random()}`), {etapa,d})));
+        const regs = [...mapa.values()];
+        const pastaOrc = zip.folder('OS_PDF/ORCAMENTOS');
+        const pastaProd = zip.folder('OS_PDF/PRODUCAO');
+        let feitos=0,prod=0;
+        for (const reg of regs) {
+            const d=reg.d, os=nomeSeguroPdf(d.os), cli=nomeSeguroPdf(d.cliente);
+            pastaOrc.file(`ORCAMENTO_OS_${os}_${cli}.pdf`, gerarPdfOsBlob('CLIENTE', d));
+            feitos++;
+            if(reg.etapa !== 'ORCAMENTOS') { pastaProd.file(`PRODUCAO_OS_${os}_${cli}.pdf`, gerarPdfOsBlob('PRODUCAO', d)); prod++; }
+            if(status) status.innerText = `Gerando backup das OS: ${feitos}/${regs.length} registros processados...`;
+            await new Promise(r=>setTimeout(r,0));
+        }
+        if(status) status.innerText = `PDFs preparados: ${feitos} orçamento(s) e ${prod} via(s) de produção.`;
+        return {orcamentos:feitos, producao:prod};
+    }
+
+    window.baixarBackupPdfsOs = async function() {
+        if (!window.marbeDB) return alert('O banco ainda está carregando. Tente novamente em alguns segundos.');
+        if (typeof JSZip === 'undefined') return alert('Não foi possível carregar o gerador de ZIP.');
+        try {
+            const zip = new JSZip();
+            const cont = await adicionarPdfsOsAoZip(zip);
+            zip.file('LEIA-ME.txt', `Backup de OS em PDF\nVersão: ${VERSAO_SISTEMA}\nGerado em: ${new Date().toLocaleString('pt-BR')}\nOrçamentos: ${cont.orcamentos}\nVias de Produção: ${cont.producao}\n`);
+            baixarBlob(await zip.generateAsync({type:'blob'}), `MARBE_OS_PDF_${nomeDataHoraBackup()}.zip`);
+            registrarBackupLocal();
+            alert(`Backup de PDFs concluído.\n\n${cont.orcamentos} orçamento(s)\n${cont.producao} via(s) de produção`);
+        } catch(e) {
+            alert('Erro ao gerar backup de PDFs: ' + e.message);
+        }
+    };
+
+    window.baixarBackupCompleto = async function() {
+        if (!window.marbeDB) return alert('O banco ainda está carregando. Tente novamente em alguns segundos.');
+        if (typeof JSZip === 'undefined') return alert('Não foi possível carregar o gerador de ZIP. O Backup do Banco (.JSON) continua disponível.');
+
+        const zip = new JSZip();
+        const pastaSistema = zip.folder('sistema');
+        const falhas = [];
+
+        for (const arquivo of ARQUIVOS_SISTEMA_BACKUP) {
+            try {
+                const resp = await fetch(encodeURI(arquivo), {cache:'no-store'});
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const dados = await resp.arrayBuffer();
+                pastaSistema.file(arquivo, dados);
+            } catch (e) {
+                falhas.push(arquivo);
+            }
+        }
+
+        zip.file('BANCO_DADOS.json', JSON.stringify(payloadBackupBanco(), null, 2));
+        const contagemPdfs = await adicionarPdfsOsAoZip(zip);
+        zip.file('BACKUP_INFO.txt', [
+            `Versão: ${VERSAO_SISTEMA}`,
+            `Gerado em: ${new Date().toLocaleString('pt-BR')}`,
+            'Banco Firebase: caminho sistema/',
+            'Este pacote foi gerado pelo Dashboard.',
+            `PDFs de OS: ${contagemPdfs.orcamentos} orçamento(s) e ${contagemPdfs.producao} via(s) de produção.`,
+            falhas.length ? `Arquivos não encontrados no servidor: ${falhas.join(', ')}` : 'Arquivos do sistema: captura concluída sem falhas.',
+            '',
+            'IMPORTANTE: restauração do banco deve ser feita de forma controlada. Este sistema não executa restauração automática.'
+        ].join('\n'));
+
+        const blob = await zip.generateAsync({type:'blob'});
+        baixarBlob(blob, `MARBE_BACKUP_COMPLETO_${nomeDataHoraBackup()}.zip`);
+        registrarBackupLocal();
+        if (falhas.length) alert(`Backup criado. Atenção: ${falhas.length} arquivo(s) da versão não foram encontrados no servidor e ficaram fora do ZIP.`);
+    };
+
+    (function carregarUltimoBackup() {
+        try {
+            const salvo = localStorage.getItem('marbeUltimoBackup');
+            if (salvo) document.getElementById('ultimoBackupLabel').innerText = `Último backup nesta máquina: ${salvo}`;
+        } catch(e) {}
+    })();
+
+    window.processarDadosDashboard = function() {
+        if (!window.marbeDB) return;
+
+        // FONTE ÚNICA DA PRODUÇÃO: sistema/pedidos.
+        // Nada de orçamentos, histórico, expedidos, arquivados ou financeiro entra aqui.
+        const pedidosAtivos = asArray(window.marbeDB.pedidos).filter(Boolean);
+
+        let osMarbe = 0;
+        let osSB = 0;
+        let valorMarbe = 0;
+        let valorSB = 0;
+
+        pedidosAtivos.forEach(pedido => {
+            const itens = asArray(pedido.itens).filter(Boolean);
+            const temPU = itens.some(itemEhPU);
+
+            // Cada OS é contada uma única vez. Se houver PU, pertence à produção Marbe; caso contrário, SB.
+            if (temPU) osMarbe++; else osSB++;
+
+            if (itens.length) {
+                itens.forEach(item => {
+                    const valor = valorItem(item);
+                    if (itemEhPU(item)) valorMarbe += valor;
+                    else valorSB += valor;
+                });
+            } else {
+                // Compatibilidade com OS antigas sem detalhamento de itens.
+                const totalPedido = parseDinheiro(pedido.total || pedido.valor_total || pedido.valor);
+                const raw = JSON.stringify(pedido).toUpperCase();
+                if (/(^|[^A-Z0-9])PU([^A-Z0-9]|$)/i.test(raw) || raw.includes('POLIURETANO')) valorMarbe += totalPedido;
+                else valorSB += totalPedido;
+            }
+        });
+
+        const hojeObj = new Date();
+        const hoje = `${hojeObj.getFullYear()}-${String(hojeObj.getMonth()+1).padStart(2,'0')}-${String(hojeObj.getDate()).padStart(2,'0')}`;
+        const mesAtual = hoje.slice(0, 7);
+
+        let pagarVencidas = 0, pagarVencidasQtd = 0;
+        let pagarHoje = 0, pagarHojeQtd = 0;
+        let receberMes = 0, receberMesQtd = 0;
+        let receberHoje = 0, receberHojeQtd = 0;
+
+        const detalhes = { pagarVencidas: [], pagarHoje: [], receberMes: [], receberHoje: [] };
+
+        renderUrgenciaProducao(pedidosAtivos, hoje);
+
+        const financeiro = window.marbeDB.financeiro || {};
+        const transacoes = asArray(financeiro.transacoes).filter(Boolean);
+
+        transacoes.forEach(t => {
+            const status = String(t.status || '').trim().toUpperCase();
+            if (status !== 'PENDENTE' && status !== 'ATRASADO') return;
+
+            const tipo = String(t.tipo || '').trim().toUpperCase();
+            const venc = dataYMD(t.vencimento || t.data);
+            if (!venc) return;
+            const valor = parseDinheiro(t.valor || t.total);
+
+            const detalhe = {
+                nome: nomeFinanceiro(t),
+                descricao: t.descricao || '',
+                categoria: t.categoria || '',
+                vencimento: venc,
+                valor: valor,
+                atrasado: venc < hoje,
+                hoje: venc === hoje
+            };
+
+            if (tipo === 'SAIDA' || tipo === 'DESPESA') {
+                if (venc < hoje) { pagarVencidas += valor; pagarVencidasQtd++; detalhes.pagarVencidas.push(detalhe); }
+                else if (venc === hoje) { pagarHoje += valor; pagarHojeQtd++; detalhes.pagarHoje.push(detalhe); }
+            }
+
+            if (tipo === 'ENTRADA' || tipo === 'RECEITA') {
+                if (venc.startsWith(mesAtual)) { receberMes += valor; receberMesQtd++; detalhes.receberMes.push(detalhe); }
+                if (venc === hoje) { receberHoje += valor; receberHojeQtd++; detalhes.receberHoje.push(detalhe); }
+            }
+        });
+
+        window.dashboardDetalhesFinanceiros = detalhes;
+        if (window.dashboardDetalheAberto) renderDetalhesFinanceiro(window.dashboardDetalheAberto);
+
+        document.getElementById('kpiOsMarbe').innerText = osMarbe;
+        document.getElementById('kpiOsSb').innerText = osSB;
+        document.getElementById('kpiOsTotal').innerText = pedidosAtivos.length;
+
+        document.getElementById('kpiValorMarbe').innerText = window.fmtMoney(valorMarbe);
+        document.getElementById('kpiValorSb').innerText = window.fmtMoney(valorSB);
+        document.getElementById('kpiValorTotal').innerText = window.fmtMoney(valorMarbe + valorSB);
+
+        document.getElementById('kpiPagarVencidas').innerText = window.fmtMoney(pagarVencidas);
+        document.getElementById('kpiPagarVencidasQtd').innerText = plural(pagarVencidasQtd, 'título pendente', 'títulos pendentes');
+        document.getElementById('kpiPagarHoje').innerText = window.fmtMoney(pagarHoje);
+        document.getElementById('kpiPagarHojeQtd').innerText = plural(pagarHojeQtd, 'título vencendo hoje', 'títulos vencendo hoje');
+        document.getElementById('kpiReceberMes').innerText = window.fmtMoney(receberMes);
+        document.getElementById('kpiReceberMesQtd').innerText = plural(receberMesQtd, 'título no mês atual', 'títulos no mês atual');
+        document.getElementById('kpiReceberHoje').innerText = window.fmtMoney(receberHoje);
+        document.getElementById('kpiReceberHojeQtd').innerText = plural(receberHojeQtd, 'título vencendo hoje', 'títulos vencendo hoje');
+
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.font.family = 'Inter';
+
+        if (chartEmpresasInst) chartEmpresasInst.destroy();
+        const ctx = document.getElementById('chartEmpresas').getContext('2d');
+        const fmt = new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' });
+        chartEmpresasInst = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: [
+                    `MARBE (PU) — ${fmt.format(valorMarbe)}`,
+                    `SB BORRACHAS — ${fmt.format(valorSB)}`
+                ],
+                datasets: [{
+                    data: [valorMarbe, valorSB],
+                    backgroundColor: ['#8b5cf6', '#f97316'],
+                    borderColor: '#1e293b',
+                    borderWidth: 3,
+                    hoverOffset: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { padding: 18, usePointStyle: true, pointStyle: 'circle' }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => {
+                                const total = valorMarbe + valorSB;
+                                const val = ctx.raw || 0;
+                                const pct = total > 0 ? ((val / total) * 100).toFixed(1) : '0.0';
+                                return ` ${fmt.format(val)} (${pct}%)`;
                             }
                         }
                     }
-                });
-            }
-        }
-
-        // ==========================================
-        // ALIMENTANDO A TELA
-        // ==========================================
-
-        // Bloco 1: Fábrica
-        document.getElementById('valMarbe').innerText = window.fmtMoney(valProducaoMarbe);
-        document.getElementById('qtdMarbe').innerText = `${qtdProducaoMarbe} OS rodando`;
-        
-        document.getElementById('valSb').innerText = window.fmtMoney(valProducaoSb);
-        document.getElementById('qtdSb').innerText = `${qtdProducaoSb} OS rodando`;
-
-        // Bloco 2: Financeiro (Dia)
-        document.getElementById('valVencidos').innerText = window.fmtMoney(valAtrasado);
-        document.getElementById('qtdVencidos').innerText = `${qtdAtrasado} boletos vencidos`;
-
-        document.getElementById('valPagarHoje').innerText = window.fmtMoney(valPagarHoje);
-        document.getElementById('qtdPagarHoje').innerText = `${qtdPagarHoje} contas vencem hoje`;
-
-        document.getElementById('valReceberHoje').innerText = window.fmtMoney(valReceberHoje);
-        document.getElementById('qtdReceberHoje').innerText = `${qtdReceberHoje} pagamentos esperados hoje`;
-
-        // Fila de Produção Tabela
-        let htmlFila = '';
-        if(listaProducao.length === 0) {
-            htmlFila = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Nenhuma OS em produção no momento.</td></tr>';
-        } else {
-            // Ordenar por prazo (urgentes primeiro)
-            listaProducao.sort((a,b) => {
-                if(a.prazo === 'Sem Prazo') return 1;
-                if(b.prazo === 'Sem Prazo') return -1;
-                return a.prazo.localeCompare(b.prazo);
-            });
-
-            listaProducao.forEach(p => {
-                let badgeFabrica = `<span style="color:${p.corFab}; font-weight:800; font-size:10px;">${p.fabrica}</span>`;
-                
-                let classPrazo = 'prazo-ok';
-                if(p.prazo !== 'Sem Prazo' && p.prazo < hojeStr) classPrazo = 'prazo-urgente';
-                let txtPrazo = p.prazo.includes('-') ? p.prazo.split('-').reverse().join('/') : p.prazo;
-
-                htmlFila += `<tr>
-                    <td><strong style="color:var(--text-main);">OS ${p.os}</strong><br>${badgeFabrica}</td>
-                    <td><strong style="font-size:13px;">${p.cli}</strong><br><span style="color:var(--text-muted); font-size:11px;">${p.desc}</span></td>
-                    <td style="text-align:right; font-weight:700; color:var(--success);">${window.fmtMoney(p.val)}</td>
-                    <td><span class="badge-prazo ${classPrazo}">${txtPrazo}</span></td>
-                </tr>`;
-            });
-        }
-        document.getElementById('listaOsProducao').innerHTML = htmlFila;
-
-        // Ranking Top 10 Clientes
-        // ORDENADO PELO VALOR VENDIDO, NÃO PELA QUANTIDADE DE OS
-        let clientesRank = Object.keys(topClientesMap).map(k => {
-            return { nome: k, val: topClientesMap[k].val, os: topClientesMap[k].qtd }
-        }).sort((a,b) => b.val - a.val).slice(0, 10);
-
-        let htmlRanking = '';
-        if(clientesRank.length === 0) {
-            htmlRanking = '<li class="top-client-item" style="justify-content:center; color:var(--text-muted);">Nenhuma OS ativa na produção.</li>';
-        } else {
-            clientesRank.forEach((c, index) => {
-                let corTrofeu = index === 0 ? '#fbbf24' : (index === 1 ? '#94a3b8' : (index === 2 ? '#b45309' : 'transparent'));
-                let icon = index < 3 ? `<i data-lucide="trophy" style="color:${corTrofeu}; width:16px;"></i>` : `<span style="font-weight:bold; color:var(--text-muted); width:16px; text-align:center;">${index+1}º</span>`;
-                
-                htmlRanking += `
-                <li class="top-client-item">
-                    <div class="cl-info">
-                        <span class="cl-name">${icon} ${c.nome}</span>
-                        <span class="cl-os">${c.os} OS Fechadas na Máquina</span>
-                    </div>
-                    <div class="cl-val">${window.fmtMoney(c.val)}</div>
-                </li>`;
-            });
-        }
-        document.getElementById('listaClientes').innerHTML = htmlRanking;
-        lucide.createIcons();
-
-        // Gráfico (Chart.js)
-        if(chartFluxoInst) chartFluxoInst.destroy();
-        const ctxFluxo = document.getElementById('chartFluxo').getContext('2d');
-        Chart.defaults.color = '#94a3b8';
-        Chart.defaults.font.family = 'Inter';
-        
-        chartFluxoInst = new Chart(ctxFluxo, {
-            type: 'bar',
-            data: {
-                labels: ['Caixa Mês Atual (Liquidado)'],
-                datasets: [
-                    { label: 'Entradas Pagas (R$)', data: [entradasPagas], backgroundColor: '#10b981', borderRadius: 6 },
-                    { label: 'Saídas Pagas (R$)', data: [saidasPagas], backgroundColor: '#ef4444', borderRadius: 6 }
-                ]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false, 
-                plugins: { legend: { position: 'bottom', labels: { color: '#f8fafc', font: {weight: 'bold'} } } },
-                scales: { y: { beginAtZero: true, grid: { color: '#334155' } }, x: { grid: { display: false } } }
+                }
             }
         });
+
+        lucide.createIcons();
     };
 </script>
 </body>

@@ -13,9 +13,12 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
   
+    <script src="marbe_guard.js"></script>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { requireAuthorizedUser, applyUserProfile, redirectToLogin } from "./marbe_auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyATu_V6e1shKRpgBOkX1lw2beyzUEZUCo0",
@@ -27,6 +30,18 @@
     };
 
     const app = initializeApp(firebaseConfig);
+    try {
+      const marbeUser = await requireAuthorizedUser(app);
+      window.MarbeCurrentUser = { email: marbeUser.email, displayName: marbeUser.displayName, uid: marbeUser.uid };
+      if (window.MarbeGuard) window.MarbeGuard.markLoggedIn();
+      applyUserProfile(marbeUser);
+    } catch (authError) {
+      console.warn('Acesso Firebase bloqueado:', authError);
+      if (window.MarbeGuard) window.MarbeGuard.logout();
+      redirectToLogin(authError?.code === 'marbe/not-authorized' ? 'denied' : 'required');
+      throw authError;
+    }
+
     const db = getDatabase(app);
     
     // GAVETA TOTALMENTE ISOLADA DO ERP PRINCIPAL
@@ -42,7 +57,8 @@
         renderDashboard();
     });
 
-    window.salvarNuvem = function() { 
+    window.salvarNuvem = function() {
+        if (window.MarbeGuard && !window.MarbeGuard.ensureWritable()) return; 
         set(ref(db, window.dbPath), { transacoes: window.transacoes })
             .catch((error) => { alert("Erro ao salvar: " + error.message); });
     };
@@ -118,9 +134,56 @@
     table td { border-bottom: 1px solid var(--border); padding: 15px; color: var(--text-main); }
     
     @media (max-width: 768px) { .row { flex-direction: column; gap: 0; } }
+
+    /* Menu mestre do ERP: sempre completo, inclusive no Controle Particular */
+    .erp-sidebar { position:fixed; left:0; top:0; width:260px; height:100vh; background:#111827; border-right:1px solid #334155; display:flex; flex-direction:column; z-index:50; }
+    .erp-sidebar .sidebar-brand { height:72px; display:flex; align-items:center; gap:12px; padding:0 22px; border-bottom:1px solid #334155; font-size:18px; font-weight:800; }
+    .erp-sidebar .sidebar-brand svg { color:#3b82f6; }
+    .erp-sidebar .sidebar-nav { flex:1; overflow-y:auto; padding:16px 12px 24px; display:flex; flex-direction:column; }
+    .erp-sidebar .nav-label { font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase; margin:18px 0 8px 10px; letter-spacing:1px; }
+    .erp-sidebar .tab-btn { width:100%; border:0; background:transparent; color:#94a3b8; padding:10px 12px; border-radius:8px; display:flex; align-items:center; gap:11px; cursor:pointer; font-family:inherit; font-size:13px; font-weight:600; text-align:left; }
+    .erp-sidebar .tab-btn:hover { background:#1e293b; color:#f8fafc; }
+    .erp-sidebar .tab-btn.active { background:#1e3a5f; color:#60a5fa; }
+    .erp-sidebar .tab-btn svg { width:18px; height:18px; flex:none; }
+    body { padding-left:280px; }
+    @media (max-width: 900px) {
+      body { padding:16px; }
+      .erp-sidebar { position:relative; width:100%; height:auto; max-height:none; margin-bottom:18px; border:1px solid #334155; border-radius:12px; overflow:hidden; }
+      .erp-sidebar .sidebar-nav { max-height:420px; }
+    }
+
   </style>
 </head>
 <body>
+
+
+<aside class="erp-sidebar">
+    <div class="sidebar-brand"><i data-lucide="layers"></i><span>Marbe OS</span></div>
+    <div class="sidebar-nav">
+          <button class="tab-btn" onclick="window.location.href='dashboard.html'"><i data-lucide="layout-dashboard"></i> <span>Dashboard</span></button>
+
+          <div class="nav-label">Vendas e Orçamentos</div>
+          <button class="tab-btn" onclick="window.location.href='index.html?tab=calc'"><i data-lucide="calculator"></i> <span>Calculadora</span></button>
+          <button class="tab-btn" onclick="window.location.href='index.html?tab=orc'"><i data-lucide="file-edit"></i> <span>Edição da OS</span></button>
+          <button class="tab-btn" onclick="window.location.href='crm.html'"><i data-lucide="pie-chart"></i> <span>CRM Vendas</span></button>
+
+          <div class="nav-label">Clientes e Consultas</div>
+          <button class="tab-btn" onclick="window.location.href='index.html?tab=clientesTab'"><i data-lucide="users"></i> <span>Clientes B2B</span></button>
+          <button class="tab-btn" onclick="window.location.href='index.html?tab=historico'"><i data-lucide="history"></i> <span>Histórico Geral</span></button>
+          <button class="tab-btn" onclick="window.location.href='pesquisa_descricao.html'"><i data-lucide="search"></i> <span>Pesquisa Avançada</span></button>
+
+          <div class="nav-label">Fábrica e Expedição</div>
+          <button class="tab-btn" onclick="window.location.href='index.html?tab=producao'"><i data-lucide="hammer"></i> <span>Produção</span></button>
+          <button class="tab-btn" onclick="window.location.href='fap.html'"><i data-lucide="factory"></i> <span>FAP / Apontamentos</span></button>
+          <button class="tab-btn" onclick="window.location.href='pedido_entregue.html'"><i data-lucide="package-check"></i> <span>Expedição</span></button>
+          <button class="tab-btn" onclick="window.location.href='PEDIDO%20DE%20COMPRAS.html'"><i data-lucide="shopping-cart"></i> <span>Compras e Estoque</span></button>
+
+          <div class="nav-label">Administração</div>
+          <button class="tab-btn" onclick="window.location.href='financeiro.html'"><i data-lucide="circle-dollar-sign"></i> <span>Financeiro</span></button>
+          <button class="tab-btn" onclick="window.location.href='index.html?tab=cfg'"><i data-lucide="settings"></i> <span>Tabelas de Custo</span></button>
+          <button class="tab-btn active" onclick="window.location.href='ABEL%20LIMA.html'"><i data-lucide="wallet"></i> <span>Controle Particular</span></button>
+    </div>
+</aside>
 
 <div class="container">
     <header class="header">

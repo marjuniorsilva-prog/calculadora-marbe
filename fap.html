@@ -13,9 +13,12 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
   
+    <script src="marbe_guard.js"></script>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { requireAuthorizedUser, applyUserProfile, redirectToLogin } from "./marbe_auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyATu_V6e1shKRpgBOkX1lw2beyzUEZUCo0",
@@ -27,6 +30,18 @@
     };
 
     const app = initializeApp(firebaseConfig);
+    try {
+      const marbeUser = await requireAuthorizedUser(app);
+      window.MarbeCurrentUser = { email: marbeUser.email, displayName: marbeUser.displayName, uid: marbeUser.uid };
+      if (window.MarbeGuard) window.MarbeGuard.markLoggedIn();
+      applyUserProfile(marbeUser);
+    } catch (authError) {
+      console.warn('Acesso Firebase bloqueado:', authError);
+      if (window.MarbeGuard) window.MarbeGuard.logout();
+      redirectToLogin(authError?.code === 'marbe/not-authorized' ? 'denied' : 'required');
+      throw authError;
+    }
+
     const db = getDatabase(app);
     window.marbeDB = null;
 
@@ -47,7 +62,8 @@
       }
     });
 
-    window.salvarNuvem = function(silencioso = false) { 
+    window.salvarNuvem = function(silencioso = false) {
+        if (window.MarbeGuard && !window.MarbeGuard.ensureWritable()) return; 
         set(ref(db, 'sistema/'), window.marbeDB)
             .then(() => { if(!silencioso) alert("Apontamento salvo com sucesso!"); })
             .catch((error) => { alert("Erro ao salvar: " + error.message); });
@@ -168,20 +184,41 @@
       <div class="sidebar-brand"><i data-lucide="factory"></i><span>Operação / PCP</span></div>
       
       <div class="sidebar-nav">
-          <div class="nav-label" style="color:var(--fap);">Atividades de Fábrica</div>
-          
-          <button class="tab-btn active" onclick="window.tabFap('tab-lancar', this)">
-              <i data-lucide="clipboard-edit"></i> <span>Lançar Atividade (FAP)</span>
-          </button>
-          
-          <button class="tab-btn" onclick="window.tabFap('tab-relatorio', this)">
-              <i data-lucide="file-bar-chart"></i> <span>Relatórios / Fichas</span>
-          </button>
-          
-          <div class="nav-label" style="margin-top:25px;">Configurações</div>
-          <button class="tab-btn" onclick="window.tabFap('tab-cadastros', this)">
-              <i data-lucide="users"></i> <span>Cadastros Base</span>
-          </button>
+          <button class="tab-btn" onclick="window.location.href='dashboard.html'"><i data-lucide="layout-dashboard"></i> <span>Dashboard</span></button>
+
+          <div class="nav-label">Vendas e Orçamentos</div>
+          <button class="tab-btn" onclick="window.location.href='index.html?tab=calc'"><i data-lucide="calculator"></i> <span>Calculadora</span></button>
+          <button class="tab-btn" onclick="window.location.href='index.html?tab=orc'"><i data-lucide="file-edit"></i> <span>Edição da OS</span></button>
+          <button class="tab-btn" onclick="window.location.href='crm.html'"><i data-lucide="pie-chart"></i> <span>CRM Vendas</span></button>
+
+          <div class="nav-label">Clientes e Consultas</div>
+          <button class="tab-btn" onclick="window.location.href='index.html?tab=clientesTab'"><i data-lucide="users"></i> <span>Clientes B2B</span></button>
+          <button class="tab-btn" onclick="window.location.href='index.html?tab=historico'"><i data-lucide="history"></i> <span>Histórico Geral</span></button>
+          <button class="tab-btn" onclick="window.location.href='pesquisa_descricao.html'"><i data-lucide="search"></i> <span>Pesquisa Avançada</span></button>
+
+          <div class="nav-label">Fábrica e Expedição</div>
+          <button class="tab-btn" onclick="window.location.href='index.html?tab=producao'"><i data-lucide="hammer"></i> <span>Produção</span></button>
+          <button class="tab-btn active" onclick="window.location.href='fap.html'"><i data-lucide="factory"></i> <span>FAP / Apontamentos</span></button>
+          <button class="tab-btn" onclick="window.location.href='pedido_entregue.html'"><i data-lucide="package-check"></i> <span>Expedição</span></button>
+          <button class="tab-btn" onclick="window.location.href='PEDIDO%20DE%20COMPRAS.html'"><i data-lucide="shopping-cart"></i> <span>Compras e Estoque</span></button>
+
+          <div class="nav-label">Administração</div>
+          <button class="tab-btn" onclick="window.location.href='financeiro.html'"><i data-lucide="circle-dollar-sign"></i> <span>Financeiro</span></button>
+          <button class="tab-btn" onclick="window.location.href='index.html?tab=cfg'"><i data-lucide="settings"></i> <span>Tabelas de Custo</span></button>
+          <button class="tab-btn" onclick="window.location.href='ABEL%20LIMA.html'"><i data-lucide="wallet"></i> <span>Controle Particular</span></button>
+
+          <div class="nav-label" style="color:var(--fap); margin-top:28px;">FAP — nesta área</div>
+          <div class="local-menu">
+              <button class="tab-btn active" onclick="window.tabFap('tab-lancar', this)">
+                  <i data-lucide="clipboard-edit"></i> <span>Lançar Atividade (FAP)</span>
+              </button>
+              <button class="tab-btn" onclick="window.tabFap('tab-relatorio', this)">
+                  <i data-lucide="file-bar-chart"></i> <span>Relatórios / Fichas</span>
+              </button>
+              <button class="tab-btn" onclick="window.tabFap('tab-cadastros', this)">
+                  <i data-lucide="users"></i> <span>Cadastros Base</span>
+              </button>
+          </div>
       </div>
       
       <div class="sidebar-footer">
@@ -364,7 +401,7 @@
 
     window.tabFap = function(id, btnElement) {
         document.querySelectorAll('.section').forEach(e => e.classList.remove('active'));
-        document.querySelectorAll('.sidebar-nav .tab-btn').forEach(e => e.classList.remove('active'));
+        document.querySelectorAll('.local-menu .tab-btn').forEach(e => e.classList.remove('active'));
         document.getElementById(id).classList.add('active');
         if(btnElement) btnElement.classList.add('active');
         window.updateUI();

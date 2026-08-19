@@ -1,0 +1,44 @@
+MARBE ERP - CONFIGURAÇÃO FIREBASE AUTHENTICATION
+Versão 2026.08.18.3
+
+CONTA AUTORIZADA
+mar.junior.silva@gmail.com
+
+IMPORTANTE
+O código já está preparado para Google Login e o arquivo database.rules.json já restringe leitura/gravação à conta acima.
+Para entrar em funcionamento, faça somente estas configurações no Firebase Console do projeto marbeapp-e2db8:
+
+1) AUTHENTICATION
+- Abra Firebase Console > projeto marbeapp-e2db8.
+- Vá em Authentication.
+- Se ainda não estiver iniciado, clique em Get started / Começar.
+- Abra Sign-in method / Método de login.
+- Ative Google.
+- Escolha um e-mail de suporte do projeto e salve.
+
+2) DOMÍNIO AUTORIZADO
+- Em Authentication > Settings > Authorized domains, confirme o domínio onde o MARBE ERP está publicado.
+- Se testar localmente, confirme também localhost.
+- Não use file:// para testar login Google.
+
+3) REALTIME DATABASE > RULES
+- Abra Realtime Database > Rules / Regras.
+- Substitua as regras atuais pelo conteúdo de database.rules.json deste pacote.
+- Clique em Publish / Publicar.
+
+4) PRIMEIRO TESTE
+- Abra o ERP pelo endereço HTTP/HTTPS publicado.
+- Clique em ENTRAR COM GOOGLE.
+- Entre com mar.junior.silva@gmail.com.
+- Confirme que Dashboard e demais módulos carregam.
+- Em janela anônima ou outra conta Google, o acesso deve ser negado.
+
+5) SEGUNDA ABA
+- Com o ERP aberto, tente abrir outra aba operacional.
+- A segunda aba deve ser bloqueada para evitar gravações concorrentes.
+
+ATENÇÃO SOBRE AS REGRAS
+Publique as regras somente junto com esta versão do sistema. Se publicar as regras antes de colocar estes arquivos no servidor, a versão antiga (sem Firebase Auth) perderá acesso ao banco.
+
+COMPRAS
+O fluxo de Compras foi preservado como estava aprovado: Pedido de Compra -> Material Recebido -> Estoque + Financeiro. Esta etapa não altera essa lógica.
