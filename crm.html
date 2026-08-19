@@ -694,7 +694,7 @@
 
     window.abrirModalGanho = function(index) {
         idxAcao = index;
-        document.getElementById('ganhoEntrada').value = new Date().toISOString().split('T')[0];
+        document.getElementById('ganhoEntrada').value = window.MarbeDate.today();
         document.getElementById('ganhoLimite').value = '';
         document.getElementById('modalGanho').style.display = 'flex';
     };

@@ -6,6 +6,25 @@
   const LOCK_TTL_MS = 12000;
   const HEARTBEAT_MS = 3000;
 
+  function localISODate(value = new Date()) {
+    const d = value instanceof Date ? value : new Date(value);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function localYearMonth(value = new Date()) {
+    return localISODate(value).slice(0, 7);
+  }
+
+  window.MarbeDate = {
+    today: () => localISODate(new Date()),
+    date: localISODate,
+    month: () => localYearMonth(new Date()),
+    yearMonth: localYearMonth
+  };
+
   const filename = decodeURIComponent((location.pathname.split('/').pop() || 'index.html')).toLowerCase();
   const isIndex = filename === 'index.html' || filename === '';
   let blocked = false;

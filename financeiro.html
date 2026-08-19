@@ -60,13 +60,18 @@
 
           // Correção automática de dados antigos e de integrações (Tornando visível)
           window.marbeDB.financeiro.transacoes.forEach(t => {
-              if(!t.vencimento) t.vencimento = t.data; // Conserta a despesa do Módulo de Compras
               if(!t.id) t.id = Date.now() + Math.random(); // Garante que todos têm ID
               
               // Padroniza os status
               if(t.status === 'Pago' || t.status === 'pago') t.status = 'PAGO';
               if(t.status === 'Pendente' || t.status === 'pendente') t.status = 'PENDENTE';
               if(t.status === 'Recebido' || t.status === 'recebido') t.status = 'RECEBIDO';
+              // Migra automaticamente NFs antigas vindas de Compras que ainda não tinham vencimento definido.
+              const compraAntigaSemProgramacao = t.status === 'PENDENTE' && !t.vencimento &&
+                  String(t.categoria || '').includes('Fornecedores') && String(t.descricao || '').includes('Pedido PC-');
+              if(compraAntigaSemProgramacao) t.status = 'AGUARDANDO_PROGRAMACAO';
+              // Demais dados antigos pendentes continuam usando a data cadastrada como vencimento.
+              if(!t.vencimento && t.status === 'PENDENTE') t.vencimento = t.data;
           });
           
           window.updateUI();
@@ -302,6 +307,11 @@
 
           <!-- ABA 2: CONTAS A PAGAR (PENDENTES) -->
           <div id="tab-pagar" class="section">
+              <div class="card-panel" id="boxAguardandoProgramacao" style="display:none; border-color:var(--warning); margin-bottom:25px;">
+                  <div class="card-header" style="color:var(--warning);"><i data-lucide="calendar-clock"></i> NFs recebidas aguardando programação de pagamento</div>
+                  <p style="color:var(--text-muted); margin-top:0; line-height:1.55;">Essas compras já deram entrada no estoque, mas ainda não entram como vencidas. Defina se será à vista ou parcelado e informe as datas.</p>
+                  <div id="listaAguardandoProgramacao"></div>
+              </div>
               <h2 class="view-title" style="color:var(--danger); margin-bottom: 25px;"><i data-lucide="alert-circle"></i> Títulos a Pagar (Pendentes)</h2>
               <div id="listaContasPagar">
                   <!-- Gerado via JS -->
@@ -379,6 +389,41 @@
   </main>
 </div>
 
+<!-- Modal: programar pagamento de NF recebida -->
+<div id="modalProgramarPagamento" style="position:fixed; inset:0; background:rgba(2,6,23,.92); display:none; z-index:10000; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(4px);">
+  <div style="background:var(--card-bg); width:min(720px,100%); max-height:92vh; overflow:auto; padding:30px; border-radius:16px; border:1px solid var(--border);">
+    <h3 style="margin:0 0 8px; color:var(--warning); font-size:21px;"><i data-lucide="calendar-clock"></i> Programar pagamento da NF</h3>
+    <div id="programacaoResumo" style="padding:14px; background:var(--bg-color); border:1px solid var(--border); border-radius:8px; color:var(--text-muted); line-height:1.55; margin-bottom:20px;"></div>
+    <input type="hidden" id="programacaoIdx">
+    <div class="row">
+      <div class="col">
+        <label>Forma de pagamento</label>
+        <select id="programacaoTipo" onchange="window.atualizarProgramacaoPagamento()">
+          <option value="AVISTA">À vista — já dar baixa</option>
+          <option value="PARCELADO">Parcelado — gerar vencimentos</option>
+        </select>
+      </div>
+      <div class="col" id="boxQtdParcelas" style="display:none;">
+        <label>Quantidade de parcelas</label>
+        <input type="number" id="programacaoQtd" min="2" max="24" value="2" onchange="window.renderCamposParcelas()">
+      </div>
+    </div>
+    <div id="boxAvista">
+      <label>Data em que foi pago</label>
+      <input type="date" id="programacaoDataAvista">
+      <p style="font-size:12px; color:var(--text-muted); margin-top:-8px;">Ao confirmar, a NF será marcada como PAGA e entrará no DRE nessa data.</p>
+    </div>
+    <div id="boxParcelado" style="display:none;">
+      <p style="font-size:12px; color:var(--text-muted);">Confira as datas e valores. A soma das parcelas precisa ser igual ao valor total da NF.</p>
+      <div id="programacaoParcelas"></div>
+    </div>
+    <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:24px; flex-wrap:wrap;">
+      <button class="btn btn-outline" onclick="document.getElementById('modalProgramarPagamento').style.display='none'">CANCELAR</button>
+      <button class="btn btn-primary" onclick="window.confirmarProgramacaoPagamento()"><i data-lucide="check"></i> CONFIRMAR PROGRAMAÇÃO</button>
+    </div>
+  </div>
+</div>
+
 <script>
     lucide.createIcons();
 
@@ -393,6 +438,7 @@
     window.updateUI = function() {
         if(!window.marbeDB || !window.marbeDB.financeiro) return;
         window.calcularKPIs();
+        window.renderAguardandoProgramacao();
         window.renderContasPagar();
         window.renderContasReceber();
         window.renderDRE();
@@ -460,7 +506,7 @@
 
                     htmlExtrato += `<tr>
                         <td style="font-weight:600; color:var(--text-muted);">${dtFmt}</td>
-                        <td><strong style="color:var(--text-main); font-size:14px;">${t.descricao}</strong><br><span style="font-size:11px; color:var(--text-muted);">${t.categoria}</span></td>
+                        <td><strong style="color:var(--text-main); font-size:14px;">${t.descricao}</strong><br><span style="font-size:11px; color:var(--text-muted);">${t.categoria}</span>${t.tipo === 'ENTRADA' && t.valor_previsto && Math.abs(Number(t.valor_previsto)-Number(t.valor)) > 0.009 ? `<br><span style="font-size:11px; color:var(--warning);">Previsto: ${window.fmtMoney(t.valor_previsto)} | Diferença: ${window.fmtMoney(Number(t.valor_previsto)-Number(t.valor))}</span>` : ''}</td>
                         <td style="text-align:center;"><span class="badge-status badge-pago"><i data-lucide="check" style="width:12px; vertical-align:middle;"></i> LIQUIDADO</span></td>
                         <td style="text-align:right; font-weight:800; font-size:15px; color:${corTexto};">${sinal} ${window.fmtMoney(val)}</td>
                         <td style="text-align:center;">
@@ -483,10 +529,138 @@
         lucide.createIcons();
     };
 
+    // --- NFs RECEBIDAS QUE AINDA PRECISAM DE CONDIÇÃO DE PAGAMENTO ---
+    window.renderAguardandoProgramacao = function() {
+        const box = document.getElementById('boxAguardandoProgramacao');
+        const lista = document.getElementById('listaAguardandoProgramacao');
+        if(!box || !lista) return;
+        let html = '';
+        (window.marbeDB.financeiro.transacoes || []).forEach((t, i) => {
+            if(t.tipo !== 'SAIDA' || t.status !== 'AGUARDANDO_PROGRAMACAO') return;
+            const referencia = [t.forma_sugerida, t.detalhe_pagamento].filter(Boolean).join(' — ') || 'Não informada no Pedido de Compra';
+            html += `<div class="bill-card" style="border-left-color:var(--warning); margin-bottom:12px;">
+                <div class="bill-info">
+                    <h4>${t.descricao}</h4>
+                    <p>${t.categoria}</p>
+                    <p style="margin-top:8px;"><strong style="color:var(--warning);">Condição combinada no pedido:</strong> ${referencia}</p>
+                </div>
+                <div style="display:flex; align-items:center; gap:18px; flex-wrap:wrap; justify-content:flex-end;" class="bill-actions">
+                    <div class="bill-value saida">${window.fmtMoney(t.valor)}</div>
+                    <button class="btn btn-primary" onclick="window.abrirProgramacaoPagamento(${i})"><i data-lucide="calendar-plus"></i> DEFINIR PAGAMENTO</button>
+                </div>
+            </div>`;
+        });
+        box.style.display = html ? 'block' : 'none';
+        lista.innerHTML = html;
+    };
+
+    function adicionarMesLocal(data, meses) {
+        const d = new Date(data.getFullYear(), data.getMonth() + meses, data.getDate());
+        return window.MarbeDate.date(d);
+    }
+
+    window.abrirProgramacaoPagamento = function(idx) {
+        const t = window.marbeDB.financeiro.transacoes[idx];
+        if(!t || t.status !== 'AGUARDANDO_PROGRAMACAO') return alert('Esta NF já foi programada ou não está mais disponível.');
+        document.getElementById('programacaoIdx').value = idx;
+        document.getElementById('programacaoResumo').innerHTML = `<strong style="color:var(--text-main);">${t.descricao}</strong><br>Valor final da NF: <strong style="color:var(--danger);">${window.fmtMoney(t.valor)}</strong><br>Referência do pedido: ${[t.forma_sugerida, t.detalhe_pagamento].filter(Boolean).join(' — ') || 'não informada'}`;
+        const sugestao = `${t.forma_sugerida || ''} ${t.detalhe_pagamento || ''}`.toLowerCase();
+        document.getElementById('programacaoTipo').value = (sugestao.includes('parc') || /\d+\s*x/.test(sugestao)) ? 'PARCELADO' : 'AVISTA';
+        document.getElementById('programacaoDataAvista').value = window.MarbeDate.today();
+        document.getElementById('programacaoQtd').value = 2;
+        window.atualizarProgramacaoPagamento();
+        document.getElementById('modalProgramarPagamento').style.display = 'flex';
+        lucide.createIcons();
+    };
+
+    window.atualizarProgramacaoPagamento = function() {
+        const parcelado = document.getElementById('programacaoTipo').value === 'PARCELADO';
+        document.getElementById('boxQtdParcelas').style.display = parcelado ? 'block' : 'none';
+        document.getElementById('boxAvista').style.display = parcelado ? 'none' : 'block';
+        document.getElementById('boxParcelado').style.display = parcelado ? 'block' : 'none';
+        if(parcelado) window.renderCamposParcelas();
+    };
+
+    window.renderCamposParcelas = function() {
+        const idx = parseInt(document.getElementById('programacaoIdx').value);
+        const t = window.marbeDB.financeiro.transacoes[idx];
+        if(!t) return;
+        let qtd = parseInt(document.getElementById('programacaoQtd').value) || 2;
+        qtd = Math.max(2, Math.min(24, qtd));
+        document.getElementById('programacaoQtd').value = qtd;
+        const totalCentavos = Math.round((Number(t.valor) || 0) * 100);
+        const base = Math.floor(totalCentavos / qtd);
+        let html = '';
+        const hoje = new Date();
+        for(let i=0; i<qtd; i++) {
+            const cents = i === qtd - 1 ? totalCentavos - base * (qtd - 1) : base;
+            const valor = (cents / 100).toFixed(2);
+            const data = adicionarMesLocal(hoje, i + 1);
+            html += `<div class="row" style="align-items:end; margin-bottom:0;">
+                <div class="col"><label>Parcela ${i+1}/${qtd} — vencimento</label><input type="date" class="prog-data" value="${data}"></div>
+                <div class="col"><label>Valor (R$)</label><input type="number" step="0.01" min="0.01" class="prog-valor" value="${valor}"></div>
+            </div>`;
+        }
+        document.getElementById('programacaoParcelas').innerHTML = html;
+    };
+
+    window.confirmarProgramacaoPagamento = function() {
+        const idx = parseInt(document.getElementById('programacaoIdx').value);
+        const t = window.marbeDB.financeiro.transacoes[idx];
+        if(!t || t.status !== 'AGUARDANDO_PROGRAMACAO') return alert('Esta NF já foi programada. Atualize a tela e tente novamente.');
+        const tipo = document.getElementById('programacaoTipo').value;
+        const total = Number(t.valor) || 0;
+        if(tipo === 'AVISTA') {
+            const data = document.getElementById('programacaoDataAvista').value;
+            if(!data) return alert('Informe a data em que o pagamento à vista foi realizado.');
+            if(!confirm(`Confirmar pagamento À VISTA de ${window.fmtMoney(total)} em ${data.split('-').reverse().join('/')}?\n\nA NF será marcada como PAGA e entrará no DRE.`)) return;
+            t.status = 'PAGO';
+            t.forma_pagamento = 'À VISTA';
+            t.vencimento = data;
+            t.data_pagamento = data;
+            t.data_programacao = window.MarbeDate.today();
+        } else {
+            const datas = [...document.querySelectorAll('.prog-data')].map(e => e.value);
+            const valores = [...document.querySelectorAll('.prog-valor')].map(e => Number(e.value));
+            if(datas.some(d => !d) || valores.some(v => !v || v <= 0)) return alert('Preencha todas as datas e valores das parcelas.');
+            const soma = valores.reduce((a,b) => a+b, 0);
+            if(Math.abs(soma - total) > 0.009) return alert(`A soma das parcelas (${window.fmtMoney(soma)}) precisa ser exatamente igual ao valor da NF (${window.fmtMoney(total)}).`);
+            const qtd = valores.length;
+            if(!confirm(`Gerar ${qtd} parcela(s) totalizando ${window.fmtMoney(total)}?\n\nCada parcela aparecerá nas Contas a Pagar e no Dashboard conforme o vencimento.`)) return;
+            t.status = 'PROGRAMADO';
+            t.forma_pagamento = `PARCELADO ${qtd}x`;
+            t.data_programacao = window.MarbeDate.today();
+            t.parcelas = [];
+            const baseId = Date.now();
+            valores.forEach((valor, i) => {
+                const id = baseId + i;
+                t.parcelas.push({id, parcela:i+1, total:qtd, vencimento:datas[i], valor});
+                window.marbeDB.financeiro.transacoes.push({
+                    id,
+                    tipo:'SAIDA',
+                    categoria:t.categoria,
+                    descricao:`${t.descricao} | Parcela ${i+1}/${qtd}`,
+                    valor,
+                    status:'PENDENTE',
+                    vencimento:datas[i],
+                    origem_programacao:t.id,
+                    nf:t.nf || '',
+                    pc:t.pc || '',
+                    fornecedor:t.fornecedor || '',
+                    origem:'COMPRAS_PARCELA'
+                });
+            });
+        }
+        window.salvarNuvem(true);
+        document.getElementById('modalProgramarPagamento').style.display = 'none';
+        alert(tipo === 'AVISTA' ? 'Pagamento à vista baixado com sucesso.' : 'Parcelas geradas com sucesso nas Contas a Pagar.');
+        window.updateUI();
+    };
+
     // --- RENDERIZAR PENDENTES ---
     window.renderContasPagar = function() {
         let html = '';
-        let hojeStr = new Date().toISOString().split('T')[0];
+        let hojeStr = window.MarbeDate.today();
 
         let transacoes = window.marbeDB.financeiro.transacoes || [];
         transacoes.forEach((t, i) => {
@@ -518,7 +692,7 @@
 
     window.renderContasReceber = function() {
         let html = '';
-        let hojeStr = new Date().toISOString().split('T')[0];
+        let hojeStr = window.MarbeDate.today();
 
         let transacoes = window.marbeDB.financeiro.transacoes || [];
         transacoes.forEach((t, i) => {
@@ -551,20 +725,39 @@
     // --- AÇÃO DO BOTÃO "MARCAR COMO PAGO" (A MÁGICA QUE RESOLVE SEU PROBLEMA) ---
     window.marcarComoPago = function(idx, tipo) {
         let t = window.marbeDB.financeiro.transacoes[idx];
-        
-        // Pergunta a data real que foi pago para o DRE ficar perfeito
-        let hojeSugestao = new Date().toISOString().split('T')[0];
-        let dataMuda = prompt("Em qual data este pagamento/recebimento foi feito realmente no banco?\n\n(No formato AAAA-MM-DD)", hojeSugestao);
-        
-        if(dataMuda) {
-            t.status = tipo === 'ENTRADA' ? 'RECEBIDO' : 'PAGO';
-            t.data_pagamento = dataMuda; // ESSA É A CHAVE PRO DRE FUNCIONAR!
-            
-            window.salvarNuvem(true);
-            alert("Baixa realizada com sucesso! O valor já está computado no DRE.");
-            window.updateUI();
-            window.tabFin('tab-dre', document.querySelector('.sidebar-nav .tab-btn')); // Pula pro DRE pra ver
+        if(!t) return alert('Lançamento não encontrado. Atualize a tela e tente novamente.');
+
+        let hojeSugestao = window.MarbeDate.today();
+        let dataMuda = prompt(`Em qual data este ${tipo === 'ENTRADA' ? 'recebimento' : 'pagamento'} foi feito realmente no banco?\n\n(No formato AAAA-MM-DD)`, hojeSugestao);
+        if(!dataMuda) return;
+
+        if(tipo === 'ENTRADA') {
+            const previsto = Number(t.valor) || 0;
+            const valorDigitado = prompt(`Valor previsto: ${window.fmtMoney(previsto)}\n\nQuanto entrou REALMENTE no banco?\nUse ponto ou vírgula para os centavos.`, previsto.toFixed(2).replace('.', ','));
+            if(valorDigitado === null) return;
+            const txtReal = String(valorDigitado).trim();
+            const normalizadoReal = txtReal.includes(',') ? txtReal.replace(/\./g,'').replace(',','.') : txtReal;
+            const real = parseFloat(normalizadoReal);
+            if(!real || real <= 0) return alert('Informe um valor recebido válido.');
+            const diferenca = previsto - real;
+            if(Math.abs(diferenca) > 0.009) {
+                if(!confirm(`O valor recebido está diferente do previsto.\n\nPrevisto: ${window.fmtMoney(previsto)}\nRecebido: ${window.fmtMoney(real)}\nDiferença: ${window.fmtMoney(diferenca)}\n\nConfirmar a baixa com o valor REAL recebido?`)) return;
+                if(!t.valor_previsto) t.valor_previsto = previsto;
+                t.valor_recebido = real;
+                t.diferenca_recebimento = diferenca;
+                t.valor = real;
+            }
+            t.status = 'RECEBIDO';
+        } else {
+            if(!confirm(`Confirmar pagamento de ${window.fmtMoney(t.valor)} em ${dataMuda.split('-').reverse().join('/')}?`)) return;
+            t.status = 'PAGO';
         }
+
+        t.data_pagamento = dataMuda;
+        window.salvarNuvem(true);
+        alert(tipo === 'ENTRADA' ? 'Recebimento baixado pelo valor real que entrou no banco.' : 'Pagamento baixado com sucesso.');
+        window.updateUI();
+        window.tabFin('tab-dre', document.querySelector('.local-menu .tab-btn'));
     };
 
     window.excluirTransacao = function(idx) {
@@ -637,7 +830,7 @@
     
     // Inicia form manual com data de hoje
     document.addEventListener("DOMContentLoaded", () => {
-        document.getElementById('lancData').value = new Date().toISOString().split('T')[0];
+        document.getElementById('lancData').value = window.MarbeDate.today();
         window.mudarCorForm();
     });
 

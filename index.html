@@ -51,8 +51,8 @@
                 let seteAtras = new Date(); seteAtras.setDate(hoje.getDate() - 7);
                 const inicio = document.getElementById('filtroInicio');
                 const fim = document.getElementById('filtroFim');
-                if(inicio) inicio.value = seteAtras.toISOString().split('T')[0];
-                if(fim) fim.value = hoje.toISOString().split('T')[0];
+                if(inicio) inicio.value = window.MarbeDate.date(seteAtras);
+                if(fim) fim.value = window.MarbeDate.date(hoje);
                 window.filtrosIniciados = true;
             }
             updateUI(); 
@@ -1244,7 +1244,7 @@
       let orcBase = window.marbeDB.orçamentos[i];
       if(!confirm(`Deseja gerar uma OS de GARANTIA para ${orcBase.cliente}? A OS irá direto para a Produção com valor R$ 0,00.`)) return;
       
-      let hojeStr = new Date().toISOString().split('T')[0];
+      let hojeStr = window.MarbeDate.today();
       let dataLimite = prompt("Data limite para entregar essa garantia (AAAA-MM-DD):", hojeStr);
       if(!dataLimite) return;
 
@@ -1274,7 +1274,7 @@
   };
 
   function fecharPedido(i) {
-      idxFechar = i; let hoje = new Date().toISOString().split('T')[0];
+      idxFechar = i; let hoje = window.MarbeDate.today();
       document.getElementById('modal-data-entrada').value = hoje; document.getElementById('modal-data-limite').value = ""; document.getElementById('modal-fechar').style.display = 'flex';
   }
 
@@ -1297,7 +1297,7 @@
       doc.setFontSize(10); doc.setFont("helvetica", "bold"); let titulo = tipo === 'DIRETORIA' ? "CRONOGRAMA DE PRODUCAO - VISAO DIRETORIA" : "CRONOGRAMA DE PRODUCAO - VISAO OPERACIONAL"; doc.text(titulo, 105, 22, {align: "center"});
       doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.text(`GERADO EM: ${new Date().toLocaleDateString('pt-BR')} as ${new Date().toLocaleTimeString('pt-BR')}`, 105, 27, {align: "center"});
       doc.setLineWidth(0.5); doc.line(15, 30, 195, 30);
-      let bodyData = []; let totalDiretoria = 0; let hojeStr = new Date().toISOString().split('T')[0];
+      let bodyData = []; let totalDiretoria = 0; let hojeStr = window.MarbeDate.today();
 
       (window.marbeDB.pedidos || []).forEach(p => {
           let ent = p.data_entrada ? p.data_entrada.split('-').reverse().join('/') : "N/D"; let lim = p.data_limite ? p.data_limite.split('-').reverse().join('/') : "N/D"; let status = "Em Producao";
@@ -1437,7 +1437,7 @@
 
   function renderProducao() {
     let htmlCron = `<table style="min-width:700px;"><thead><tr><th>OS - Cliente</th><th>Entrada Produção</th><th>Prazo Limite</th><th>Status</th><th style="text-align:center">Ações</th></tr></thead><tbody>`;
-    let hojeStr = new Date().toISOString().split('T')[0];
+    let hojeStr = window.MarbeDate.today();
     
     (window.marbeDB.pedidos || []).forEach((p, i) => {
         let ent = p.data_entrada ? p.data_entrada.split('-').reverse().join('/') : "N/D"; let lim = p.data_limite ? p.data_limite.split('-').reverse().join('/') : "N/D";
@@ -1490,10 +1490,19 @@
             <input value="${m.n}" readonly style="flex:2; background:var(--bg-color); cursor:default; color:var(--text-main); font-weight:600; font-size:15px;">
             <input value="${window.fmtMoney(m.p)}" readonly style="flex:1; background:var(--bg-color); font-weight:800; cursor:default; color:var(--success); font-size:15px;">
             <button class="btn btn-outline" onclick="editarPrecoMaterial(${i})" style="padding:14px; color:#f59e0b; border-color:#b45309;"><i data-lucide="edit-2" style="width:18px;"></i></button>
-            <button class="btn btn-outline" onclick="window.marbeDB.custos.mats.splice(${i},1); window.salvarNuvem(); updateUI();" style="padding:14px; color:var(--danger); border-color:#7f1d1d;"><i data-lucide="trash-2" style="width:18px;"></i></button>
+            <button class="btn btn-outline" onclick="excluirMaterialCusto(${i})" style="padding:14px; color:var(--danger); border-color:#7f1d1d;"><i data-lucide="trash-2" style="width:18px;"></i></button>
           </div>`).join('');
           if (typeof lucide !== 'undefined') lucide.createIcons();
     }
+  }
+
+  function excluirMaterialCusto(i) {
+      const m = window.marbeDB.custos.mats[i];
+      if(!m) return;
+      if(!confirm(`Excluir o material "${m.n}" da Tabela de Custos?\n\nIsso pode afetar novos cálculos. Orçamentos e OS já salvos não serão apagados.`)) return;
+      window.marbeDB.custos.mats.splice(i,1);
+      window.salvarNuvem();
+      updateUI();
   }
 
   function editarPrecoMaterial(i) {

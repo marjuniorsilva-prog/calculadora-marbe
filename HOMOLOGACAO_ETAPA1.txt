@@ -1,15 +1,62 @@
 MARBE ERP - HOMOLOGAÇÃO ETAPA 1
-Versão 2026.08.18.3
+Versão 2026.08.19.4
 
-Alterações consolidadas:
-- Proteção contra uso simultâneo em duas abas.
+OBJETIVO
+Validar o sistema para operação diária por 1 funcionário antes da criação do manual oficial em PDF.
+
+SEGURANÇA E ACESSO
 - Firebase Authentication com login Google.
 - Conta autorizada: mar.junior.silva@gmail.com.
-- Páginas internas exigem autenticação Firebase antes de ler o banco.
-- Regras do Realtime Database incluídas para bloquear leitura/gravação sem autenticação e sem o e-mail autorizado.
-- Removidos busca decorativa e sino sem função.
-- Textos, confirmações, mensagens críticas e caminhos operacionais revisados.
-- Dashboard mantém backup do banco, backup das OS em PDF e backup completo.
-- Compras PRESERVADO no fluxo aprovado: Pedido de Compra -> Material Recebido -> Estoque + Financeiro.
+- Regras do Realtime Database exigem autenticação e e-mail autorizado.
+- Proteção contra duas abas operacionais simultâneas.
+- Botões de encerramento de sessão corrigidos onde estavam sem ação.
 
-Antes de publicar as regras, leia CONFIGURAR_FIREBASE_AUTH.txt.
+CORREÇÕES DESTA HOMOLOGAÇÃO
+1. Datas locais
+- Datas de "hoje" agora usam o calendário local do computador, sem o erro de UTC que podia adiantar a data depois das 21h no Brasil.
+
+2. Compras -> Material Recebido -> Financeiro
+- Pedido de Compra continua funcionando como antes.
+- Ao receber material, o operador confere NF, produtos do pedido e valor final da NF.
+- Se o valor da NF for diferente do Pedido de Compra, o sistema exige confirmação.
+- Estoque só é atualizado após confirmação de Material Recebido.
+- A NF vai ao Financeiro como "aguardando programação", sem virar vencida automaticamente.
+- No Financeiro o operador define:
+  a) À vista: informa a data e já dá baixa como PAGO.
+  b) Parcelado: define quantidade, datas e valores das parcelas.
+- A soma das parcelas precisa fechar exatamente o valor da NF.
+- Parcelas geradas passam a aparecer nas Contas a Pagar e no Dashboard pelas datas corretas.
+- NFs antigas de Compras sem vencimento são reconhecidas para programação.
+
+3. Recebimentos de clientes / Factory
+- Venda não gera receita automática.
+- Contas a Receber continuam sob controle manual.
+- Ao dar baixa em uma receita, o sistema pergunta quanto realmente entrou no banco.
+- Se o valor recebido for diferente do previsto, o sistema guarda:
+  * valor previsto;
+  * valor real recebido;
+  * diferença.
+- O DRE usa o valor REAL recebido.
+
+4. Facilidade e prevenção de erro
+- Confirmação antes de gerar Pedido de Compra.
+- Confirmação forte antes de Material Recebido atualizar estoque/financeiro.
+- Confirmação antes de excluir material da Tabela de Custos.
+- Confirmação antes de remover funcionário/processo do FAP.
+- Subabas automáticas de Compras corrigidas para manter destaque visual.
+
+TESTES AUTOMATIZADOS / ESTRUTURAIS EXECUTADOS
+- Sintaxe dos 20 blocos JavaScript: OK.
+- IDs de elementos referenciados pelo código: OK.
+- Links internos entre arquivos: OK.
+- Botões sem ação: nenhum encontrado.
+- Proteção de segunda aba e liberação após timeout: OK.
+- Data local Brasil em horário onde UTC mudaria o dia: OK.
+- Fluxo Orçamento aprovado -> Produção -> Expedição -> Histórico: OK.
+- Compra à vista -> baixa financeira: OK.
+- Compra parcelada -> geração de títulos: OK.
+- Recebimento previsto R$ 10.000 / real R$ 9.700 -> DRE R$ 9.700 e diferença R$ 300 preservada: OK.
+
+PRÓXIMO PASSO
+Realizar teste vivo no ambiente publicado com o Firebase real e a conta Google autorizada.
+Somente depois da homologação final será criado o Manual Operacional em PDF.

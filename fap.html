@@ -70,7 +70,7 @@
     };
     
     document.addEventListener("DOMContentLoaded", () => {
-        let hoje = new Date().toISOString().split('T')[0];
+        let hoje = window.MarbeDate.today();
         document.getElementById('fapData').value = hoje;
         document.getElementById('filtroData').value = hoje;
     });
@@ -529,7 +529,7 @@
     };
 
     window.renderHoje = function() {
-        let hojeStr = new Date().toISOString().split('T')[0];
+        let hojeStr = window.MarbeDate.today();
         let html = '';
         let apReverse = [...(window.marbeDB.producao.apontamentos || [])].reverse();
         
@@ -606,7 +606,7 @@
         if(!window.marbeDB.producao.funcionarios) window.marbeDB.producao.funcionarios = [];
         window.marbeDB.producao.funcionarios.push(n); window.salvarNuvem(true); document.getElementById('cadFuncNome').value = ''; window.updateUI();
     };
-    window.rmFuncionario = function(i) { window.marbeDB.producao.funcionarios.splice(i, 1); window.salvarNuvem(true); window.updateUI(); };
+    window.rmFuncionario = function(i) { const nome = window.marbeDB.producao.funcionarios[i]; if(confirm(`Remover o funcionário "${nome}" da lista de apontamento?\n\nOs apontamentos antigos não serão apagados.`)) { window.marbeDB.producao.funcionarios.splice(i, 1); window.salvarNuvem(true); window.updateUI(); } };
 
     window.addProcesso = function() {
         let p = document.getElementById('cadProcessoNome').value.trim();
@@ -614,7 +614,7 @@
         if(!window.marbeDB.producao.processos) window.marbeDB.producao.processos = [];
         window.marbeDB.producao.processos.push(p); window.salvarNuvem(true); document.getElementById('cadProcessoNome').value = ''; window.updateUI();
     };
-    window.rmProcesso = function(i) { window.marbeDB.producao.processos.splice(i, 1); window.salvarNuvem(true); window.updateUI(); };
+    window.rmProcesso = function(i) { const nome = window.marbeDB.producao.processos[i]; if(confirm(`Remover o processo "${nome}" da lista?\n\nOs apontamentos antigos não serão apagados.`)) { window.marbeDB.producao.processos.splice(i, 1); window.salvarNuvem(true); window.updateUI(); } };
 
     /* ========================================================================================= */
     /* GERAR PDF FICHA EM BRANCO PARA O PEÃO PREENCHER NA FÁBRICA                                */

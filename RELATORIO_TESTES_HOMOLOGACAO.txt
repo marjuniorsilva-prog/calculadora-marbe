@@ -1,0 +1,19 @@
+MARBE ERP 2026.08.19.4 - RELATÓRIO RESUMIDO DE TESTES
+
+PASSOU:
+- JavaScript
+- Links internos
+- IDs de tela
+- Botões acionáveis
+- Trava de duas abas
+- Data local
+- Fluxo OS -> produção -> expedição -> histórico
+- Financeiro de compras à vista
+- Financeiro de compras parcelado
+- Recebimento de cliente pelo valor real
+
+PENDENTE DE VALIDAÇÃO HUMANA NO AMBIENTE PUBLICADO:
+- Login Google real no domínio publicado
+- Leitura/gravação real do Realtime Database com as regras publicadas
+- Geração visual dos PDFs no navegador
+- Teste de impressão e navegação com dados reais da empresa

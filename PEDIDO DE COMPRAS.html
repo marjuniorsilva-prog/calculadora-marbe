@@ -250,15 +250,15 @@
           
           <!-- SUBMENUS DINÂMICOS -->
           <div class="sub-tabs" id="submenu-compras">
-              <button class="sub-tab-btn active" onclick="window.tabSection('tab-pedido', this)"><i data-lucide="shopping-bag" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Gerar Pedido (PO)</button>
-              <button class="sub-tab-btn" onclick="window.tabSection('tab-historico', this)"><i data-lucide="history" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Histórico de Compras</button>
+              <button class="sub-tab-btn active" onclick="window.tabSection('tab-pedido', this)"><i data-lucide="shopping-bag" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Gerar Pedido de Compra</button>
+              <button id="btn-tab-historico" class="sub-tab-btn" onclick="window.tabSection('tab-historico', this)"><i data-lucide="history" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Histórico de Compras</button>
           </div>
           <div class="sub-tabs" id="submenu-cadastros" style="display:none;">
               <button class="sub-tab-btn active" onclick="window.tabSection('tab-fornecedores', this)"><i data-lucide="truck" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Agenda Fornecedores</button>
               <button class="sub-tab-btn" onclick="window.tabSection('tab-produtos', this)"><i data-lucide="package-plus" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Catálogo de Insumos</button>
           </div>
           <div class="sub-tabs" id="submenu-estoque" style="display:none;">
-              <button class="sub-tab-btn active-estoque active" onclick="window.tabSection('tab-saldos', this)"><i data-lucide="layers" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Saldo nas Prateleiras</button>
+              <button id="btn-tab-saldos" class="sub-tab-btn active-estoque active" onclick="window.tabSection('tab-saldos', this)"><i data-lucide="layers" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Saldo nas Prateleiras</button>
               <button class="sub-tab-btn active-estoque" onclick="window.tabSection('tab-extrato', this)"><i data-lucide="list" style="width:16px; margin-right:6px; vertical-align:middle;"></i> Extrato de Movimentações</button>
           </div>
           <div class="sub-tabs" id="submenu-retirada" style="display:none;">
@@ -495,6 +495,9 @@
         <p style="font-size:14px; color:var(--text-muted); margin-bottom:25px;">Informe a NF para dar entrada. <strong style="color:var(--text-main);">Os itens irão para o Estoque e a Despesa será enviada ao Contas a Pagar.</strong></p>
         <label>Número da Nota Fiscal (NF-e)</label>
         <input type="text" id="nfRecebimento" placeholder="Ex: 0001548">
+        <label>Valor final da Nota Fiscal (R$)</label>
+        <input type="number" step="0.01" min="0" id="valorNFRecebimento" placeholder="0,00">
+        <div id="resumoRecebimento" style="margin-top:14px; padding:14px; background:var(--bg-color); border:1px solid var(--border); border-radius:8px; color:var(--text-muted); font-size:12px; line-height:1.55;"></div>
         <input type="hidden" id="idxRecebimento">
         <div style="display:flex; gap:20px; margin-top:30px;">
             <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('modalReceberNF').style.display='none'">CANCELAR</button>
@@ -538,7 +541,7 @@
         } else if(modulo === 'retirada') {
             document.getElementById('btn-retirada').classList.add('active-estoque');
             document.getElementById('submenu-retirada').style.display = 'flex';
-            document.getElementById('mainTitle').innerText = 'Catraca de Retirada (Baixa)';
+            document.getElementById('mainTitle').innerText = 'Retirada de Material';
             document.documentElement.style.setProperty('--primary', '#8b5cf6'); 
             window.tabSection('tab-baixa');
         }
@@ -731,9 +734,10 @@
             }
 
             let nPedido = window.marbeDB.compras.seq;
+            let totalGlobal = itensPedidoAtual.reduce((acc, it) => acc + (it.q_emb * it.v_emb), 0);
+            if(!confirm(`Gerar o Pedido de Compra PC-${nPedido}?\n\nFornecedor: ${forn}\nEmpresa: ${empresaSelecionada}\nItens: ${itensPedidoAtual.length}\nTotal: ${window.fmtMoney(totalGlobal)}\n\nConfirme somente depois de revisar os dados.`)) return;
             window.marbeDB.compras.seq++; 
             
-            let totalGlobal = itensPedidoAtual.reduce((acc, it) => acc + (it.q_emb * it.v_emb), 0);
             let dtEmissao = new Date().toISOString();
             
             let elemObs = document.getElementById('obsCompra');
@@ -786,13 +790,24 @@
     /* ALMOXARIFADO, ESTOQUE E INJEÇÃO FINANCEIRA (NO RECEBIMENTO)               */
     /* ========================================================================= */
     window.abrirRecebimentoNF = function(index) {
-        document.getElementById('idxRecebimento').value = index; document.getElementById('nfRecebimento').value = ''; document.getElementById('modalReceberNF').style.display = 'flex';
+        const pedido = window.marbeDB.compras.pedidos[index];
+        document.getElementById('idxRecebimento').value = index;
+        document.getElementById('nfRecebimento').value = '';
+        document.getElementById('valorNFRecebimento').value = Number(pedido.total || 0).toFixed(2);
+        const itens = (pedido.itens || []).map(it => `${it.n} — ${Number(it.q_total || 0).toFixed(2)} ${it.un || ''}`).join('<br>');
+        document.getElementById('resumoRecebimento').innerHTML = `<strong style="color:var(--text-main);">PC ${pedido.pc} — ${pedido.fornecedor}</strong><br>${itens || 'Sem itens cadastrados.'}<br><br><strong style="color:var(--text-main);">Valor do pedido:</strong> ${window.fmtMoney(pedido.total || 0)}<br><span style="color:var(--warning);">Confira a NF. Se o valor final estiver diferente do pedido, ajuste o campo acima antes de confirmar.</span>`;
+        document.getElementById('modalReceberNF').style.display = 'flex';
     };
 
     window.confirmarRecebimento = function() {
         try {
             const nf = document.getElementById('nfRecebimento').value.trim(); if(!nf) return alert("Digite o número da Nota Fiscal.");
+            const valorNF = parseFloat(document.getElementById('valorNFRecebimento').value); if(!valorNF || valorNF <= 0) return alert("Informe o valor final da Nota Fiscal.");
             const index = parseInt(document.getElementById('idxRecebimento').value); let pedido = window.marbeDB.compras.pedidos[index];
+            if (Math.abs(valorNF - Number(pedido.total || 0)) > 0.009) {
+                if(!confirm(`O valor da NF (${window.fmtMoney(valorNF)}) está diferente do Pedido de Compra (${window.fmtMoney(pedido.total || 0)}).\n\nConfirma que o valor correto a enviar ao Financeiro é o da NF?`)) return;
+            }
+            if(!confirm(`CONFIRMAR MATERIAL RECEBIDO?\n\nNF: ${nf}\nFornecedor: ${pedido.fornecedor}\nValor final: ${window.fmtMoney(valorNF)}\n\nAo confirmar, os itens entrarão no estoque e a NF será enviada ao Financeiro para programação do pagamento.`)) return;
             
             // 1. INJEÇÃO NO ESTOQUE FÍSICO
             if(!window.marbeDB.almoxarifado.movimentacoes) window.marbeDB.almoxarifado.movimentacoes = [];
@@ -815,24 +830,32 @@
             let detalhePgto = pedido.detalhe_pagamento || 'A Combinar';
             let despesaAutomatica = {
                 id: Date.now(),
-                tipo: "SAIDA", // É uma despesa a pagar
-                data: new Date().toISOString().split('T')[0], // Data de hoje (recebimento)
+                tipo: "SAIDA",
+                data: window.MarbeDate.today(),
                 categoria: "Fornecedores / Matéria-Prima",
-                descricao: `NF: ${nf} | Pedido PC-${pedido.pc} | Fornecedor: ${pedido.fornecedor} | Pgto: ${detalhePgto}`,
-                valor: pedido.total,
-                status: "PENDENTE" // Entra vermelho aguardando o pagamento do boleto
+                descricao: `NF: ${nf} | Pedido PC-${pedido.pc} | Fornecedor: ${pedido.fornecedor}`,
+                valor: valorNF,
+                status: "AGUARDANDO_PROGRAMACAO",
+                nf: nf,
+                pc: pedido.pc,
+                fornecedor: pedido.fornecedor,
+                forma_sugerida: pedido.tipo_pagamento || '',
+                detalhe_pagamento: detalhePgto,
+                origem: "COMPRAS"
             };
             
             window.marbeDB.financeiro.transacoes.push(despesaAutomatica);
 
             // Confirma o recebimento no pedido
             pedido.recebido = true; 
-            pedido.nf_entrada = nf; 
+            pedido.nf_entrada = nf;
+            pedido.valor_nf = valorNF;
+            pedido.data_recebimento = window.MarbeDate.today();
             
             window.salvarNuvem(true); 
             document.getElementById('modalReceberNF').style.display = 'none'; 
             
-            alert(`SUCESSO!\n\n1. Estoque Físico Atualizado.\n2. Despesa gerada no Financeiro aguardando pagamento.`); 
+            alert(`MATERIAL RECEBIDO COM SUCESSO!\n\n1. Estoque físico atualizado.\n2. NF enviada ao Financeiro.\n3. No Financeiro, defina se o pagamento é à vista ou parcelado e informe as datas.`); 
             window.updateUI();
         } catch(e) {
             alert("Erro ao processar recebimento: " + e.message);
@@ -847,7 +870,7 @@
         });
         document.getElementById('tabelaSaldosEstoque').innerHTML = html || '<tr><td colspan="3" style="text-align:center; padding:30px; color:var(--text-muted);">Almoxarifado Vazio.</td></tr>';
         document.getElementById('kpiEstoqueItens').innerText = totaisUnicos;
-        let mesAtual = new Date().toISOString().substring(0, 7); let ent = 0, sai = 0;
+        let mesAtual = window.MarbeDate.month(); let ent = 0, sai = 0;
         (window.marbeDB.almoxarifado.movimentacoes || []).forEach(m => { if(m.data.startsWith(mesAtual)) { if(m.tipo === 'ENTRADA') ent++; if(m.tipo === 'SAÍDA') sai++; } });
         document.getElementById('kpiEstoqueEntradas').innerText = ent; document.getElementById('kpiEstoqueSaidas').innerText = sai;
     };

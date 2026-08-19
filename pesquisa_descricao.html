@@ -16,7 +16,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-    import { requireAuthorizedUser, applyUserProfile, redirectToLogin } from "./marbe_auth.js";
+    import { requireAuthorizedUser, applyUserProfile, redirectToLogin, logoutFirebase } from "./marbe_auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyATu_V6e1shKRpgBOkX1lw2beyzUEZUCo0",
@@ -39,6 +39,15 @@
       redirectToLogin(authError?.code === 'marbe/not-authorized' ? 'denied' : 'required');
       throw authError;
     }
+
+    window.marbeFirebaseLogout = async function() {
+      if(!confirm('Encerrar sua sessão do MARBE ERP neste navegador?')) return;
+      try { await logoutFirebase(app); }
+      finally {
+        if(window.MarbeGuard) window.MarbeGuard.logout();
+        location.replace('index.html?auth=required');
+      }
+    };
 
     const db = getDatabase(app);
     window.marbeDB = null;
@@ -178,7 +187,7 @@
       </div>
       
       <div class="sidebar-footer">
-          <button class="tab-btn" style="color: var(--danger);"><i data-lucide="log-out" style="color:var(--danger)"></i> <span>Encerrar Sessão</span></button>
+          <button class="tab-btn" onclick="window.marbeFirebaseLogout()" style="color: var(--danger);"><i data-lucide="log-out" style="color:var(--danger)"></i> <span>Encerrar Sessão</span></button>
       </div>
   </aside>
 

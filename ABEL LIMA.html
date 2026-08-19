@@ -73,7 +73,7 @@
         if(!jaCreditou) {
             window.transacoes.push({
                 id: Date.now(),
-                data: hoje.toISOString().split('T')[0],
+                data: window.MarbeDate.date(hoje),
                 mes_ref: mesAnoAtual,
                 tipo: 'CREDITO_AUTO',
                 valor: VALOR_PROLABORE_MENSAL,
@@ -91,7 +91,7 @@
     document.addEventListener("DOMContentLoaded", () => {
         let hoje = new Date();
         document.getElementById('dataFiltro').value = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
-        document.getElementById('dataRetirada').value = hoje.toISOString().split('T')[0];
+        document.getElementById('dataRetirada').value = window.MarbeDate.date(hoje);
     });
   </script>
 
