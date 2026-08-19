@@ -270,6 +270,12 @@
                   <div class="subtitle" id="kpiPagarHojeQtd">0 títulos vencendo hoje</div>
                   <button class="detail-toggle" onclick="toggleDetalhesFinanceiro('pagarHoje')"><i data-lucide="list"></i> EXIBIR COMPROMISSOS</button>
               </div>
+              <div class="kpi-card" style="border-bottom:4px solid #f97316;">
+                  <h3 style="color:#f97316"><i data-lucide="calendar-minus" style="width:16px;"></i> Contas a Pagar no Mês</h3>
+                  <div class="value money" id="kpiPagarMes">R$ 0,00</div>
+                  <div class="subtitle" id="kpiPagarMesQtd">0 títulos no mês atual</div>
+                  <button class="detail-toggle" onclick="toggleDetalhesFinanceiro('pagarMes')"><i data-lucide="list"></i> EXIBIR COMPROMISSOS</button>
+              </div>
               <div class="kpi-card" style="border-bottom:4px solid var(--primary);">
                   <h3 style="color:var(--primary)"><i data-lucide="calendar-range" style="width:16px;"></i> Contas a Receber no Mês</h3>
                   <div class="value money" id="kpiReceberMes">R$ 0,00</div>
@@ -281,6 +287,11 @@
                   <div class="value money" id="kpiReceberHoje">R$ 0,00</div>
                   <div class="subtitle" id="kpiReceberHojeQtd">0 títulos vencendo hoje</div>
                   <button class="detail-toggle" onclick="toggleDetalhesFinanceiro('receberHoje')"><i data-lucide="list"></i> EXIBIR COMPROMISSOS</button>
+              </div>
+              <div class="kpi-card" id="cardSaldoPrevistoMes" style="border-bottom:4px solid var(--success);">
+                  <h3 id="tituloSaldoPrevistoMes" style="color:var(--success)"><i data-lucide="scale" style="width:16px;"></i> Saldo Previsto do Mês</h3>
+                  <div class="value money" id="kpiSaldoPrevistoMes">R$ 0,00</div>
+                  <div class="subtitle" id="kpiSaldoPrevistoMesInfo">Receber no mês − Pagar no mês</div>
               </div>
           </div>
 
@@ -438,7 +449,7 @@
         </table></div>`;
     }
 
-    window.dashboardDetalhesFinanceiros = { pagarVencidas: [], pagarHoje: [], receberMes: [], receberHoje: [] };
+    window.dashboardDetalhesFinanceiros = { pagarVencidas: [], pagarHoje: [], pagarMes: [], receberMes: [], receberHoje: [] };
     window.dashboardDetalheAberto = null;
 
     function nomeFinanceiro(t) {
@@ -466,6 +477,7 @@
         const titulos = {
             pagarVencidas: ['Contas a Pagar Vencidas', 'Compromissos pendentes com vencimento anterior a hoje.'],
             pagarHoje: ['Contas a Pagar Hoje', 'Pagamentos que vencem na data de hoje.'],
+            pagarMes: ['Contas a Pagar no Mês', 'Pagamentos pendentes com vencimento no mês atual.'],
             receberMes: ['Contas a Receber no Mês', 'Recebimentos pendentes com vencimento no mês atual.'],
             receberHoje: ['Contas a Receber Hoje', 'Recebimentos previstos para a data de hoje.']
         };
@@ -745,10 +757,11 @@
 
         let pagarVencidas = 0, pagarVencidasQtd = 0;
         let pagarHoje = 0, pagarHojeQtd = 0;
+        let pagarMes = 0, pagarMesQtd = 0;
         let receberMes = 0, receberMesQtd = 0;
         let receberHoje = 0, receberHojeQtd = 0;
 
-        const detalhes = { pagarVencidas: [], pagarHoje: [], receberMes: [], receberHoje: [] };
+        const detalhes = { pagarVencidas: [], pagarHoje: [], pagarMes: [], receberMes: [], receberHoje: [] };
 
         renderUrgenciaProducao(pedidosAtivos, hoje);
 
@@ -775,6 +788,7 @@
             };
 
             if (tipo === 'SAIDA' || tipo === 'DESPESA') {
+                if (venc.startsWith(mesAtual)) { pagarMes += valor; pagarMesQtd++; detalhes.pagarMes.push(detalhe); }
                 if (venc < hoje) { pagarVencidas += valor; pagarVencidasQtd++; detalhes.pagarVencidas.push(detalhe); }
                 else if (venc === hoje) { pagarHoje += valor; pagarHojeQtd++; detalhes.pagarHoje.push(detalhe); }
             }
@@ -800,10 +814,25 @@
         document.getElementById('kpiPagarVencidasQtd').innerText = plural(pagarVencidasQtd, 'título pendente', 'títulos pendentes');
         document.getElementById('kpiPagarHoje').innerText = window.fmtMoney(pagarHoje);
         document.getElementById('kpiPagarHojeQtd').innerText = plural(pagarHojeQtd, 'título vencendo hoje', 'títulos vencendo hoje');
+        document.getElementById('kpiPagarMes').innerText = window.fmtMoney(pagarMes);
+        document.getElementById('kpiPagarMesQtd').innerText = plural(pagarMesQtd, 'título no mês atual', 'títulos no mês atual');
         document.getElementById('kpiReceberMes').innerText = window.fmtMoney(receberMes);
         document.getElementById('kpiReceberMesQtd').innerText = plural(receberMesQtd, 'título no mês atual', 'títulos no mês atual');
         document.getElementById('kpiReceberHoje').innerText = window.fmtMoney(receberHoje);
         document.getElementById('kpiReceberHojeQtd').innerText = plural(receberHojeQtd, 'título vencendo hoje', 'títulos vencendo hoje');
+
+        const saldoPrevistoMes = receberMes - pagarMes;
+        const saldoEl = document.getElementById('kpiSaldoPrevistoMes');
+        const saldoTitulo = document.getElementById('tituloSaldoPrevistoMes');
+        const saldoCard = document.getElementById('cardSaldoPrevistoMes');
+        saldoEl.innerText = window.fmtMoney(saldoPrevistoMes);
+        const saldoCor = saldoPrevistoMes < 0 ? 'var(--danger)' : 'var(--success)';
+        saldoEl.style.color = saldoCor;
+        saldoTitulo.style.color = saldoCor;
+        saldoCard.style.borderBottomColor = saldoCor;
+        document.getElementById('kpiSaldoPrevistoMesInfo').innerText = saldoPrevistoMes < 0
+            ? `Previsão negativa: faltam ${window.fmtMoney(Math.abs(saldoPrevistoMes))}`
+            : `Previsão positiva: sobra ${window.fmtMoney(saldoPrevistoMes)}`;
 
         Chart.defaults.color = '#94a3b8';
         Chart.defaults.font.family = 'Inter';
