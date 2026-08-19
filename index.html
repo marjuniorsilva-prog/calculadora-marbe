@@ -1166,9 +1166,17 @@
   };
 
   function salvarOrcamento() {
-    const razaoComercial = document.getElementById('razao').value || "CLIENTE NÃO INFORMADO"; 
+    const razaoDigitada = (document.getElementById('razao').value || '').trim();
+    const razaoComercial = razaoDigitada || "CLIENTE NÃO INFORMADO"; 
     const cnpjComercial = document.getElementById('cnpj').value || ""; 
     const enderecoComercial = document.getElementById('endereco').value || "";
+
+    if(!razaoDigitada) {
+        if(!confirm("ATENÇÃO: nenhum cliente foi informado nesta OS.\n\nDeseja salvar mesmo assim como CLIENTE NÃO INFORMADO?")) {
+            document.getElementById('razao').focus();
+            return;
+        }
+    }
     
     if(itensTemp.length === 0) {
         if(!confirm("Esta OS não possui nenhum item adicionado. Deseja salvar a OS vazia mesmo assim?")) return;
@@ -1192,21 +1200,20 @@
     if (razaoComercial !== "CLIENTE NÃO INFORMADO") { salvarClienteDb(razaoComercial, cnpjComercial, enderecoComercial); }
 
     if(idEdicao) {
-        let objAntigo = window.marbeDB[idEdicao.origem][idEdicao.index];
-        orcData.data_criacao = objAntigo.data_criacao || orcData.data_criacao;
-        if(objAntigo.crm_status) orcData.crm_status = objAntigo.crm_status;
-        if(objAntigo.crm_motivo) orcData.crm_motivo = objAntigo.crm_motivo;
-        if(objAntigo.crm_obs_perda) orcData.crm_obs_perda = objAntigo.crm_obs_perda;
-        if(objAntigo.crm_obs) orcData.crm_obs = objAntigo.crm_obs;
-
-        if(idEdicao.origem === 'pedidos') {
-            if(objAntigo.data_entrada) orcData.data_entrada = objAntigo.data_entrada;
-            if(objAntigo.data_limite) orcData.data_limite = objAntigo.data_limite;
-            if(objAntigo.projecao) orcData.projecao = objAntigo.projecao;
-            window.marbeDB.pedidos[idEdicao.index] = orcData;
-        } else {
-            window.marbeDB.orçamentos[idEdicao.index] = orcData;
+        const origemEdicao = idEdicao.origem;
+        const indiceEdicao = idEdicao.index;
+        const listaOrigem = window.marbeDB[origemEdicao];
+        const objAntigo = Array.isArray(listaOrigem) ? listaOrigem[indiceEdicao] : null;
+        if(!objAntigo) {
+            alert('Não foi possível localizar a OS original para salvar a alteração. Atualize a página e tente novamente.');
+            return;
         }
+
+        // Mantém todos os dados operacionais já registrados (CRM, Produção, Expedição,
+        // entrega, garantia etc.) e substitui apenas os campos comerciais/editáveis.
+        orcData.data_criacao = objAntigo.data_criacao || orcData.data_criacao;
+        window.marbeDB[origemEdicao][indiceEdicao] = { ...objAntigo, ...orcData };
+
         idEdicao = null; document.getElementById('btnCancelaEdit').style.display = 'none'; document.getElementById('osEdicaoLabel').innerText = "Nova";
     } else {
         orcData.crm_status = 'pendente';
@@ -1282,7 +1289,7 @@
         const total = Number(o.total || 0);
         const detalheEntrega = r.etapa === 'ENTREGUE' ? `<div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border); color:var(--text-muted); font-size:12px;"><strong style="color:var(--text-main);">Entrega:</strong> ${o.tipo_entrega || 'não informada'}${o.recebedor_nome ? ` | <strong>Recebedor:</strong> ${o.recebedor_nome}` : ''}${o.recebedor_doc ? ` | <strong>Documento:</strong> ${o.recebedor_doc}` : ''}${o.obs_entrega ? `<br><strong>Observação:</strong> ${o.obs_entrega}` : ''}</div>` : '';
         const motivo = r.etapa === 'PERDIDO' ? `<div style="margin-top:8px; color:var(--danger); font-size:12px;"><strong>Motivo:</strong> ${o.crm_motivo || 'Não informado'}${o.crm_obs_perda ? ` — ${o.crm_obs_perda}` : ''}</div>` : '';
-        html += `<div class="card-list" style="border-left-color:${c[0]};"><div style="display:flex; justify-content:space-between; align-items:flex-start; gap:15px; flex-wrap:wrap;"><div><strong style="font-size:16px; color:var(--text-main);">OS: ${o.os || 'CONTATO'} - ${o.cliente || 'Cliente não informado'}</strong><div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;"><span style="font-size:11px; background:${c[1]}; color:#0f172a; padding:5px 9px; border-radius:999px; font-weight:800;">${r.rotulo}</span><span style="font-size:12px; color:var(--text-muted);">Data da etapa: ${dataBr}</span></div></div><div style="font-size:21px; font-weight:800; color:${total > 0 ? 'var(--success)' : 'var(--text-muted)'};">${window.fmtMoney(total)}</div></div>${motivo}${detalheEntrega}${o.os !== 'CONTATO' ? `<div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;"><button class="btn btn-outline" style="width:auto;" onclick="gerarPDF('CLIENTE', ${r.index}, '${r.base}')"><i data-lucide="file-text" style="width:17px;"></i> PDF Cliente</button><button class="btn btn-outline" style="width:auto;" onclick="gerarPDF('PRODUCAO', ${r.index}, '${r.base}')"><i data-lucide="factory" style="width:17px;"></i> PDF Produção</button></div>` : ''}</div>`;
+        html += `<div class="card-list" style="border-left-color:${c[0]};"><div style="display:flex; justify-content:space-between; align-items:flex-start; gap:15px; flex-wrap:wrap;"><div><strong style="font-size:16px; color:var(--text-main);">OS: ${o.os || 'CONTATO'} - ${o.cliente || 'Cliente não informado'}</strong><div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;"><span style="font-size:11px; background:${c[1]}; color:#0f172a; padding:5px 9px; border-radius:999px; font-weight:800;">${r.rotulo}</span><span style="font-size:12px; color:var(--text-muted);">Data da etapa: ${dataBr}</span></div></div><div style="font-size:21px; font-weight:800; color:${total > 0 ? 'var(--success)' : 'var(--text-muted)'};">${window.fmtMoney(total)}</div></div>${motivo}${detalheEntrega}${o.os !== 'CONTATO' ? `<div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;"><button class="btn btn-outline" style="width:auto; color:var(--info); border-color:var(--info);" onclick="editarExistente('${r.base}', ${r.index})"><i data-lucide="edit-3" style="width:17px;"></i> Editar OS</button><button class="btn btn-outline" style="width:auto;" onclick="gerarPDF('CLIENTE', ${r.index}, '${r.base}')"><i data-lucide="file-text" style="width:17px;"></i> PDF Cliente</button><button class="btn btn-outline" style="width:auto;" onclick="gerarPDF('PRODUCAO', ${r.index}, '${r.base}')"><i data-lucide="factory" style="width:17px;"></i> PDF Produção</button></div>` : ''}</div>`;
     });
     document.getElementById('listaOrcamentos').innerHTML = html || "<div style='text-align:center; padding:50px; background:var(--card-bg); border-radius:12px; border:1px dashed var(--border); color:var(--text-muted)'><i data-lucide='file-search' style='width:40px; height:40px; margin-bottom:15px; opacity:0.5;'></i><br>Nenhuma OS encontrada com esses filtros.</div>";
     const resumo = document.getElementById('resumoHistoricoGeral');
@@ -1596,18 +1603,32 @@
   }
 
   function editarExistente(origem, index) {
-      const base = window.marbeDB[origem][index]; idEdicao = { origem, index, os: base.os };
+      const lista = window.marbeDB[origem];
+      const base = Array.isArray(lista) ? lista[index] : null;
+      if(!base) return alert('OS não localizada. Atualize a página e tente novamente.');
+
+      if(origem === 'arquivados') {
+          if(!confirm(`A OS ${base.os} já está ENTREGUE / ARQUIVADA. Deseja corrigir os dados da OS?\n\nOs dados de entrega e o histórico serão preservados.`)) return;
+      } else if(origem === 'expedidos') {
+          if(!confirm(`A OS ${base.os} está na EXPEDIÇÃO. Deseja corrigir os dados da OS?\n\nA etapa atual e os dados operacionais serão preservados.`)) return;
+      }
+
+      idEdicao = { origem, index, os: base.os };
       document.getElementById('cnpj').value = base.cnpj || ""; 
-      document.getElementById('razao').value = base.cliente; 
+      document.getElementById('razao').value = base.cliente === 'CLIENTE NÃO INFORMADO' ? '' : (base.cliente || ''); 
       document.getElementById('endereco').value = base.endereco || ""; 
       document.getElementById('orcContato').value = base.contato || ""; 
       document.getElementById('orcTelefone').value = base.telefone || ""; 
+      document.getElementById('frete').value = base.frete || document.getElementById('frete').value || '';
+      document.getElementById('prazo').value = base.prazo || document.getElementById('prazo').value || '';
+      document.getElementById('pagamento').value = base.pagamento || document.getElementById('pagamento').value || '';
       document.getElementById('osEdicaoLabel').innerText = base.os;
       document.getElementById('btnCancelaEdit').style.display = 'block'; 
       
       itensTemp = base.itens ? JSON.parse(JSON.stringify(base.itens)) : []; 
       
       renderTabelaAtual(); tab('orc');
+      setTimeout(() => document.getElementById('razao')?.focus(), 80);
   }
 
   function cancelarEdicao() {
