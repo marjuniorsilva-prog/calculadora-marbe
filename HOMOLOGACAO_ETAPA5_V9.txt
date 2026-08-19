@@ -1,0 +1,27 @@
+MARBE ERP — HOMOLOGAÇÃO ETAPA 5 / V9
+Versão: MARBE ERP 2026.08.19.9
+
+ESCOPO DESTA RODADA
+- Backup e recuperação
+- Consistência de versão
+- Eliminação de rota antiga de Expedição
+- Teste estrutural final de navegação e scripts
+
+CORREÇÕES
+1. Backup do banco passou a incluir também controle_particular/abel, além de sistema/.
+2. Backup completo registra contagens do ERP e do Controle Particular no BACKUP_INFO.txt.
+3. PDFs antigos regenerados no backup preservam a data original da OS/orçamento, em vez da data em que o backup foi executado.
+4. pedido.html (Expedição antiga) foi desativado e redireciona para pedido_entregue.html, evitando arquivamento sem os dados obrigatórios de entrega.
+5. Versão visual da tela de login unificada com o Dashboard: 2026.08.19.9.
+6. Incluído RESTAURACAO_BACKUP_EMERGENCIA.txt.
+
+ITENS PRESERVADOS
+- Financeiro V7
+- Compras/Estoque e Solicitação de Orçamento V5
+- Histórico/Expedição V6
+- Produção/FAP/CRM V8
+- Firebase Authentication e regras de segurança
+- Menu mestre
+
+STATUS
+Candidata a versão 1.0 após teste real no navegador/Firebase do usuário.

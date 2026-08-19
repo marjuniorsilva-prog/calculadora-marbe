@@ -1,0 +1,47 @@
+MARBE ERP — CHECKLIST DE TESTE FINAL V9
+Versão candidata: MARBE ERP 2026.08.19.9
+
+1. LOGIN E SEGURANÇA
+[ ] Entrar com mar.junior.silva@gmail.com.
+[ ] Abrir uma segunda aba do ERP e confirmar o bloqueio.
+[ ] Fechar a segunda aba e continuar normalmente na primeira.
+
+2. MENU / NAVEGAÇÃO
+[ ] Percorrer Dashboard, Orçamento, CRM, Histórico, Produção, FAP, Expedição, Compras, Financeiro e voltar ao Dashboard.
+[ ] Confirmar que o menu mestre permanece completo.
+
+3. FLUXO DE UMA OS DE TESTE
+[ ] Criar orçamento.
+[ ] Aprovar no CRM.
+[ ] Enviar para Produção com data de entrada e entrega.
+[ ] Confirmar prioridade correta na Produção/Dashboard.
+[ ] Fazer um apontamento FAP.
+[ ] Liberar para Expedição.
+[ ] Registrar entrega com data, forma e recebedor.
+[ ] Localizar a OS no Histórico Geral como Entregue/Arquivada.
+
+4. COMPRAS / ESTOQUE
+[ ] Gerar uma Solicitação de Orçamento e confirmar que não movimenta estoque/financeiro.
+[ ] Gerar um Pedido de Compra.
+[ ] Confirmar Material Recebido com NF e valor real.
+[ ] Programar pagamento à vista ou parcelado no Financeiro.
+[ ] Fazer uma retirada de material e localizar no Relatório de Retiradas por período/funcionário.
+
+5. FINANCEIRO
+[ ] Criar título de teste de R$ 1.000,00.
+[ ] Baixar R$ 400,00 como recebimento parcial e confirmar R$ 600,00 pendente.
+[ ] Testar um recebimento com desconto/ajuste e confirmar que o DRE usa o valor real.
+[ ] Conferir Relatórios Financeiros por período.
+
+6. BACKUP
+[ ] Gerar BACKUP DO BANCO COMPLETO (.JSON).
+[ ] Abrir o JSON e confirmar as chaves "sistema" e "controle_particular".
+[ ] Gerar BACKUP DAS OS EM PDF.
+[ ] Abrir um orçamento antigo e conferir que a data exibida é a data original da OS.
+[ ] Gerar BACKUP COMPLETO (.ZIP) e conferir BACKUP_INFO.txt.
+
+7. ROTA ANTIGA DE EXPEDIÇÃO
+[ ] Abrir manualmente pedido.html e confirmar redirecionamento automático para pedido_entregue.html.
+
+APROVAÇÃO
+Se todos os itens acima passarem no ambiente real, a V9 pode ser congelada como MARBE ERP 1.0 e usada como base oficial para o Manual Operacional em PDF.

@@ -319,7 +319,7 @@
         </div>
         <button class="login-btn" id="btnGoogleLogin" onclick="fazerLogin()">ENTRAR COM GOOGLE</button>
         <p id="loginFirebaseMsg" style="font-size:12px; color:var(--text-muted); margin:16px 0 0; line-height:1.5;">Somente contas autorizadas têm acesso ao banco de dados.</p>
-        <p style="font-size:12px; color:var(--text-muted); margin-top:26px; font-weight:500;">MARBE ERP • Versão 2026.08.18.3</p>
+        <p style="font-size:12px; color:var(--text-muted); margin-top:26px; font-weight:500;">MARBE ERP • Versão 2026.08.19.9</p>
     </div>
 </div>
 
@@ -585,19 +585,35 @@
             </div>
         </div>
 
-        <!-- TELA 3: HISTÓRICO -->
+        <!-- TELA 3: HISTÓRICO GERAL -->
         <div id="historico" class="section">
-            <h2 class="view-title">Histórico de Movimentações</h2>
-            
-            <div class="card-panel" style="padding:20px 25px;">
-                <div style="font-weight:700; font-size:13px; margin-bottom:15px; color:var(--accent); text-transform:uppercase;">Filtro de Período</div>
-                <div style="display:flex; gap:20px; flex-wrap:wrap; align-items: flex-end;">
-                    <div style="flex:1"><label style="margin:0 0 8px;">De:</label><input type="date" id="filtroInicio" style="margin:0;"></div>
-                    <div style="flex:1"><label style="margin:0 0 8px;">Até:</label><input type="date" id="filtroFim" style="margin:0;"></div>
-                    <button class="btn btn-primary" style="margin:0;" onclick="renderOrcamentos()">BUSCAR</button>
-                </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:15px; flex-wrap:wrap;">
+                <h2 class="view-title" style="margin:0;">Histórico Geral de OS</h2>
+                <button class="btn btn-outline" style="width:auto;" onclick="gerarPDFHistoricoGeral()"><i data-lucide="printer"></i> RELATÓRIO PDF DO FILTRO</button>
             </div>
             
+            <div class="card-panel" style="padding:20px 25px; margin-top:25px;">
+                <div style="font-weight:700; font-size:13px; margin-bottom:15px; color:var(--accent); text-transform:uppercase;">Localizar OS em qualquer etapa</div>
+                <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end;">
+                    <div style="flex:1; min-width:180px;"><label style="margin:0 0 8px;">OS ou Cliente:</label><input type="text" id="filtroHistBusca" placeholder="Ex: 642 ou Usina..." style="margin:0;" onkeyup="renderOrcamentos()"></div>
+                    <div style="flex:1; min-width:170px;"><label style="margin:0 0 8px;">Etapa:</label>
+                        <select id="filtroHistEtapa" style="margin:0;" onchange="renderOrcamentos()">
+                            <option value="TODOS">Todas as etapas</option>
+                            <option value="ORCAMENTO">Orçamento / CRM</option>
+                            <option value="PRODUCAO">Produção</option>
+                            <option value="EXPEDICAO">Expedição</option>
+                            <option value="ENTREGUE">Entregue / Arquivada</option>
+                            <option value="PERDIDO">Perdido / Cancelado</option>
+                        </select>
+                    </div>
+                    <div style="flex:1; min-width:160px;"><label style="margin:0 0 8px;">De:</label><input type="date" id="filtroInicio" style="margin:0;"></div>
+                    <div style="flex:1; min-width:160px;"><label style="margin:0 0 8px;">Até:</label><input type="date" id="filtroFim" style="margin:0;"></div>
+                    <button class="btn btn-primary" style="margin:0; width:auto;" onclick="renderOrcamentos()">BUSCAR</button>
+                    <button class="btn btn-outline" style="margin:0; width:auto;" onclick="limparHistoricoGeral()">LIMPAR</button>
+                </div>
+                <div style="margin-top:14px; color:var(--text-muted); font-size:12px;">Esta consulta acompanha a OS do orçamento até a entrega. A OS aparece na etapa em que se encontra atualmente.</div>
+            </div>
+            <div id="resumoHistoricoGeral" style="margin-bottom:15px; color:var(--text-muted); font-size:13px;"></div>
             <div id="listaOrcamentos"></div>
         </div>
 
@@ -1211,34 +1227,80 @@
     tab('historico');
   }
 
+  function coletarHistoricoGeral() {
+    const registros = [];
+    const add = (base, etapa, rotulo, lista) => {
+        (lista || []).forEach((o, i) => {
+            if(!o) return;
+            let etapaFinal = etapa;
+            let rotuloFinal = rotulo;
+            if(base === 'orçamentos' && String(o.crm_status || '').toLowerCase() === 'perdido') {
+                etapaFinal = 'PERDIDO';
+                rotuloFinal = String(o.crm_motivo || '').toLowerCase() === 'cancelado' ? 'CANCELADO' : 'PERDIDO / ARQUIVADO';
+            }
+            const dataRef = o.data_entrega_local || (o.data_entrega ? String(o.data_entrega).slice(0,10) : '') || o.data_liberacao_expedicao || o.data_entrada || (o.data_criacao ? String(o.data_criacao).slice(0,10) : '');
+            registros.push({base, index:i, etapa:etapaFinal, rotulo:rotuloFinal, dataRef, obj:o});
+        });
+    };
+    add('orçamentos', 'ORCAMENTO', 'ORÇAMENTO / CRM', window.marbeDB.orçamentos);
+    add('pedidos', 'PRODUCAO', 'EM PRODUÇÃO', window.marbeDB.pedidos);
+    add('expedidos', 'EXPEDICAO', 'AGUARDANDO EXPEDIÇÃO', window.marbeDB.expedidos);
+    add('arquivados', 'ENTREGUE', 'ENTREGUE / ARQUIVADA', window.marbeDB.arquivados);
+    return registros;
+  }
+
+  function historicoFiltrado() {
+    const busca = (document.getElementById('filtroHistBusca')?.value || '').trim().toLowerCase();
+    const etapa = document.getElementById('filtroHistEtapa')?.value || 'TODOS';
+    const ini = document.getElementById('filtroInicio')?.value || '';
+    const fim = document.getElementById('filtroFim')?.value || '';
+    return coletarHistoricoGeral().filter(r => {
+        const o = r.obj || {};
+        const alvo = `${o.os || ''} ${o.cliente || ''} ${o.cnpj || ''} ${o.contato || ''}`.toLowerCase();
+        if(busca && !alvo.includes(busca)) return false;
+        if(etapa !== 'TODOS' && r.etapa !== etapa) return false;
+        if(ini && (!r.dataRef || r.dataRef < ini)) return false;
+        if(fim && (!r.dataRef || r.dataRef > fim)) return false;
+        return true;
+    }).sort((a,b) => String(b.dataRef || '').localeCompare(String(a.dataRef || '')) || Number(b.obj?.os || 0) - Number(a.obj?.os || 0));
+  }
+
+  window.limparHistoricoGeral = function() {
+    ['filtroHistBusca','filtroInicio','filtroFim'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+    const e = document.getElementById('filtroHistEtapa'); if(e) e.value='TODOS';
+    renderOrcamentos();
+  };
+
   function renderOrcamentos() {
-    let dataInicioStr = document.getElementById('filtroInicio').value; let dataFimStr = document.getElementById('filtroFim').value;
-    let dataInicio = dataInicioStr ? new Date(dataInicioStr + "T00:00:00") : new Date(0); let dataFim = dataFimStr ? new Date(dataFimStr + "T23:59:59") : new Date();
+    const regs = historicoFiltrado();
+    const cores = {ORCAMENTO:['var(--primary)', '#dbeafe'],PRODUCAO:['var(--warning)', '#fef3c7'],EXPEDICAO:['var(--info)', '#cffafe'],ENTREGUE:['var(--success)', '#d1fae5'],PERDIDO:['var(--danger)', '#fee2e2']};
     let html = '';
-    (window.marbeDB.orçamentos || []).forEach((o, i) => {
-        let exibir = false;
-        if (!o.data_criacao) exibir = true; else { let dataOrc = new Date(o.data_criacao); if (dataOrc >= dataInicio && dataOrc <= dataFim) exibir = true; }
-        if (exibir) {
-            let dataFormatada = o.data_criacao ? new Date(o.data_criacao).toLocaleDateString('pt-BR') : "Antigo";
-            html += `<div class="card-list" style="border-left-color: var(--primary);">
-                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                    <strong style="font-size:16px; color:var(--text-main);">OS: ${o.os} - ${o.cliente}</strong>
-                    <span style="font-size:12px; background:var(--card-bg); padding:6px 10px; border-radius:6px; color:var(--text-muted); border:1px solid var(--border); font-weight:600;">${dataFormatada}</span>
-                </div>
-                <div style="font-size:22px; font-weight:800; color:var(--success); margin:15px 0;">${window.fmtMoney(o.total)}</div>
-                <div style="display:flex; gap:12px; margin-top:20px; flex-wrap:wrap;">
-                    <button class="btn btn-outline" style="flex:1;" onclick="gerarPDF('CLIENTE', ${i}, 'orçamentos')"><i data-lucide="file-text" style="width:18px;"></i> PDF Cliente</button>
-                    <button class="btn btn-outline" style="flex:1;" onclick="gerarPDF('PRODUCAO', ${i}, 'orçamentos')"><i data-lucide="factory" style="width:18px;"></i> PDF Produção</button>
-                    <button class="btn" style="background:#451a03; border:1px solid #b45309; color:#fde68a; flex:1;" onclick="gerarGarantia(${i})"><i data-lucide="refresh-ccw" style="width:18px;"></i> Garantia</button>
-                    <button class="btn btn-outline" style="flex:1;" onclick="editarExistente('orçamentos', ${i})"><i data-lucide="edit-3" style="width:18px;"></i> Editar</button>
-                    <button class="btn btn-primary" style="flex:1;" onclick="fecharPedido(${i})"><i data-lucide="check-circle" style="width:18px;"></i> APROVAR / ENVIAR PRODUÇÃO</button>
-                </div>
-            </div>`;
-        }
+    regs.forEach(r => {
+        const o = r.obj || {};
+        const c = cores[r.etapa] || ['var(--text-muted)', '#e5e7eb'];
+        const dataBr = r.dataRef ? r.dataRef.split('-').reverse().join('/') : 'Sem data';
+        const total = Number(o.total || 0);
+        const detalheEntrega = r.etapa === 'ENTREGUE' ? `<div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border); color:var(--text-muted); font-size:12px;"><strong style="color:var(--text-main);">Entrega:</strong> ${o.tipo_entrega || 'não informada'}${o.recebedor_nome ? ` | <strong>Recebedor:</strong> ${o.recebedor_nome}` : ''}${o.recebedor_doc ? ` | <strong>Documento:</strong> ${o.recebedor_doc}` : ''}${o.obs_entrega ? `<br><strong>Observação:</strong> ${o.obs_entrega}` : ''}</div>` : '';
+        const motivo = r.etapa === 'PERDIDO' ? `<div style="margin-top:8px; color:var(--danger); font-size:12px;"><strong>Motivo:</strong> ${o.crm_motivo || 'Não informado'}${o.crm_obs_perda ? ` — ${o.crm_obs_perda}` : ''}</div>` : '';
+        html += `<div class="card-list" style="border-left-color:${c[0]};"><div style="display:flex; justify-content:space-between; align-items:flex-start; gap:15px; flex-wrap:wrap;"><div><strong style="font-size:16px; color:var(--text-main);">OS: ${o.os || 'CONTATO'} - ${o.cliente || 'Cliente não informado'}</strong><div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;"><span style="font-size:11px; background:${c[1]}; color:#0f172a; padding:5px 9px; border-radius:999px; font-weight:800;">${r.rotulo}</span><span style="font-size:12px; color:var(--text-muted);">Data da etapa: ${dataBr}</span></div></div><div style="font-size:21px; font-weight:800; color:${total > 0 ? 'var(--success)' : 'var(--text-muted)'};">${window.fmtMoney(total)}</div></div>${motivo}${detalheEntrega}${o.os !== 'CONTATO' ? `<div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;"><button class="btn btn-outline" style="width:auto;" onclick="gerarPDF('CLIENTE', ${r.index}, '${r.base}')"><i data-lucide="file-text" style="width:17px;"></i> PDF Cliente</button><button class="btn btn-outline" style="width:auto;" onclick="gerarPDF('PRODUCAO', ${r.index}, '${r.base}')"><i data-lucide="factory" style="width:17px;"></i> PDF Produção</button></div>` : ''}</div>`;
     });
-    document.getElementById('listaOrcamentos').innerHTML = html || "<div style='text-align:center; padding:50px; background:var(--card-bg); border-radius:12px; border: 1px dashed var(--border); color:var(--text-muted)'><i data-lucide='file-search' style='width:40px; height:40px; margin-bottom:15px; opacity:0.5;'></i><br>Nenhum orçamento encontrado neste período.</div>";
+    document.getElementById('listaOrcamentos').innerHTML = html || "<div style='text-align:center; padding:50px; background:var(--card-bg); border-radius:12px; border:1px dashed var(--border); color:var(--text-muted)'><i data-lucide='file-search' style='width:40px; height:40px; margin-bottom:15px; opacity:0.5;'></i><br>Nenhuma OS encontrada com esses filtros.</div>";
+    const resumo = document.getElementById('resumoHistoricoGeral');
+    if(resumo) resumo.innerHTML = `<strong style="color:var(--text-main);">${regs.length}</strong> registro(s) localizado(s)`;
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
+
+  window.gerarPDFHistoricoGeral = function() {
+    const regs = historicoFiltrado();
+    if(!regs.length) return alert('Nenhum registro para gerar o relatório.');
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({orientation:'landscape'});
+    doc.setFontSize(15); doc.setFont('helvetica','bold'); doc.text('GRUPO MARBE / SB BORRACHAS - HISTÓRICO GERAL DE OS', 14, 16);
+    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')} | Registros: ${regs.length}`, 14, 22);
+    const body = regs.map(r => { const o=r.obj||{}; return [String(o.os || 'CONTATO'),String(o.cliente || ''),r.rotulo,r.dataRef ? r.dataRef.split('-').reverse().join('/') : 'N/D',window.fmtMoney(Number(o.total || 0)),r.etapa === 'ENTREGUE' ? `${o.tipo_entrega || ''}${o.recebedor_nome ? ' / '+o.recebedor_nome : ''}` : r.etapa === 'PERDIDO' ? String(o.crm_motivo || '') : '']; });
+    doc.autoTable({startY:28,head:[['OS','CLIENTE','ETAPA','DATA','VALOR','DETALHE']],body,theme:'grid',headStyles:{fillColor:[15,23,42]},styles:{fontSize:8, cellPadding:2.5},columnStyles:{0:{cellWidth:22},1:{cellWidth:68},2:{cellWidth:45},3:{cellWidth:28},4:{cellWidth:35},5:{cellWidth:70}}});
+    window.abrirPDFMobile(doc.output('blob'), `HISTORICO_GERAL_${Date.now()}`);
+  };
 
   window.gerarGarantia = function(i) {
       let orcBase = window.marbeDB.orçamentos[i];
@@ -1299,7 +1361,13 @@
       doc.setLineWidth(0.5); doc.line(15, 30, 195, 30);
       let bodyData = []; let totalDiretoria = 0; let hojeStr = window.MarbeDate.today();
 
-      (window.marbeDB.pedidos || []).forEach(p => {
+      const pedidosPdf = [...(window.marbeDB.pedidos || [])].sort((a,b) => {
+          const da = a.data_limite || '9999-12-31', db = b.data_limite || '9999-12-31';
+          if(da !== db) return da.localeCompare(db);
+          const ea = a.data_entrada || '9999-12-31', eb = b.data_entrada || '9999-12-31';
+          return ea.localeCompare(eb);
+      });
+      pedidosPdf.forEach(p => {
           let ent = p.data_entrada ? p.data_entrada.split('-').reverse().join('/') : "N/D"; let lim = p.data_limite ? p.data_limite.split('-').reverse().join('/') : "N/D"; let status = "Em Producao";
           if (p.data_limite) { if (p.data_limite < hojeStr) { status = "ATRASADO"; } else if (p.data_limite === hojeStr) { status = "ENTREGAR HOJE"; } else { status = "No Prazo"; } }
           let clienteStr = p.cliente ? p.cliente.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().substring(0, 30) : "";
@@ -1410,6 +1478,8 @@
   function liberarExpedicao(i) {
       if(!confirm("A peça está pronta? Confirmar e enviar esta OS para a Expedição?")) return;
       let p = window.marbeDB.pedidos.splice(i, 1)[0];
+      p.data_liberacao_expedicao = window.MarbeDate.today();
+      p.data_liberacao_expedicao_iso = new Date().toISOString();
       if(!window.marbeDB.expedidos) window.marbeDB.expedidos = [];
       window.marbeDB.expedidos.push(p);
       window.salvarNuvem();
@@ -1439,7 +1509,17 @@
     let htmlCron = `<table style="min-width:700px;"><thead><tr><th>OS - Cliente</th><th>Entrada Produção</th><th>Prazo Limite</th><th>Status</th><th style="text-align:center">Ações</th></tr></thead><tbody>`;
     let hojeStr = window.MarbeDate.today();
     
-    (window.marbeDB.pedidos || []).forEach((p, i) => {
+    const pedidosOrdenados = (window.marbeDB.pedidos || []).map((pedido, indiceOriginal) => ({ pedido, indiceOriginal })).sort((a, b) => {
+        const da = a.pedido.data_limite || '9999-12-31';
+        const db = b.pedido.data_limite || '9999-12-31';
+        if (da !== db) return da.localeCompare(db);
+        const ea = a.pedido.data_entrada || '9999-12-31';
+        const eb = b.pedido.data_entrada || '9999-12-31';
+        if (ea !== eb) return ea.localeCompare(eb);
+        return String(a.pedido.os || '').localeCompare(String(b.pedido.os || ''), 'pt-BR', { numeric:true });
+    });
+
+    pedidosOrdenados.forEach(({ pedido: p, indiceOriginal: i }) => {
         let ent = p.data_entrada ? p.data_entrada.split('-').reverse().join('/') : "N/D"; let lim = p.data_limite ? p.data_limite.split('-').reverse().join('/') : "N/D";
         let status = "Em Produção"; let bgCor = "var(--card-bg)"; let txtCor = "var(--text-main)";
         

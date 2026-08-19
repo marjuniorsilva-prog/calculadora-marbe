@@ -1,0 +1,31 @@
+MARBE ERP — GUIA DE RESTAURAÇÃO DE EMERGÊNCIA
+Versão de referência: MARBE ERP 2026.08.19.9
+
+IMPORTANTE
+- O ERP NÃO restaura dados automaticamente.
+- Isso é intencional para impedir que um arquivo antigo substitua o banco atual por engano.
+- Antes de qualquer restauração, gere um NOVO backup do estado atual, mesmo que o banco esteja com algum problema.
+
+O BACKUP COMPLETO V9 CONTÉM
+1. BANCO_DADOS.json
+   - sistema/
+   - controle_particular/abel
+2. pasta sistema/
+   - arquivos HTML/JS e arquivos de configuração desta versão
+3. OS_PDF/
+   - Orçamentos em PDF
+   - Vias de Produção em PDF quando aplicável
+4. BACKUP_INFO.txt
+   - versão, data, contagens e eventuais arquivos que não puderam ser capturados
+
+RESTAURAÇÃO SEGURA
+1. Não restaure no meio do expediente.
+2. Feche o MARBE ERP em todos os navegadores/abas.
+3. Guarde uma cópia do banco atual antes de alterar qualquer dado.
+4. Confira no BACKUP_INFO.txt a versão e a data do pacote escolhido.
+5. No BANCO_DADOS.json, confirme que existem as chaves "sistema" e "controle_particular".
+6. Restaure somente a gaveta necessária. Não substitua todo o banco se o problema estiver restrito a uma área.
+7. Depois da restauração, entre no ERP e confira Dashboard, uma OS conhecida, Financeiro e Compras antes de voltar a operar.
+
+RECOMENDAÇÃO
+Em caso de restauração real, faça o procedimento de forma controlada no console do Firebase ou com suporte técnico. O arquivo de backup foi pensado para recuperação, mas a gravação de volta no banco deve ser uma ação deliberada e conferida.

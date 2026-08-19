@@ -1,0 +1,39 @@
+MARBE ERP — HOMOLOGAÇÃO ETAPA 4 / V8
+Versão: MARBE ERP 2026.08.19.8
+
+ESCOPO DESTA RODADA
+- Produção / cronograma operacional
+- FAP / apontamentos e relatórios
+- CRM / indicadores históricos e datas locais
+
+ALTERAÇÕES
+1. PRODUÇÃO
+   - Lista operacional agora é exibida pela urgência do prazo de entrega.
+   - Ordem: atrasados -> entrega hoje -> próximas datas -> sem prazo.
+   - Índice original é preservado nas ações de editar, PDF, cancelar e liberar expedição.
+   - PDFs de cronograma também seguem a mesma ordem de urgência.
+
+2. FAP
+   - Relatório passa de data única para período (data inicial/final).
+   - Filtros: período, funcionário, OS e processo.
+   - Atalhos: Hoje, Mês Atual e Limpar.
+   - Campo OS mostra sugestões das OS atualmente em produção.
+   - Se for digitada uma OS inexistente, o sistema alerta antes de gravar, mas permite OS antiga mediante confirmação.
+   - Apontamento não é mais apagado definitivamente: agora é cancelado com motivo e permanece auditável.
+   - Apontamentos cancelados deixam de somar nas horas válidas e aparecem no relatório/PDF.
+   - O operador e o processo selecionados são preservados na atualização da tela para reduzir cliques repetitivos.
+
+3. CRM
+   - Volume Global Emitido agora inclui também OS já entregues/arquivadas; antes elas desapareciam do indicador ao serem entregues.
+   - Filtros por data usam dia local do Brasil, evitando deslocamento por UTC.
+   - Novos registros guardam também data local de criação.
+   - Ao fechar negócio, é registrada a data de aprovação do cliente.
+
+4. VERSÃO/BACKUP
+   - Dashboard e metadados de backup atualizados para MARBE ERP 2026.08.19.8.
+
+PRESERVAÇÃO
+- Financeiro V7 mantido sem alterações funcionais.
+- Compras/Estoque V5 mantido sem alterações funcionais.
+- Expedição/Histórico V6 mantidos sem alterações funcionais.
+- Firebase Authentication e regras de acesso mantidos.

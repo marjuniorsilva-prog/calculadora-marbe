@@ -1,0 +1,62 @@
+MARBE ERP — HOMOLOGAÇÃO ETAPA 3 — V7
+Versão: MARBE ERP 2026.08.19.7
+
+ESCOPO DESTA RODADA
+- Financeiro: segurança de baixas e relatórios.
+- Dashboard: identificação da versão e lembrete de backup.
+- Restante do ERP preservado conforme V6 aprovada.
+
+ALTERAÇÕES
+1. Contas a Receber — baixa segura
+   - Se valor recebido = valor previsto: liquidação normal.
+   - Se valor recebido < previsto: operador escolhe entre:
+     a) Recebimento parcial: valor recebido entra no DRE e saldo continua pendente.
+     b) Desconto/Ajuste: título é encerrado pelo valor realmente recebido.
+   - Se valor recebido > previsto: liquidação por ajuste/acréscimo.
+   - Guarda usuário responsável pela baixa.
+
+2. Contas a Pagar / Receber — prioridade
+   - Ordenação automática por vencimento.
+   - Atrasados aparecem primeiro.
+   - Depois vencimentos/recebimentos de hoje.
+   - Depois próximos compromissos.
+
+3. Cancelamento com auditoria
+   - Lixeira definitiva substituída por Cancelar lançamento.
+   - Exige motivo.
+   - Registro permanece no banco como CANCELADO e não entra nos saldos/DRE.
+   - Se a baixa cancelada era um recebimento parcial, o valor retorna ao saldo pendente de origem.
+
+4. Relatórios Financeiros
+   - Nova aba própria no Financeiro.
+   - Filtros: período, tipo, situação e descrição/categoria.
+   - Situações: liquidado, pendente, atrasado, aguardando programação e cancelado.
+   - Atalhos Hoje e Mês Atual.
+   - Totais filtrados de entradas, saídas, a receber e a pagar.
+   - Geração de PDF.
+
+5. Backup
+   - Dashboard atualizado para versão 2026.08.19.7.
+   - Guarda data técnica do último backup nesta máquina.
+   - Alerta quando o último backup tiver 7 dias ou mais.
+   - Nenhuma restauração automática foi adicionada.
+
+TESTES EXECUTADOS
+- 20 blocos JavaScript: sintaxe OK.
+- IDs duplicados: nenhum.
+- Links internos: nenhum arquivo ausente.
+- Recebimento parcial 10.000 -> 5.000: OK; saldo de 5.000 permanece pendente.
+- Recebimento com ajuste 10.000 -> 9.700: OK; DRE registra 9.700 e diferença 300 fica auditável.
+- Cancelamento da baixa parcial: OK; saldo original foi recomposto.
+- Relatório ignora registro-pai PROGRAMADO para evitar dupla contagem: OK.
+- Comparação com a V6: somente dashboard.html e financeiro.html foram alterados, além deste relatório de homologação.
+
+TESTE REAL RECOMENDADO
+1. Abrir Financeiro -> Contas a Receber.
+2. Criar título de teste de R$ 1.000.
+3. Dar baixa de R$ 400 como RECEBIMENTO PARCIAL.
+4. Confirmar que R$ 600 permanece em Contas a Receber e R$ 400 aparece no DRE.
+5. Abrir Relatórios Financeiros e localizar os dois registros.
+6. Fazer um segundo título de teste e liquidar com diferença usando DESCONTO/AJUSTE.
+7. Gerar o PDF do relatório.
+8. No Dashboard, conferir a indicação do último backup.

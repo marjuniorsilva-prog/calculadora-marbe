@@ -500,7 +500,8 @@
             nome: nome,
             telefone: document.getElementById('leadWhats').value,
             assunto: document.getElementById('leadAssunto').value,
-            data_criacao: new Date().toISOString()
+            data_criacao: new Date().toISOString(),
+            data_criacao_local: window.MarbeDate.today()
         };
         
         if(!window.marbeDB.leads) window.marbeDB.leads = [];
@@ -525,7 +526,8 @@
                 crm_status: 'perdido',
                 crm_motivo: 'Fora de Linha',
                 crm_obs_perda: motivo,
-                data_criacao: new Date().toISOString()
+                data_criacao: new Date().toISOString(),
+            data_criacao_local: window.MarbeDate.today()
             };
             
             if(!window.marbeDB.orçamentos) window.marbeDB.orçamentos = [];
@@ -555,7 +557,8 @@
             pagamento: "A DEFINIR",
             crm_status: 'pendente',
             crm_obs: `(Vindo do WhatsApp) Assunto Original: ${lead.assunto}`,
-            data_criacao: new Date().toISOString()
+            data_criacao: new Date().toISOString(),
+            data_criacao_local: window.MarbeDate.today()
         };
         
         if(!window.marbeDB.orçamentos) window.marbeDB.orçamentos = [];
@@ -585,12 +588,20 @@
         let dataFimStr = document.getElementById('filtroDataFim') ? document.getElementById('filtroDataFim').value : '';
         let numOsBusca = document.getElementById('filtroOS') ? document.getElementById('filtroOS').value : '';
 
+        const dataLocalItem = (item) => {
+            if(item.data_criacao_local) return item.data_criacao_local;
+            if(!item.data_criacao) return '';
+            const d = new Date(item.data_criacao);
+            if(Number.isNaN(d.getTime())) return String(item.data_criacao).substring(0,10);
+            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        };
+
         const verificaFiltro = (item) => {
             let exibir = true;
             if (dataIniStr || dataFimStr) {
-                if (!item.data_criacao) { exibir = false; } 
+                const dItem = dataLocalItem(item);
+                if (!dItem) { exibir = false; }
                 else {
-                    let dItem = item.data_criacao.substring(0, 10);
                     if (dataIniStr && dItem < dataIniStr) exibir = false;
                     if (dataFimStr && dItem > dataFimStr) exibir = false;
                 }
@@ -623,7 +634,7 @@
             if (orc.os !== "CONTATO") { vGlobal += (orc.total || 0); cGlobal++; }
 
             let status = orc.crm_status || 'pendente';
-            let dtStr = orc.data_criacao ? new Date(orc.data_criacao).toLocaleDateString('pt-BR') : 'N/D';
+            let dtLocal = dataLocalItem(orc); let dtStr = dtLocal ? dtLocal.split('-').reverse().join('/') : 'N/D';
             
             let cardHtml = `
             <div class="k-card">
@@ -662,6 +673,7 @@
 
         (window.marbeDB.pedidos || []).forEach(p => { if (!verificaFiltro(p)) return; vGlobal += (p.total || 0); cGlobal++; });
         (window.marbeDB.expedidos || []).forEach(e => { if (!verificaFiltro(e)) return; vGlobal += (e.total || 0); cGlobal++; });
+        (window.marbeDB.arquivados || []).forEach(a => { if (!verificaFiltro(a)) return; vGlobal += (a.total || 0); cGlobal++; });
 
         document.getElementById('valGlobal').innerText = window.fmtMoney(vGlobal);
         document.getElementById('qtdGlobal').innerText = cGlobal;
@@ -706,6 +718,8 @@
         let orc = window.marbeDB.orçamentos.splice(idxAcao, 1)[0];
         orc.data_entrada = document.getElementById('ganhoEntrada').value;
         orc.data_limite = lim;
+        orc.data_aprovacao_cliente = window.MarbeDate.today();
+        orc.data_aprovacao_cliente_iso = new Date().toISOString();
         delete orc.crm_status; delete orc.crm_motivo;
 
         window.marbeDB.pedidos.push(orc);
@@ -736,8 +750,12 @@
         (window.marbeDB.orçamentos || []).forEach(orc => {
             let exibir = true;
             if (dataIniStr || dataFimStr) {
-                if (!orc.data_criacao) exibir = false; else {
-                    let dOrc = orc.data_criacao.substring(0, 10);
+                let dOrc = orc.data_criacao_local || '';
+                if(!dOrc && orc.data_criacao) {
+                    const d = new Date(orc.data_criacao);
+                    if(!Number.isNaN(d.getTime())) dOrc = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                }
+                if (!dOrc) exibir = false; else {
                     if (dataIniStr && dOrc < dataIniStr) exibir = false;
                     if (dataFimStr && dOrc > dataFimStr) exibir = false;
                 }

@@ -72,7 +72,8 @@
     document.addEventListener("DOMContentLoaded", () => {
         let hoje = window.MarbeDate.today();
         document.getElementById('fapData').value = hoje;
-        document.getElementById('filtroData').value = hoje;
+        document.getElementById('filtroDataIni').value = hoje;
+        document.getElementById('filtroDataFim').value = hoje;
     });
 
     window.abrirPDFMobile = (blob, nomeArquivo) => {
@@ -260,7 +261,9 @@
                   <div class="row">
                       <div class="col" style="flex:1">
                           <label>Nº da OS Relacionada</label>
-                          <input type="text" id="fapOS" placeholder="Ex: 650 (Deixe branco se interno)">
+                          <input type="text" id="fapOS" list="listaOSAtivas" placeholder="Ex: 650 (Deixe branco se interno)">
+                          <datalist id="listaOSAtivas"></datalist>
+                          <div style="font-size:11px; color:var(--text-muted); margin-top:-10px; margin-bottom:12px;">As OS em produção aparecem como sugestão; ainda é possível informar uma OS antiga manualmente.</div>
                       </div>
                       <div class="col" style="flex:2">
                           <label>Qual Processo foi executado?</label>
@@ -330,18 +333,33 @@
                   
                   <div class="row">
                       <div class="col">
-                          <label>Data Específica</label>
-                          <input type="date" id="filtroData" onchange="window.renderRelatorio()">
+                          <label>Data Inicial</label>
+                          <input type="date" id="filtroDataIni" onchange="window.renderRelatorio()">
                       </div>
                       <div class="col">
-                          <label>Filtrar por Funcionário (Opcional)</label>
+                          <label>Data Final</label>
+                          <input type="date" id="filtroDataFim" onchange="window.renderRelatorio()">
+                      </div>
+                      <div class="col">
+                          <label>Funcionário</label>
                           <select id="filtroFunc" onchange="window.renderRelatorio()">
                               <option value="TODOS">Todos os Funcionários</option>
                           </select>
                       </div>
+                  </div>
+                  <div class="row">
                       <div class="col">
-                          <label>Filtrar por OS (Opcional)</label>
+                          <label>OS (Opcional)</label>
                           <input type="text" id="filtroOS" placeholder="Digite a OS..." onkeyup="window.renderRelatorio()">
+                      </div>
+                      <div class="col">
+                          <label>Processo</label>
+                          <select id="filtroProcesso" onchange="window.renderRelatorio()"><option value="TODOS">Todos os Processos</option></select>
+                      </div>
+                      <div class="col" style="display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap;">
+                          <button class="btn btn-outline" style="width:auto;" onclick="window.filtroFapHoje()">HOJE</button>
+                          <button class="btn btn-outline" style="width:auto;" onclick="window.filtroFapMes()">MÊS ATUAL</button>
+                          <button class="btn btn-outline" style="width:auto;" onclick="window.limparFiltrosFap()">LIMPAR</button>
                       </div>
                   </div>
                   <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px; border-top:1px solid var(--border); padding-top:15px;">
@@ -419,18 +437,34 @@
             funcFiltroOptions += `<option value="${f}">${f}</option>`;
             listFuncsHtml += `<tr><td>${f}</td><td style="text-align:right;"><button class="btn btn-outline" style="padding:4px; color:var(--danger); border:none;" onclick="window.rmFuncionario(${i})"><i data-lucide="trash-2" style="width:16px;"></i></button></td></tr>`;
         });
-        document.getElementById('fapFuncionario').innerHTML = funcOptions;
-        document.getElementById('filtroFunc').innerHTML = funcFiltroOptions;
+        const fapFuncionarioEl = document.getElementById('fapFuncionario');
+        const operadorAtual = fapFuncionarioEl.value;
+        fapFuncionarioEl.innerHTML = funcOptions;
+        if([...fapFuncionarioEl.options].some(o=>o.value===operadorAtual)) fapFuncionarioEl.value = operadorAtual;
+        const filtroFuncEl = document.getElementById('filtroFunc');
+        const filtroFuncAtual = filtroFuncEl.value || 'TODOS';
+        filtroFuncEl.innerHTML = funcFiltroOptions;
+        if([...filtroFuncEl.options].some(o=>o.value===filtroFuncAtual)) filtroFuncEl.value = filtroFuncAtual;
         document.getElementById('listaCadFuncionarios').innerHTML = listFuncsHtml || '<tr><td colspan="2" style="text-align:center; color:var(--text-muted);">Nenhum funcionário cadastrado.</td></tr>';
 
         let procOptions = '';
+        let procFiltroOptions = '<option value="TODOS">Todos os Processos</option>';
         let listProcHtml = '';
         (window.marbeDB.producao.processos || []).forEach((p, i) => {
             procOptions += `<option value="${p}">${p}</option>`;
+            procFiltroOptions += `<option value="${p}">${p}</option>`;
             listProcHtml += `<tr><td>${p}</td><td style="text-align:right;"><button class="btn btn-outline" style="padding:4px; color:var(--danger); border:none;" onclick="window.rmProcesso(${i})"><i data-lucide="trash-2" style="width:16px;"></i></button></td></tr>`;
         });
-        document.getElementById('fapProcesso').innerHTML = procOptions;
+        const fapProcessoEl = document.getElementById('fapProcesso');
+        const processoAtual = fapProcessoEl.value;
+        fapProcessoEl.innerHTML = procOptions;
+        if([...fapProcessoEl.options].some(o=>o.value===processoAtual)) fapProcessoEl.value = processoAtual;
+        const filtroProc = document.getElementById('filtroProcesso');
+        if(filtroProc) { const atualProc = filtroProc.value || 'TODOS'; filtroProc.innerHTML = procFiltroOptions; if([...filtroProc.options].some(o=>o.value===atualProc)) filtroProc.value = atualProc; }
         document.getElementById('listaCadProcessos').innerHTML = listProcHtml || '<tr><td colspan="2" style="text-align:center; color:var(--text-muted);">Nenhum processo cadastrado.</td></tr>';
+
+        const dl = document.getElementById('listaOSAtivas');
+        if(dl) dl.innerHTML = (window.marbeDB.pedidos || []).map(p => `<option value="${p.os}">OS ${p.os} — ${p.cliente || ''}</option>`).join('');
 
         window.renderHoje();
         window.renderRelatorio();
@@ -466,6 +500,13 @@
 
         if(!data || !func || !proc || !hi || !hf) return alert("Preencha todos os campos obrigatórios.");
         if(horasGasto <= 0) return alert("Horário de término deve ser maior que o início.");
+        if(os) {
+            const bases = ['orçamentos','pedidos','expedidos','arquivados'];
+            const existeOS = bases.some(base => (window.marbeDB[base] || []).some(x => String(x.os) === String(os)));
+            if(!existeOS && !confirm(`A OS ${os} não foi encontrada no sistema.
+
+Pode ser uma OS antiga ou digitada incorretamente. Deseja registrar o apontamento mesmo assim?`)) return;
+        }
 
         let novoFap = {
             id: Date.now(),
@@ -537,15 +578,15 @@
             if(ap.data === hojeStr) {
                 let realIdx = (window.marbeDB.producao.apontamentos.length - 1) - idxReverso;
                 let badgeOS = ap.os ? `<span class="badge-os">OS ${ap.os}</span>` : `<span class="badge-interno">Uso Interno</span>`;
-                let badgeStatus = ap.status === 'Reprovado' ? `<span class="badge-reprovado">REPROVADO</span>` : `<span class="badge-aprovado">APROVADO</span>`;
+                let badgeStatus = ap.status === 'Cancelado' ? `<span class="badge-reprovado" title="${ap.motivo_cancelamento || ''}">CANCELADO</span>` : (ap.status === 'Reprovado' ? `<span class="badge-reprovado">REPROVADO</span>` : `<span class="badge-aprovado">APROVADO</span>`);
                 
                 html += `<tr>
                     <td><strong style="color:var(--text-main);">${ap.func}</strong></td>
                     <td>${badgeOS}</td>
-                    <td>${ap.processo}</td>
+                    <td>${ap.processo}${ap.status === 'Cancelado' && ap.motivo_cancelamento ? `<br><span style="font-size:11px;color:var(--danger);">Motivo: ${ap.motivo_cancelamento}</span>` : ''}</td>
                     <td style="text-align:center; font-weight:600;">${ap.inicio} às ${ap.fim} <br><span style="color:var(--fap); font-size:12px;">(${ap.horas} h)</span></td>
                     <td style="text-align:center;">${badgeStatus}</td>
-                    <td style="text-align:center;"><button class="btn btn-outline" style="padding:6px; color:var(--danger); border:none;" onclick="window.excluirFap(${realIdx})"><i data-lucide="trash-2" style="width:16px;"></i></button></td>
+                    <td style="text-align:center;">${ap.status === 'Cancelado' ? '<span style="font-size:11px;color:var(--text-muted);">Auditado</span>' : `<button class="btn btn-outline" title="Cancelar apontamento" style="padding:6px; color:var(--danger); border:none;" onclick="window.cancelarFap(${realIdx})"><i data-lucide="x-circle" style="width:16px;"></i></button>`}</td>
                 </tr>`;
             }
         });
@@ -553,51 +594,92 @@
         lucide.createIcons();
     };
 
+    window.getFiltrosFap = function() {
+        return {
+            ini: document.getElementById('filtroDataIni')?.value || '',
+            fim: document.getElementById('filtroDataFim')?.value || '',
+            func: document.getElementById('filtroFunc')?.value || 'TODOS',
+            os: (document.getElementById('filtroOS')?.value || '').toLowerCase().trim(),
+            processo: document.getElementById('filtroProcesso')?.value || 'TODOS'
+        };
+    };
+
+    window.apontamentoPassaFiltro = function(ap, f) {
+        if(f.ini && ap.data < f.ini) return false;
+        if(f.fim && ap.data > f.fim) return false;
+        if(f.func !== 'TODOS' && ap.func !== f.func) return false;
+        if(f.os && !(ap.os || '').toLowerCase().includes(f.os)) return false;
+        if(f.processo !== 'TODOS' && ap.processo !== f.processo) return false;
+        return true;
+    };
+
+    window.filtroFapHoje = function() {
+        const h = window.MarbeDate.today();
+        document.getElementById('filtroDataIni').value = h;
+        document.getElementById('filtroDataFim').value = h;
+        window.renderRelatorio();
+    };
+
+    window.filtroFapMes = function() {
+        const h = window.MarbeDate.today();
+        const [ano, mes] = h.split('-').map(Number);
+        const ultimo = new Date(ano, mes, 0).getDate();
+        document.getElementById('filtroDataIni').value = `${ano}-${String(mes).padStart(2,'0')}-01`;
+        document.getElementById('filtroDataFim').value = `${ano}-${String(mes).padStart(2,'0')}-${String(ultimo).padStart(2,'0')}`;
+        window.renderRelatorio();
+    };
+
+    window.limparFiltrosFap = function() {
+        document.getElementById('filtroDataIni').value = '';
+        document.getElementById('filtroDataFim').value = '';
+        document.getElementById('filtroFunc').value = 'TODOS';
+        document.getElementById('filtroOS').value = '';
+        document.getElementById('filtroProcesso').value = 'TODOS';
+        window.renderRelatorio();
+    };
+
     window.renderRelatorio = function() {
-        let fData = document.getElementById('filtroData').value;
-        let fFunc = document.getElementById('filtroFunc').value;
-        let fOs = document.getElementById('filtroOS').value.toLowerCase().trim();
-        
+        const f = window.getFiltrosFap();
         let html = '';
         let somaHoras = 0;
         let apReverse = [...(window.marbeDB.producao.apontamentos || [])].reverse();
-        
-        apReverse.forEach((ap, idxReverso) => {
-            let passar = true;
-            if(fData && ap.data !== fData) passar = false;
-            if(fFunc !== 'TODOS' && ap.func !== fFunc) passar = false;
-            if(fOs && !(ap.os || '').toLowerCase().includes(fOs)) passar = false;
-            
-            if(passar) {
-                if(ap.status !== 'Reprovado') somaHoras += parseFloat(ap.horas);
-                
-                let dataBr = ap.data.split('-').reverse().join('/');
-                let badgeOS = ap.os ? `<span class="badge-os">OS ${ap.os}</span>` : `<span class="badge-interno">Uso Interno</span>`;
-                let descExtra = ap.obs ? `<br><span style="font-size:11px; color:var(--text-muted);">${ap.obs}</span>` : '';
-                let badgeStatus = ap.status === 'Reprovado' ? `<span class="badge-reprovado">REPROVADO</span>` : `<span class="badge-aprovado">APROVADO</span>`;
-                
-                html += `<tr>
-                    <td>${dataBr}</td>
-                    <td><strong style="color:var(--text-main);">${ap.func}</strong></td>
-                    <td>${badgeOS}</td>
-                    <td>${ap.processo} ${descExtra}</td>
-                    <td style="text-align:center; font-weight:600; color:${ap.status === 'Reprovado' ? 'var(--danger)' : 'var(--text-main)'}">${ap.inicio} - ${ap.fim} <br><span style="font-size:12px;">(${ap.horas} h)</span></td>
-                    <td style="text-align:center;">${badgeStatus}</td>
-                </tr>`;
-            }
+
+        apReverse.forEach((ap) => {
+            if(!window.apontamentoPassaFiltro(ap, f)) return;
+            if(ap.status !== 'Reprovado' && ap.status !== 'Cancelado') somaHoras += parseFloat(ap.horas || 0);
+
+            let dataBr = ap.data ? ap.data.split('-').reverse().join('/') : 'N/D';
+            let badgeOS = ap.os ? `<span class="badge-os">OS ${ap.os}</span>` : `<span class="badge-interno">Uso Interno</span>`;
+            let descExtra = ap.obs ? `<br><span style="font-size:11px; color:var(--text-muted);">${ap.obs}</span>` : '';
+            if(ap.status === 'Cancelado' && ap.motivo_cancelamento) descExtra += `<br><span style="font-size:11px; color:var(--danger);">Cancelado: ${ap.motivo_cancelamento}</span>`;
+            let badgeStatus = ap.status === 'Cancelado' ? `<span class="badge-reprovado">CANCELADO</span>` : (ap.status === 'Reprovado' ? `<span class="badge-reprovado">REPROVADO</span>` : `<span class="badge-aprovado">APROVADO</span>`);
+
+            html += `<tr>
+                <td>${dataBr}</td>
+                <td><strong style="color:var(--text-main);">${ap.func}</strong></td>
+                <td>${badgeOS}</td>
+                <td>${ap.processo} ${descExtra}</td>
+                <td style="text-align:center; font-weight:600; color:${ap.status === 'Aprovado' ? 'var(--text-main)' : 'var(--danger)'}">${ap.inicio} - ${ap.fim} <br><span style="font-size:12px;">(${ap.horas} h)</span></td>
+                <td style="text-align:center;">${badgeStatus}</td>
+            </tr>`;
         });
-        
+
         document.getElementById('tabelaRelatorio').innerHTML = html || '<tr><td colspan="6" style="text-align:center; padding:30px; color:var(--text-muted);">Nenhum apontamento encontrado para este filtro.</td></tr>';
         document.getElementById('kpiHorasRelatorio').innerText = somaHoras.toFixed(2) + 'h';
         lucide.createIcons();
     };
 
-    window.excluirFap = function(idx) {
-        if(confirm("Deseja realmente apagar este apontamento de produção?")) {
-            window.marbeDB.producao.apontamentos.splice(idx, 1);
-            window.salvarNuvem(true);
-            window.updateUI();
-        }
+    window.cancelarFap = function(idx) {
+        const ap = window.marbeDB.producao.apontamentos[idx];
+        if(!ap) return alert('Apontamento não encontrado. Atualize a tela.');
+        const motivo = prompt(`Motivo do cancelamento do apontamento de ${ap.func} (${ap.data})?\n\nO registro não será apagado e ficará disponível nos relatórios.`);
+        if(!motivo || !motivo.trim()) return;
+        if(!confirm(`Confirmar o CANCELAMENTO deste apontamento?\n\nFuncionário: ${ap.func}\nOS: ${ap.os || 'Uso Interno'}\nProcesso: ${ap.processo}\nHoras: ${ap.horas}h\n\nEle deixará de somar horas, mas continuará no histórico.`)) return;
+        ap.status = 'Cancelado';
+        ap.motivo_cancelamento = motivo.trim();
+        ap.cancelado_em = new Date().toISOString();
+        window.salvarNuvem(true);
+        window.updateUI();
     };
 
     window.addFuncionario = function() {
@@ -676,9 +758,7 @@
     window.gerarPDFFap = function() {
         try {
             alert("Gerando Relatório Preenchido. Aguarde...");
-            let fData = document.getElementById('filtroData').value;
-            let fFunc = document.getElementById('filtroFunc').value;
-            let fOs = document.getElementById('filtroOS').value.toLowerCase().trim();
+            const f = window.getFiltrosFap();
             
             const { jsPDF } = window.jspdf; 
             const doc = new jsPDF();
@@ -687,7 +767,8 @@
             doc.text("RELATÓRIO DE ATIVIDADE PROFISSIONAL (FAP)", 105, 20, {align: "center"});
             
             doc.setFontSize(10); doc.setFont("helvetica", "normal");
-            let subtitle = `Filtros -> Data: ${fData ? fData.split('-').reverse().join('/') : 'Todas'} | Operador: ${fFunc} | OS: ${fOs ? fOs.toUpperCase() : 'Todas'}`;
+            const br = d => d ? d.split('-').reverse().join('/') : 'Todas';
+            let subtitle = `Período: ${br(f.ini)} a ${br(f.fim)} | Operador: ${f.func} | OS: ${f.os ? f.os.toUpperCase() : 'Todas'} | Processo: ${f.processo}`;
             doc.text(subtitle, 105, 28, {align: "center"});
             
             doc.setLineWidth(0.5); doc.line(15, 32, 195, 32);
@@ -697,16 +778,11 @@
             let apReverse = [...(window.marbeDB.producao.apontamentos || [])]; 
             
             apReverse.forEach((ap) => {
-                let passar = true;
-                if(fData && ap.data !== fData) passar = false;
-                if(fFunc !== 'TODOS' && ap.func !== fFunc) passar = false;
-                if(fOs && !(ap.os || '').toLowerCase().includes(fOs)) passar = false;
-                
-                if(passar) {
-                    if(ap.status !== 'Reprovado') somaHoras += parseFloat(ap.horas);
+                if(window.apontamentoPassaFiltro(ap, f)) {
+                    if(ap.status !== 'Reprovado' && ap.status !== 'Cancelado') somaHoras += parseFloat(ap.horas || 0);
                     let dataBr = ap.data.split('-').reverse().join('/');
                     let dest = ap.os ? `OS ${ap.os}` : `Uso Interno`;
-                    let proc = ap.obs ? `${ap.processo}\n(Obs: ${ap.obs})` : ap.processo;
+                    let proc = ap.obs ? `${ap.processo}\n(Obs: ${ap.obs})` : ap.processo; if(ap.status === 'Cancelado' && ap.motivo_cancelamento) proc += `\n(Cancelado: ${ap.motivo_cancelamento})`;
                     
                     bodyData.push([dataBr, ap.func, dest, proc, `${ap.inicio} às ${ap.fim} (${ap.horas}h)`, ap.status || 'Aprovado']);
                 }
@@ -728,7 +804,7 @@
             doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(13, 148, 136);
             doc.text(`TOTAL DE HORAS VÁLIDAS/APROVADAS: ${somaHoras.toFixed(2)} Horas`, 195, finalY, {align: 'right'});
 
-            window.abrirPDFMobile(doc.output('blob'), `Relatorio_FAP_Preenchido`);
+            window.abrirPDFMobile(doc.output('blob'), `Relatorio_FAP_${f.ini || 'inicio'}_${f.fim || 'fim'}`);
         } catch(e) {
             alert("Erro ao tentar gerar o PDF: " + e.message);
         }

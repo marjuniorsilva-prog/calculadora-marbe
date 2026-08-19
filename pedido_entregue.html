@@ -225,6 +225,28 @@
   </main>
 </div>
 
+<div id="modalEntrega" style="display:none; position:fixed; inset:0; background:rgba(2,6,23,.82); z-index:9999; align-items:center; justify-content:center; padding:20px;">
+  <div style="width:min(620px,96vw); background:var(--card-bg); border:1px solid var(--border); border-radius:14px; padding:24px; box-shadow:0 25px 60px rgba(0,0,0,.45);">
+    <div style="display:flex; justify-content:space-between; gap:15px; align-items:flex-start; margin-bottom:18px;">
+      <div><h3 style="margin:0; color:var(--text-main);">Confirmar entrega da OS</h3><div id="entregaResumo" style="font-size:12px; color:var(--text-muted); margin-top:6px;"></div></div>
+      <button class="btn btn-outline" style="width:auto; padding:7px 10px;" onclick="fecharModalEntrega()">X</button>
+    </div>
+    <input type="hidden" id="entregaIdx">
+    <div style="display:flex; gap:12px; flex-wrap:wrap;">
+      <div style="flex:1; min-width:180px;"><label>Data da entrega</label><input type="date" id="entregaData"></div>
+      <div style="flex:1; min-width:220px;"><label>Forma de entrega</label><select id="entregaTipo"><option>CLIENTE RETIROU</option><option>TRANSPORTADORA</option><option>ENTREGA PRÓPRIA</option><option>OUTRO</option></select></div>
+    </div>
+    <label>Quem recebeu / responsável pela retirada *</label><input type="text" id="entregaRecebedor" placeholder="Nome da pessoa, motorista ou responsável">
+    <label>Documento / identificação (opcional)</label><input type="text" id="entregaDocumento" placeholder="RG, CPF, placa, transportadora...">
+    <label>Observação da entrega (opcional)</label><textarea id="entregaObs" rows="2" placeholder="Ex: retirado por transportadora X, canhoto assinado, volumes conferidos..."></textarea>
+    <div style="display:flex; gap:12px; margin-top:18px;">
+      <button class="btn btn-outline" style="flex:1;" onclick="fecharModalEntrega()">CANCELAR</button>
+      <button class="btn" style="flex:2; background:var(--success); color:white;" onclick="confirmarEntregaArquivar()"><i data-lucide="check-circle"></i> CONFIRMAR ENTREGA E ARQUIVAR</button>
+    </div>
+    <div style="font-size:11px; color:var(--text-muted); margin-top:12px;">Esses dados ficarão gravados no Histórico Geral da OS para futura conferência.</div>
+  </div>
+</div>
+
 <script>
     lucide.createIcons();
 
@@ -244,7 +266,7 @@
                 <div class="card-sub"><strong>Frete:</strong> <span style="color:var(--text-main);">${os.frete || 'Não informado'}</span> | <strong>Itens Liberados:</strong> <span style="color:var(--text-main);">${qtdItens} peça(s)</span></div>
                 <div class="botoes-acao">
                     <button class="btn btn-outline" style="color:var(--info); border-color:var(--info);" onclick="gerarTermoPDF(${index})"><i data-lucide="printer"></i> GERAR TERMO DE ASSINATURA</button>
-                    <button class="btn" style="background:var(--success); color:white;" onclick="arquivarOS(${index})"><i data-lucide="check-circle"></i> PEÇA ENTREGUE / ARQUIVAR</button>
+                    <button class="btn" style="background:var(--success); color:white;" onclick="abrirConfirmacaoEntrega(${index})"><i data-lucide="check-circle"></i> PEÇA ENTREGUE / ARQUIVAR</button>
                 </div>
             </div>`;
         });
@@ -292,13 +314,47 @@
         window.abrirPDFMobile(doc.output('blob'), `TERMO_RETIRADA_OS_${d.os}`);
     };
 
-    window.arquivarOS = function(index) {
-        if(!confirm("Confirmar entrega ao cliente? Esta OS sairá da Expedição e irá para o Histórico de Entregues/Arquivados.")) return;
+    window.abrirConfirmacaoEntrega = function(index) {
+        const os = window.marbeDB.expedidos[index];
+        if(!os) return alert('OS não encontrada na Expedição. Atualize a tela.');
+        document.getElementById('entregaIdx').value = index;
+        document.getElementById('entregaData').value = window.MarbeDate.today();
+        document.getElementById('entregaTipo').value = 'CLIENTE RETIROU';
+        document.getElementById('entregaRecebedor').value = '';
+        document.getElementById('entregaDocumento').value = '';
+        document.getElementById('entregaObs').value = '';
+        document.getElementById('entregaResumo').innerText = `OS ${os.os} — ${os.cliente}`;
+        document.getElementById('modalEntrega').style.display = 'flex';
+        lucide.createIcons();
+    };
+
+    window.fecharModalEntrega = function() { document.getElementById('modalEntrega').style.display = 'none'; };
+
+    window.confirmarEntregaArquivar = function() {
+        const index = Number(document.getElementById('entregaIdx').value);
+        const data = document.getElementById('entregaData').value;
+        const tipo = document.getElementById('entregaTipo').value;
+        const recebedor = document.getElementById('entregaRecebedor').value.trim();
+        const doc = document.getElementById('entregaDocumento').value.trim();
+        const obs = document.getElementById('entregaObs').value.trim();
+        if(!data) return alert('Informe a data da entrega.');
+        if(!recebedor) return alert('Informe quem recebeu ou quem foi responsável pela retirada.');
+        const os = window.marbeDB.expedidos[index];
+        if(!os) return alert('OS não encontrada. Atualize a tela e tente novamente.');
+        if(!confirm(`Confirmar a entrega da OS ${os.os} para ${recebedor} em ${data.split('-').reverse().join('/')}?\n\nA OS sairá da Expedição e ficará registrada no Histórico Geral.`)) return;
         let osEntregue = window.marbeDB.expedidos.splice(index, 1)[0];
         osEntregue.data_entrega = new Date().toISOString();
+        osEntregue.data_entrega_local = data;
+        osEntregue.tipo_entrega = tipo;
+        osEntregue.recebedor_nome = recebedor;
+        osEntregue.recebedor_doc = doc;
+        osEntregue.obs_entrega = obs;
         if(!window.marbeDB.arquivados) window.marbeDB.arquivados = [];
         window.marbeDB.arquivados.push(osEntregue);
-        window.salvarNuvem(); renderExpedicao();
+        window.salvarNuvem();
+        fecharModalEntrega();
+        renderExpedicao();
+        alert('Entrega registrada e OS arquivada com sucesso.');
     };
 </script>
 </body>

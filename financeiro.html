@@ -232,6 +232,9 @@
               <button class="tab-btn" onclick="window.tabFin('tab-lancar', this)">
                   <i data-lucide="plus-circle"></i> <span>Lançamento Manual</span>
               </button>
+              <button class="tab-btn" onclick="window.tabFin('tab-relatorios', this)">
+                  <i data-lucide="file-bar-chart"></i> <span>Relatórios Financeiros</span>
+              </button>
           </div>
       </div>
       
@@ -385,6 +388,44 @@
               </div>
           </div>
 
+          <!-- ABA 5: RELATÓRIOS FINANCEIROS -->
+          <div id="tab-relatorios" class="section">
+              <div class="card-panel">
+                  <div class="card-header"><i data-lucide="file-bar-chart"></i> Relatório Financeiro por Período</div>
+                  <p style="color:var(--text-muted); margin-top:-6px; line-height:1.55;">Consulte contas pagas, recebidas, pendentes, atrasadas, canceladas e NFs aguardando programação. O relatório não altera nenhum lançamento.</p>
+                  <div class="row">
+                      <div class="col"><label>Data inicial</label><input type="date" id="relFinInicio"></div>
+                      <div class="col"><label>Data final</label><input type="date" id="relFinFim"></div>
+                      <div class="col"><label>Tipo</label><select id="relFinTipo"><option value="TODOS">Todos</option><option value="ENTRADA">Receitas / Entradas</option><option value="SAIDA">Despesas / Saídas</option></select></div>
+                      <div class="col"><label>Situação</label><select id="relFinStatus"><option value="TODOS">Todas</option><option value="LIQUIDADO">Pagos / Recebidos</option><option value="PENDENTE">Pendentes</option><option value="ATRASADO">Atrasados</option><option value="AGUARDANDO_PROGRAMACAO">Aguardando programação</option><option value="CANCELADO">Cancelados</option></select></div>
+                  </div>
+                  <div class="row">
+                      <div class="col"><label>Descrição ou categoria</label><input type="text" id="relFinBusca" placeholder="Ex.: fornecedor, cliente, imposto, venda..."></div>
+                      <div class="col" style="display:flex; align-items:end; gap:10px; flex-wrap:wrap; padding-bottom:18px;">
+                          <button class="btn btn-outline" onclick="window.atalhoRelFinanceiro('HOJE')"><i data-lucide="calendar-days"></i> HOJE</button>
+                          <button class="btn btn-outline" onclick="window.atalhoRelFinanceiro('MES')"><i data-lucide="calendar-range"></i> MÊS ATUAL</button>
+                          <button class="btn btn-primary" onclick="window.renderRelatorioFinanceiro()"><i data-lucide="search"></i> FILTRAR</button>
+                          <button class="btn btn-success" onclick="window.gerarPdfRelatorioFinanceiro()"><i data-lucide="file-down"></i> GERAR PDF</button>
+                      </div>
+                  </div>
+
+                  <div class="dash-grid" style="margin-top:8px;">
+                      <div class="dash-card"><h3>Entradas liquidadas</h3><div class="value" id="relFinEntradas" style="color:var(--success); font-size:22px;">R$ 0,00</div></div>
+                      <div class="dash-card"><h3>Saídas liquidadas</h3><div class="value" id="relFinSaidas" style="color:var(--danger); font-size:22px;">R$ 0,00</div></div>
+                      <div class="dash-card"><h3>A receber no filtro</h3><div class="value" id="relFinAReceber" style="color:var(--success); font-size:22px;">R$ 0,00</div></div>
+                      <div class="dash-card"><h3>A pagar no filtro</h3><div class="value" id="relFinAPagar" style="color:var(--danger); font-size:22px;">R$ 0,00</div></div>
+                  </div>
+
+                  <div class="table-container">
+                      <table>
+                          <thead><tr><th>Data</th><th>Tipo</th><th>Descrição / Categoria</th><th>Situação</th><th style="text-align:right;">Valor</th></tr></thead>
+                          <tbody id="tabelaRelFinanceiro"></tbody>
+                      </table>
+                  </div>
+                  <p id="relFinResumo" style="color:var(--text-muted); margin:14px 0 0; font-size:12px;"></p>
+              </div>
+          </div>
+
       </div>
   </main>
 </div>
@@ -424,6 +465,31 @@
   </div>
 </div>
 
+<!-- Modal: baixa de recebimento -->
+<div id="modalBaixaRecebimento" style="position:fixed; inset:0; background:rgba(2,6,23,.92); display:none; z-index:10001; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(4px);">
+  <div style="background:var(--card-bg); width:min(620px,100%); max-height:92vh; overflow:auto; padding:30px; border-radius:16px; border:1px solid var(--border);">
+    <h3 style="margin:0 0 8px; color:var(--success); font-size:21px;"><i data-lucide="badge-dollar-sign"></i> Dar baixa no recebimento</h3>
+    <div id="recebimentoResumo" style="padding:14px; background:var(--bg-color); border:1px solid var(--border); border-radius:8px; color:var(--text-muted); line-height:1.55; margin-bottom:20px;"></div>
+    <input type="hidden" id="recebimentoIdx">
+    <div class="row">
+      <div class="col"><label>Data em que entrou no banco</label><input type="date" id="recebimentoData"></div>
+      <div class="col"><label>Valor que entrou realmente (R$)</label><input type="number" step="0.01" min="0.01" id="recebimentoValor" oninput="window.atualizarTratamentoRecebimento()"></div>
+    </div>
+    <div id="boxTratamentoRecebimento" style="display:none;">
+      <label>Como tratar a diferença?</label>
+      <select id="recebimentoTratamento">
+        <option value="PARCIAL">Recebimento parcial — manter o saldo pendente</option>
+        <option value="AJUSTE">Liquidar com desconto/ajuste — encerrar o título</option>
+      </select>
+      <div id="recebimentoAviso" style="padding:12px; border:1px solid var(--warning); background:rgba(245,158,11,.08); border-radius:8px; color:var(--text-muted); font-size:12px; line-height:1.5; margin-bottom:16px;"></div>
+    </div>
+    <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:20px; flex-wrap:wrap;">
+      <button class="btn btn-outline" onclick="document.getElementById('modalBaixaRecebimento').style.display='none'">CANCELAR</button>
+      <button class="btn btn-success" onclick="window.confirmarBaixaRecebimento()"><i data-lucide="check-circle"></i> CONFIRMAR BAIXA</button>
+    </div>
+  </div>
+</div>
+
 <script>
     lucide.createIcons();
 
@@ -442,6 +508,7 @@
         window.renderContasPagar();
         window.renderContasReceber();
         window.renderDRE();
+        if(document.getElementById('relFinInicio')) window.renderRelatorioFinanceiro();
         lucide.createIcons();
     };
 
@@ -510,7 +577,7 @@
                         <td style="text-align:center;"><span class="badge-status badge-pago"><i data-lucide="check" style="width:12px; vertical-align:middle;"></i> LIQUIDADO</span></td>
                         <td style="text-align:right; font-weight:800; font-size:15px; color:${corTexto};">${sinal} ${window.fmtMoney(val)}</td>
                         <td style="text-align:center;">
-                            <button class="btn btn-outline" style="padding:4px; color:var(--danger); border:none;" onclick="window.excluirTransacao(${t.originalIdx})"><i data-lucide="trash-2" style="width:16px;"></i></button>
+                            <button class="btn btn-outline" style="padding:4px; color:var(--danger); border:none;" title="Cancelar lançamento" onclick="window.cancelarTransacao(${t.originalIdx})"><i data-lucide="ban" style="width:16px;"></i></button>
                         </td>
                     </tr>`;
                 }
@@ -662,13 +729,16 @@
         let html = '';
         let hojeStr = window.MarbeDate.today();
 
-        let transacoes = window.marbeDB.financeiro.transacoes || [];
-        transacoes.forEach((t, i) => {
-            if(t.tipo === 'SAIDA' && t.status === 'PENDENTE') {
-                let vto = t.vencimento || t.data;
-                let isAtrasado = vto < hojeStr;
-                let classBadge = isAtrasado ? 'badge-atrasado' : 'badge-pendente';
-                let txtAtraso = isAtrasado ? '(ATRASADO)' : '';
+        let transacoes = (window.marbeDB.financeiro.transacoes || [])
+            .map((t, i) => ({t, i}))
+            .filter(x => x.t.tipo === 'SAIDA' && x.t.status === 'PENDENTE')
+            .sort((a,b) => String(a.t.vencimento || a.t.data || '9999-12-31').localeCompare(String(b.t.vencimento || b.t.data || '9999-12-31')));
+        transacoes.forEach(({t, i}) => {
+                let vto = t.vencimento || t.data || '';
+                let isAtrasado = !!vto && vto < hojeStr;
+                let isHoje = vto === hojeStr;
+                let classBadge = (isAtrasado || isHoje) ? 'badge-atrasado' : 'badge-pendente';
+                let txtAtraso = isAtrasado ? '(ATRASADO)' : (isHoje ? '(VENCE HOJE)' : '');
                 let vtoBr = vto ? vto.split('-').reverse().join('/') : 'N/D';
 
                 html += `
@@ -680,11 +750,10 @@
                     </div>
                     <div style="display:flex; align-items:center; gap:30px;" class="bill-actions">
                         <div class="bill-value saida">${window.fmtMoney(t.valor)}</div>
-                        <button class="btn btn-outline" style="border-color:var(--danger); color:var(--danger);" onclick="window.excluirTransacao(${i})"><i data-lucide="trash-2"></i></button>
+                        <button class="btn btn-outline" style="border-color:var(--danger); color:var(--danger);" title="Cancelar lançamento" onclick="window.cancelarTransacao(${i})"><i data-lucide="ban"></i></button>
                         <button class="btn btn-success" onclick="window.marcarComoPago(${i}, 'SAIDA')"><i data-lucide="check-circle"></i> MARCAR COMO PAGO</button>
                     </div>
                 </div>`;
-            }
         });
         document.getElementById('listaContasPagar').innerHTML = html || '<div style="text-align:center; padding:40px; color:var(--text-muted); background:var(--card-bg); border-radius:8px;">Nenhuma conta a pagar pendente. Viva!</div>';
         lucide.createIcons();
@@ -694,13 +763,16 @@
         let html = '';
         let hojeStr = window.MarbeDate.today();
 
-        let transacoes = window.marbeDB.financeiro.transacoes || [];
-        transacoes.forEach((t, i) => {
-            if(t.tipo === 'ENTRADA' && t.status === 'PENDENTE') {
-                let vto = t.vencimento || t.data;
-                let isAtrasado = vto < hojeStr;
-                let classBadge = isAtrasado ? 'badge-atrasado' : 'badge-pendente';
-                let txtAtraso = isAtrasado ? '(CLIENTE ATRASADO)' : '';
+        let transacoes = (window.marbeDB.financeiro.transacoes || [])
+            .map((t, i) => ({t, i}))
+            .filter(x => x.t.tipo === 'ENTRADA' && x.t.status === 'PENDENTE')
+            .sort((a,b) => String(a.t.vencimento || a.t.data || '9999-12-31').localeCompare(String(b.t.vencimento || b.t.data || '9999-12-31')));
+        transacoes.forEach(({t, i}) => {
+                let vto = t.vencimento || t.data || '';
+                let isAtrasado = !!vto && vto < hojeStr;
+                let isHoje = vto === hojeStr;
+                let classBadge = (isAtrasado || isHoje) ? 'badge-atrasado' : 'badge-pendente';
+                let txtAtraso = isAtrasado ? '(CLIENTE ATRASADO)' : (isHoje ? '(RECEBER HOJE)' : '');
                 let vtoBr = vto ? vto.split('-').reverse().join('/') : 'N/D';
 
                 html += `
@@ -712,60 +784,270 @@
                     </div>
                     <div style="display:flex; align-items:center; gap:30px;" class="bill-actions">
                         <div class="bill-value entrada">${window.fmtMoney(t.valor)}</div>
-                        <button class="btn btn-outline" style="border-color:var(--danger); color:var(--danger);" onclick="window.excluirTransacao(${i})"><i data-lucide="trash-2"></i></button>
-                        <button class="btn btn-success" onclick="window.marcarComoPago(${i}, 'ENTRADA')"><i data-lucide="check-circle"></i> DAR BAIXA (RECEBIDO)</button>
+                        <button class="btn btn-outline" style="border-color:var(--danger); color:var(--danger);" title="Cancelar lançamento" onclick="window.cancelarTransacao(${i})"><i data-lucide="ban"></i></button>
+                        <button class="btn btn-success" onclick="window.abrirBaixaRecebimento(${i})"><i data-lucide="check-circle"></i> DAR BAIXA (RECEBIDO)</button>
                     </div>
                 </div>`;
-            }
         });
         document.getElementById('listaContasReceber').innerHTML = html || '<div style="text-align:center; padding:40px; color:var(--text-muted); background:var(--card-bg); border-radius:8px;">Nenhuma previsão de recebimento futura.</div>';
         lucide.createIcons();
     };
 
-    // --- AÇÃO DO BOTÃO "MARCAR COMO PAGO" (A MÁGICA QUE RESOLVE SEU PROBLEMA) ---
+    // --- BAIXA DE PAGAMENTOS E RECEBIMENTOS ---
     window.marcarComoPago = function(idx, tipo) {
         let t = window.marbeDB.financeiro.transacoes[idx];
         if(!t) return alert('Lançamento não encontrado. Atualize a tela e tente novamente.');
+        if(tipo === 'ENTRADA') return window.abrirBaixaRecebimento(idx);
 
         let hojeSugestao = window.MarbeDate.today();
-        let dataMuda = prompt(`Em qual data este ${tipo === 'ENTRADA' ? 'recebimento' : 'pagamento'} foi feito realmente no banco?\n\n(No formato AAAA-MM-DD)`, hojeSugestao);
+        let dataMuda = prompt(`Em qual data este pagamento foi feito realmente no banco?\n\n(No formato AAAA-MM-DD)`, hojeSugestao);
         if(!dataMuda) return;
-
-        if(tipo === 'ENTRADA') {
-            const previsto = Number(t.valor) || 0;
-            const valorDigitado = prompt(`Valor previsto: ${window.fmtMoney(previsto)}\n\nQuanto entrou REALMENTE no banco?\nUse ponto ou vírgula para os centavos.`, previsto.toFixed(2).replace('.', ','));
-            if(valorDigitado === null) return;
-            const txtReal = String(valorDigitado).trim();
-            const normalizadoReal = txtReal.includes(',') ? txtReal.replace(/\./g,'').replace(',','.') : txtReal;
-            const real = parseFloat(normalizadoReal);
-            if(!real || real <= 0) return alert('Informe um valor recebido válido.');
-            const diferenca = previsto - real;
-            if(Math.abs(diferenca) > 0.009) {
-                if(!confirm(`O valor recebido está diferente do previsto.\n\nPrevisto: ${window.fmtMoney(previsto)}\nRecebido: ${window.fmtMoney(real)}\nDiferença: ${window.fmtMoney(diferenca)}\n\nConfirmar a baixa com o valor REAL recebido?`)) return;
-                if(!t.valor_previsto) t.valor_previsto = previsto;
-                t.valor_recebido = real;
-                t.diferenca_recebimento = diferenca;
-                t.valor = real;
-            }
-            t.status = 'RECEBIDO';
-        } else {
-            if(!confirm(`Confirmar pagamento de ${window.fmtMoney(t.valor)} em ${dataMuda.split('-').reverse().join('/')}?`)) return;
-            t.status = 'PAGO';
-        }
-
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(dataMuda)) return alert('Data inválida. Use o formato AAAA-MM-DD.');
+        if(!confirm(`Confirmar pagamento de ${window.fmtMoney(t.valor)} em ${dataMuda.split('-').reverse().join('/')}?`)) return;
+        t.status = 'PAGO';
         t.data_pagamento = dataMuda;
+        t.baixado_por = window.MarbeCurrentUser?.email || 'Usuário autenticado';
         window.salvarNuvem(true);
-        alert(tipo === 'ENTRADA' ? 'Recebimento baixado pelo valor real que entrou no banco.' : 'Pagamento baixado com sucesso.');
+        alert('Pagamento baixado com sucesso.');
         window.updateUI();
         window.tabFin('tab-dre', document.querySelector('.local-menu .tab-btn'));
     };
 
-    window.excluirTransacao = function(idx) {
-        if(confirm("EXCLUIR DEFINITIVAMENTE este lançamento financeiro?\n\nEsta ação não pode ser desfeita pelo sistema. Confirme apenas se o registro realmente foi lançado por engano.")) {
-            window.marbeDB.financeiro.transacoes.splice(idx, 1);
-            window.salvarNuvem(true);
-            window.updateUI();
+    window.abrirBaixaRecebimento = function(idx) {
+        const t = window.marbeDB.financeiro.transacoes[idx];
+        if(!t || t.tipo !== 'ENTRADA' || t.status !== 'PENDENTE') return alert('Este recebimento não está mais pendente. Atualize a tela e tente novamente.');
+        document.getElementById('recebimentoIdx').value = idx;
+        document.getElementById('recebimentoData').value = window.MarbeDate.today();
+        document.getElementById('recebimentoValor').value = Number(t.valor || 0).toFixed(2);
+        document.getElementById('recebimentoResumo').innerHTML = `<strong style="color:var(--text-main);">${t.descricao}</strong><br>${t.categoria || 'Sem categoria'}<br>Saldo pendente atual: <strong style="color:var(--success);">${window.fmtMoney(t.valor)}</strong>`;
+        document.getElementById('recebimentoTratamento').value = 'PARCIAL';
+        window.atualizarTratamentoRecebimento();
+        document.getElementById('modalBaixaRecebimento').style.display = 'flex';
+        lucide.createIcons();
+    };
+
+    window.atualizarTratamentoRecebimento = function() {
+        const idx = parseInt(document.getElementById('recebimentoIdx').value);
+        const t = window.marbeDB.financeiro.transacoes[idx];
+        if(!t) return;
+        const previsto = Number(t.valor) || 0;
+        const real = Number(document.getElementById('recebimentoValor').value) || 0;
+        const box = document.getElementById('boxTratamentoRecebimento');
+        const aviso = document.getElementById('recebimentoAviso');
+        const sel = document.getElementById('recebimentoTratamento');
+        if(real > 0 && Math.abs(real - previsto) > 0.009) {
+            box.style.display = 'block';
+            if(real < previsto) {
+                const saldo = previsto - real;
+                aviso.innerHTML = `Entrou <strong>${window.fmtMoney(real)}</strong> de um saldo de <strong>${window.fmtMoney(previsto)}</strong>. Se for pagamento parcial, permanecerá <strong>${window.fmtMoney(saldo)}</strong> a receber. Se for desconto/ajuste definitivo, o título será encerrado.`;
+                [...sel.options].forEach(o => o.disabled = false);
+                if(sel.value !== 'PARCIAL' && sel.value !== 'AJUSTE') sel.value = 'PARCIAL';
+            } else {
+                aviso.innerHTML = `O valor recebido é <strong>${window.fmtMoney(real - previsto)}</strong> maior que o previsto. O lançamento será liquidado como ajuste/acréscimo.`;
+                sel.value = 'AJUSTE';
+                [...sel.options].forEach(o => o.disabled = o.value === 'PARCIAL');
+            }
+        } else {
+            box.style.display = 'none';
         }
+    };
+
+    window.confirmarBaixaRecebimento = function() {
+        const idx = parseInt(document.getElementById('recebimentoIdx').value);
+        const t = window.marbeDB.financeiro.transacoes[idx];
+        if(!t || t.tipo !== 'ENTRADA' || t.status !== 'PENDENTE') return alert('Este recebimento não está mais pendente. Atualize a tela e tente novamente.');
+        const data = document.getElementById('recebimentoData').value;
+        const real = Number(document.getElementById('recebimentoValor').value);
+        const previsto = Number(t.valor) || 0;
+        if(!data) return alert('Informe a data em que o valor entrou no banco.');
+        if(!real || real <= 0) return alert('Informe um valor recebido válido.');
+        const diferente = Math.abs(real - previsto) > 0.009;
+        let tratamento = diferente ? document.getElementById('recebimentoTratamento').value : 'INTEGRAL';
+        if(real > previsto) tratamento = 'AJUSTE';
+
+        if(tratamento === 'PARCIAL') {
+            if(real >= previsto) return alert('Para recebimento parcial, o valor precisa ser menor que o saldo pendente.');
+            const saldo = Number((previsto - real).toFixed(2));
+            if(!confirm(`Confirmar RECEBIMENTO PARCIAL?\n\nRecebido agora: ${window.fmtMoney(real)}\nSaldo que continuará pendente: ${window.fmtMoney(saldo)}\n\nO valor recebido entrará no DRE e o saldo continuará em Contas a Receber.`)) return;
+            if(!t.valor_previsto_original) t.valor_previsto_original = previsto;
+            if(!Array.isArray(t.recebimentos_parciais)) t.recebimentos_parciais = [];
+            const registroId = Date.now() + Math.floor(Math.random()*1000);
+            t.recebimentos_parciais.push({id:registroId, data, valor:real, usuario:window.MarbeCurrentUser?.email || ''});
+            t.valor_recebido_acumulado = Number(((Number(t.valor_recebido_acumulado)||0) + real).toFixed(2));
+            t.valor = saldo;
+            window.marbeDB.financeiro.transacoes.push({
+                id: registroId,
+                tipo: 'ENTRADA',
+                categoria: t.categoria,
+                descricao: `${t.descricao} | Recebimento parcial`,
+                valor: real,
+                status: 'RECEBIDO',
+                vencimento: t.vencimento || t.data || data,
+                data_pagamento: data,
+                origem_recebimento_parcial: t.id,
+                origem: 'RECEBIMENTO_PARCIAL',
+                baixado_por: window.MarbeCurrentUser?.email || 'Usuário autenticado'
+            });
+        } else {
+            const diferenca = previsto - real;
+            const msgAjuste = diferente ? `\nDiferença/ajuste: ${window.fmtMoney(diferenca)}` : '';
+            if(!confirm(`Confirmar LIQUIDAÇÃO do título?\n\nSaldo previsto: ${window.fmtMoney(previsto)}\nValor recebido: ${window.fmtMoney(real)}${msgAjuste}\n\nO título será encerrado.`)) return;
+            if(diferente) {
+                t.valor_previsto = previsto;
+                t.valor_recebido = real;
+                t.diferenca_recebimento = diferenca;
+                t.valor = real;
+                t.tipo_baixa_recebimento = 'AJUSTE';
+            } else {
+                t.tipo_baixa_recebimento = 'INTEGRAL';
+            }
+            t.status = 'RECEBIDO';
+            t.data_pagamento = data;
+            t.baixado_por = window.MarbeCurrentUser?.email || 'Usuário autenticado';
+        }
+
+        window.salvarNuvem(true);
+        document.getElementById('modalBaixaRecebimento').style.display = 'none';
+        alert(tratamento === 'PARCIAL' ? 'Recebimento parcial registrado. O saldo continua pendente.' : 'Recebimento liquidado com sucesso.');
+        window.updateUI();
+        window.tabFin('tab-dre', document.querySelector('.local-menu .tab-btn'));
+    };
+
+    window.cancelarTransacao = function(idx) {
+        const t = window.marbeDB.financeiro.transacoes[idx];
+        if(!t) return alert('Lançamento não encontrado.');
+        if(t.status === 'CANCELADO') return alert('Este lançamento já está cancelado.');
+        const motivo = prompt(`Cancelar este lançamento financeiro?\n\n${t.descricao || ''}\n${window.fmtMoney(t.valor || 0)}\n\nInforme o motivo do cancelamento:`);
+        if(motivo === null) return;
+        if(!motivo.trim()) return alert('Informe o motivo do cancelamento para manter a auditoria.');
+        if(!confirm('Confirmar CANCELAMENTO?\n\nO registro não será apagado. Ele deixará de contar nos saldos e ficará disponível nos Relatórios Financeiros.')) return;
+
+        // Se for uma baixa parcial, devolve o valor ao saldo pendente de origem.
+        if(t.origem_recebimento_parcial) {
+            const origem = window.marbeDB.financeiro.transacoes.find(x => String(x.id) === String(t.origem_recebimento_parcial));
+            if(origem && origem.status === 'PENDENTE') {
+                origem.valor = Number(((Number(origem.valor)||0) + (Number(t.valor)||0)).toFixed(2));
+                origem.valor_recebido_acumulado = Math.max(0, Number(((Number(origem.valor_recebido_acumulado)||0) - (Number(t.valor)||0)).toFixed(2)));
+            }
+        }
+
+        t.status_anterior = t.status;
+        t.status = 'CANCELADO';
+        t.motivo_cancelamento = motivo.trim();
+        t.data_cancelamento = window.MarbeDate.today();
+        t.cancelado_por = window.MarbeCurrentUser?.email || 'Usuário autenticado';
+        window.salvarNuvem(true);
+        alert('Lançamento cancelado e preservado para auditoria.');
+        window.updateUI();
+    };
+
+    function relFinStatusEfetivo(t) {
+        if(t.status === 'PAGO' || t.status === 'RECEBIDO') return 'LIQUIDADO';
+        if(t.status === 'CANCELADO') return 'CANCELADO';
+        if(t.status === 'AGUARDANDO_PROGRAMACAO') return 'AGUARDANDO_PROGRAMACAO';
+        if(t.status === 'PENDENTE') {
+            const v = t.vencimento || t.data || '';
+            return v && v < window.MarbeDate.today() ? 'ATRASADO' : 'PENDENTE';
+        }
+        return t.status || 'OUTRO';
+    }
+
+    function relFinDataReferencia(t) {
+        if(t.status === 'PAGO' || t.status === 'RECEBIDO') return t.data_pagamento || t.vencimento || t.data || '';
+        if(t.status === 'CANCELADO') return t.data_cancelamento || t.vencimento || t.data || '';
+        return t.vencimento || t.data || t.data_recebimento || '';
+    }
+
+    function relFinLabelStatus(st) {
+        return ({LIQUIDADO:'Liquidado', PENDENTE:'Pendente', ATRASADO:'Atrasado', AGUARDANDO_PROGRAMACAO:'Aguardando programação', CANCELADO:'Cancelado'})[st] || st;
+    }
+
+    function escHtml(v) {
+        return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+    }
+
+    window.atalhoRelFinanceiro = function(tipo) {
+        const hoje = new Date();
+        if(tipo === 'HOJE') {
+            const d = window.MarbeDate.today();
+            document.getElementById('relFinInicio').value = d;
+            document.getElementById('relFinFim').value = d;
+        } else {
+            const ini = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+            const fim = new Date(hoje.getFullYear(), hoje.getMonth()+1, 0);
+            document.getElementById('relFinInicio').value = window.MarbeDate.date(ini);
+            document.getElementById('relFinFim').value = window.MarbeDate.date(fim);
+        }
+        window.renderRelatorioFinanceiro();
+    };
+
+    window.obterLinhasRelFinanceiro = function() {
+        const ini = document.getElementById('relFinInicio').value;
+        const fim = document.getElementById('relFinFim').value;
+        const tipo = document.getElementById('relFinTipo').value;
+        const status = document.getElementById('relFinStatus').value;
+        const busca = (document.getElementById('relFinBusca').value || '').trim().toLowerCase();
+        const lista = (window.marbeDB.financeiro.transacoes || []).map((t, idx) => ({...t, originalIdx:idx})).filter(t => t.status !== 'PROGRAMADO');
+        return lista.filter(t => {
+            const data = relFinDataReferencia(t);
+            if(ini && (!data || data < ini)) return false;
+            if(fim && (!data || data > fim)) return false;
+            if(tipo !== 'TODOS' && t.tipo !== tipo) return false;
+            const st = relFinStatusEfetivo(t);
+            if(status !== 'TODOS' && st !== status) return false;
+            if(busca) {
+                const alvo = `${t.descricao||''} ${t.categoria||''} ${t.fornecedor||''} ${t.nf||''} ${t.pc||''}`.toLowerCase();
+                if(!alvo.includes(busca)) return false;
+            }
+            return true;
+        }).sort((a,b) => relFinDataReferencia(a).localeCompare(relFinDataReferencia(b)));
+    };
+
+    window.renderRelatorioFinanceiro = function() {
+        if(!window.marbeDB?.financeiro || !document.getElementById('tabelaRelFinanceiro')) return;
+        const rows = window.obterLinhasRelFinanceiro();
+        let entradas=0, saidas=0, aReceber=0, aPagar=0;
+        let html='';
+        rows.forEach(t => {
+            const st = relFinStatusEfetivo(t);
+            const val = Number(t.valor)||0;
+            if(st === 'LIQUIDADO') {
+                if(t.tipo === 'ENTRADA') entradas += val;
+                if(t.tipo === 'SAIDA') saidas += val;
+            }
+            if((st === 'PENDENTE' || st === 'ATRASADO') && t.tipo === 'ENTRADA') aReceber += val;
+            if((st === 'PENDENTE' || st === 'ATRASADO') && t.tipo === 'SAIDA') aPagar += val;
+            const data = relFinDataReferencia(t);
+            const dt = data ? data.split('-').reverse().join('/') : 'N/D';
+            const tipoLabel = t.tipo === 'ENTRADA' ? 'ENTRADA' : 'SAÍDA';
+            const cor = t.tipo === 'ENTRADA' ? 'var(--success)' : 'var(--danger)';
+            const detalheCancel = st === 'CANCELADO' && t.motivo_cancelamento ? `<br><span style="font-size:11px;color:var(--warning);">Motivo: ${escHtml(t.motivo_cancelamento)}</span>` : '';
+            html += `<tr><td>${dt}</td><td style="font-weight:800;color:${cor};">${tipoLabel}</td><td><strong>${escHtml(t.descricao||'')}</strong><br><span style="font-size:11px;color:var(--text-muted);">${escHtml(t.categoria||'')}</span>${detalheCancel}</td><td>${relFinLabelStatus(st)}</td><td style="text-align:right;font-weight:800;">${window.fmtMoney(val)}</td></tr>`;
+        });
+        document.getElementById('relFinEntradas').innerText = window.fmtMoney(entradas);
+        document.getElementById('relFinSaidas').innerText = window.fmtMoney(saidas);
+        document.getElementById('relFinAReceber').innerText = window.fmtMoney(aReceber);
+        document.getElementById('relFinAPagar').innerText = window.fmtMoney(aPagar);
+        document.getElementById('tabelaRelFinanceiro').innerHTML = html || '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-muted);">Nenhum lançamento encontrado para este filtro.</td></tr>';
+        document.getElementById('relFinResumo').innerText = `${rows.length} lançamento(s) encontrado(s). Cancelados aparecem para auditoria, mas não entram nos totais.`;
+    };
+
+    window.gerarPdfRelatorioFinanceiro = function() {
+        const rows = window.obterLinhasRelFinanceiro();
+        if(!rows.length) return alert('Não há lançamentos no filtro atual para gerar PDF.');
+        if(!window.jspdf?.jsPDF) return alert('Gerador de PDF não carregado. Atualize a página e tente novamente.');
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({orientation:'landscape'});
+        const ini = document.getElementById('relFinInicio').value;
+        const fim = document.getElementById('relFinFim').value;
+        doc.setFontSize(16); doc.text('MARBE / SB BORRACHAS - RELATÓRIO FINANCEIRO', 14, 16);
+        doc.setFontSize(9); doc.text(`Período: ${ini ? ini.split('-').reverse().join('/') : 'início'} a ${fim ? fim.split('-').reverse().join('/') : 'fim'} | Gerado em ${new Date().toLocaleString('pt-BR')}`, 14, 23);
+        const body = rows.map(t => {
+            const d=relFinDataReferencia(t); const st=relFinStatusEfetivo(t);
+            return [d?d.split('-').reverse().join('/'):'N/D', t.tipo==='ENTRADA'?'Entrada':'Saída', t.descricao||'', t.categoria||'', relFinLabelStatus(st), window.fmtMoney(Number(t.valor)||0)];
+        });
+        doc.autoTable({startY:29, head:[['Data','Tipo','Descrição','Categoria','Situação','Valor']], body, styles:{fontSize:8}, headStyles:{fillColor:[30,41,59]}});
+        doc.save(`MARBE_RELATORIO_FINANCEIRO_${ini||'inicio'}_${fim||'fim'}.pdf`);
     };
 
     // --- LANÇAMENTO MANUAL ---
@@ -832,6 +1114,7 @@
     document.addEventListener("DOMContentLoaded", () => {
         document.getElementById('lancData').value = window.MarbeDate.today();
         window.mudarCorForm();
+        if(document.getElementById('relFinInicio')) window.atalhoRelFinanceiro('MES');
     });
 
 </script>

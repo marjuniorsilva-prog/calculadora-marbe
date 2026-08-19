@@ -48,12 +48,18 @@
 
     const db = getDatabase(app);
     window.marbeDB = null;
+    window.marbeControleParticular = null;
 
     // Dashboard operacional: usa a mesma raiz de dados dos demais módulos.
     // Produção ativa = sistema/pedidos. Ao liberar a OS, ela sai de pedidos e vai para expedidos.
     onValue(ref(db, 'sistema/'), (snapshot) => {
         window.marbeDB = snapshot.val() || {};
         window.processarDadosDashboard();
+    });
+
+    // Backup realmente completo: o Controle Particular fica fora da raiz sistema/.
+    onValue(ref(db, 'controle_particular/abel'), (snapshot) => {
+        window.marbeControleParticular = snapshot.val() || {};
     });
 
     window.fmtMoney = (v) => {
@@ -297,17 +303,18 @@
                   </div>
               </div>
               <div class="backup-actions">
-                  <button class="backup-btn database" onclick="baixarBackupBanco()"><i data-lucide="database-backup"></i> BACKUP DO BANCO (.JSON)</button>
+                  <button class="backup-btn database" onclick="baixarBackupBanco()"><i data-lucide="database-backup"></i> BACKUP DO BANCO COMPLETO (.JSON)</button>
                   <button class="backup-btn full" onclick="baixarBackupPdfsOs()"><i data-lucide="files"></i> BACKUP DAS OS EM PDF (.ZIP)</button>
                   <button class="backup-btn full" onclick="baixarBackupCompleto()"><i data-lucide="archive"></i> BACKUP COMPLETO (.ZIP)</button>
               </div>
               <div class="dashboard-note" id="backupPdfStatus" style="margin-top:10px;">O backup de PDFs inclui Orçamento de Cliente e, quando aplicável, Via de Produção.</div>
               <div class="backup-meta">
-                  <span id="versaoSistemaLabel">Versão: MARBE ERP 2026.08.18.3</span>
+                  <span id="versaoSistemaLabel">Versão: MARBE ERP 2026.08.19.9</span>
                   <span>Banco: Firebase / sistema</span>
                   <span id="ultimoBackupLabel">Último backup nesta máquina: ainda não realizado</span>
+                  <span id="backupSaudeLabel">Backup recomendado: a cada 7 dias</span>
               </div>
-              <div class="dashboard-note" style="margin-top:12px;">O backup não altera nem apaga nenhum dado. A restauração não é automática para evitar substituição acidental do banco.</div>
+              <div class="dashboard-note" style="margin-top:12px;">O backup do banco inclui o ERP e o Controle Particular do Abel. Ele não altera nem apaga nenhum dado. A restauração não é automática para evitar substituição acidental do banco.</div>
           </div>
       </div>
   </main>
@@ -490,10 +497,10 @@
         lucide.createIcons();
     }
 
-    const VERSAO_SISTEMA = 'MARBE ERP 2026.08.19.4';
+    const VERSAO_SISTEMA = 'MARBE ERP 2026.08.19.9';
     const ARQUIVOS_SISTEMA_BACKUP = [
         'index.html','dashboard.html','crm.html','financeiro.html','fap.html','pedido.html','pedido_entregue.html',
-        'PEDIDO DE COMPRAS.html','pesquisa_descricao.html','ABEL LIMA.html','logo.jpg','README.md','AJUSTE_MENU_MESTRE.txt','marbe_guard.js','marbe_auth.js','database.rules.json','CONFIGURAR_FIREBASE_AUTH.txt'
+        'PEDIDO DE COMPRAS.html','pesquisa_descricao.html','ABEL LIMA.html','logo.jpg','README.md','AJUSTE_MENU_MESTRE.txt','marbe_guard.js','marbe_auth.js','database.rules.json','CONFIGURAR_FIREBASE_AUTH.txt','RESTAURACAO_BACKUP_EMERGENCIA.txt','HOMOLOGACAO_ETAPA5_V9.txt','TESTE_FINAL_V9.txt'
     ];
 
     function nomeDataHoraBackup() {
@@ -507,9 +514,13 @@
             metadata: {
                 versao_sistema: VERSAO_SISTEMA,
                 gerado_em: new Date().toISOString(),
-                caminho_firebase: 'sistema/'
+                caminhos_firebase: ['sistema/', 'controle_particular/abel'],
+                observacao: 'Backup completo das áreas protegidas usadas por esta versão do MARBE ERP.'
             },
-            sistema: window.marbeDB || {}
+            sistema: window.marbeDB || {},
+            controle_particular: {
+                abel: window.marbeControleParticular || {}
+            }
         };
     }
 
@@ -520,15 +531,30 @@
         setTimeout(() => URL.revokeObjectURL(url), 1500);
     }
 
+    function atualizarSaudeBackup() {
+        const el = document.getElementById('backupSaudeLabel');
+        if(!el) return;
+        let iso = '';
+        try { iso = localStorage.getItem('marbeUltimoBackupISO') || ''; } catch(e) {}
+        if(!iso) { el.innerText = 'Backup recomendado: faça pelo menos 1 vez por semana'; el.style.color = 'var(--warning)'; return; }
+        const dias = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+        if(dias >= 7) { el.innerText = `ATENÇÃO: último backup há ${dias} dia(s)`; el.style.color = 'var(--warning)'; }
+        else { el.innerText = `Backup em dia: realizado há ${dias} dia(s)`; el.style.color = 'var(--success)'; }
+    }
+
     function registrarBackupLocal() {
         const data = new Date().toLocaleString('pt-BR');
-        try { localStorage.setItem('marbeUltimoBackup', data); } catch(e) {}
+        try {
+            localStorage.setItem('marbeUltimoBackup', data);
+            localStorage.setItem('marbeUltimoBackupISO', new Date().toISOString());
+        } catch(e) {}
         const el = document.getElementById('ultimoBackupLabel');
         if (el) el.innerText = `Último backup nesta máquina: ${data}`;
+        atualizarSaudeBackup();
     }
 
     window.baixarBackupBanco = function() {
-        if (!window.marbeDB) return alert('O banco ainda está carregando. Tente novamente em alguns segundos.');
+        if (!window.marbeDB || window.marbeControleParticular === null) return alert('O banco completo ainda está carregando. Tente novamente em alguns segundos.');
         const json = JSON.stringify(payloadBackupBanco(), null, 2);
         baixarBlob(new Blob([json], {type:'application/json;charset=utf-8'}), `MARBE_BANCO_${nomeDataHoraBackup()}.json`);
         registrarBackupLocal();
@@ -537,6 +563,19 @@
 
     function cleanPdfText(t) {
         return t ? String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase() : '';
+    }
+
+    function dataOriginalOsBR(d) {
+        const raw = d?.data_criacao_local || d?.data_criacao || d?.data_entrada || '';
+        if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+            const [y,m,day] = raw.split('-');
+            return `${day}/${m}/${y}`;
+        }
+        if (raw) {
+            const dt = new Date(raw);
+            if (!Number.isNaN(dt.getTime())) return dt.toLocaleDateString('pt-BR');
+        }
+        return 'N/D';
     }
 
     function gerarPdfOsBlob(tipo, d) {
@@ -553,7 +592,7 @@
             doc.text('SETOR PU ALTA PERFORMANCE: vendas@marbeborrachas.com.br | Tel: (16) 2525-0294', 105, 30, {align:'center'});
             doc.setFont('helvetica', 'bold'); doc.text('CELULAR CENTRAL / URGENCIA: (16) 99447-2314 ou (16) 98808-6686', 105, 34, {align:'center'});
             doc.setLineWidth(.5); doc.line(20,37,190,37);
-            doc.setFontSize(10); doc.text(`ORCAMENTO - OS: ${d.os || 'N/D'} | DATA: ${new Date().toLocaleDateString('pt-BR')}`,20,44);
+            doc.setFontSize(10); doc.text(`ORCAMENTO - OS: ${d.os || 'N/D'} | DATA: ${dataOriginalOsBR(d)}`,20,44);
             doc.text(`CLIENTE: ${clean(d.cliente)}`,20,49); doc.text(`CNPJ: ${d.cnpj || ''}`,20,54);
             doc.text(`CONTATO: ${clean(d.contato || '')}   |   TELEFONE: ${clean(d.telefone || '')}`,20,59);
             doc.text('ENDERECO:',20,64); const splitEnd = doc.splitTextToSize(clean(d.endereco),140); doc.text(splitEnd,45,64);
@@ -619,7 +658,7 @@
     };
 
     window.baixarBackupCompleto = async function() {
-        if (!window.marbeDB) return alert('O banco ainda está carregando. Tente novamente em alguns segundos.');
+        if (!window.marbeDB || window.marbeControleParticular === null) return alert('O banco completo ainda está carregando. Tente novamente em alguns segundos.');
         if (typeof JSZip === 'undefined') return alert('Não foi possível carregar o gerador de ZIP. O Backup do Banco (.JSON) continua disponível.');
 
         const zip = new JSZip();
@@ -642,8 +681,10 @@
         zip.file('BACKUP_INFO.txt', [
             `Versão: ${VERSAO_SISTEMA}`,
             `Gerado em: ${new Date().toLocaleString('pt-BR')}`,
-            'Banco Firebase: caminho sistema/',
+            'Banco Firebase: caminhos sistema/ + controle_particular/abel',
             'Este pacote foi gerado pelo Dashboard.',
+            `Registros ERP: orçamentos ${(window.marbeDB?.orçamentos || []).filter(Boolean).length}, produção ${(window.marbeDB?.pedidos || []).filter(Boolean).length}, expedição ${(window.marbeDB?.expedidos || []).filter(Boolean).length}, arquivados ${(window.marbeDB?.arquivados || []).filter(Boolean).length}.`,
+            `Controle Particular Abel: ${(window.marbeControleParticular?.transacoes || []).filter(Boolean).length} movimentação(ões).`,
             `PDFs de OS: ${contagemPdfs.orcamentos} orçamento(s) e ${contagemPdfs.producao} via(s) de produção.`,
             falhas.length ? `Arquivos não encontrados no servidor: ${falhas.join(', ')}` : 'Arquivos do sistema: captura concluída sem falhas.',
             '',
@@ -660,6 +701,7 @@
         try {
             const salvo = localStorage.getItem('marbeUltimoBackup');
             if (salvo) document.getElementById('ultimoBackupLabel').innerText = `Último backup nesta máquina: ${salvo}`;
+            atualizarSaudeBackup();
         } catch(e) {}
     })();
 

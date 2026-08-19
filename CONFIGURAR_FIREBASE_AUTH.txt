@@ -1,5 +1,5 @@
 MARBE ERP - CONFIGURAÇÃO FIREBASE AUTHENTICATION
-Versão 2026.08.18.3
+Versão atual do pacote: 2026.08.19.9 (Firebase Auth introduzido na V3)
 
 CONTA AUTORIZADA
 mar.junior.silva@gmail.com

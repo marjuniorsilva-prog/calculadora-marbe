@@ -1,0 +1,47 @@
+MARBE ERP — HOMOLOGAÇÃO ETAPA 2 — V6
+Versão: MARBE ERP 2026.08.19.6
+
+ESCOPO DESTA RODADA
+1. Histórico Geral passou a localizar OS em qualquer etapa:
+   - Orçamento / CRM
+   - Produção
+   - Expedição
+   - Entregue / Arquivada
+   - Perdido / Cancelado
+   Filtros: OS/cliente, etapa, data inicial e data final.
+   Incluído relatório PDF do filtro.
+
+2. Produção agora registra a data em que a OS foi liberada para Expedição.
+
+3. Expedição agora exige conferência de entrega antes de arquivar:
+   - data da entrega
+   - forma de entrega
+   - nome do recebedor/responsável
+   - documento/identificação opcional
+   - observação opcional
+   Esses dados ficam gravados no banco e aparecem no Histórico Geral.
+
+4. Identificação de versão do Dashboard e dos backups unificada em 2026.08.19.6.
+
+PRESERVADO
+- Dashboard: cálculos, produção ativa, financeiro e backups.
+- Compras/Estoque V5, inclusive Solicitação de Orçamento e relatório de retiradas.
+- Financeiro.
+- CRM.
+- FAP.
+- Firebase Authentication e regras.
+- Trava de duas abas.
+
+VALIDAÇÕES EXECUTADAS
+- 20 blocos JavaScript: sintaxe OK (Node --check).
+- IDs HTML duplicados: nenhum.
+- Referências a páginas HTML inexistentes: nenhuma.
+- Comparação com V5: alterações funcionais somente em index.html e pedido_entregue.html; dashboard.html alterado apenas para identificação da versão.
+
+TESTE REAL RECOMENDADO
+- Localizar uma OS em cada etapa no Histórico Geral.
+- Filtrar por cliente, etapa e período.
+- Gerar o PDF do Histórico filtrado.
+- Liberar uma OS de teste para Expedição.
+- Confirmar entrega preenchendo recebedor e forma de entrega.
+- Confirmar que a OS some da Expedição e aparece como Entregue/Arquivada no Histórico Geral com os dados da entrega.
