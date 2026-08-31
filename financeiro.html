@@ -449,7 +449,7 @@ import { getDatabase, ref, set, onValue } from "./marbe_mysql_db.js";
                           <button class="btn btn-outline" onclick="window.atalhoRelFinanceiro('HOJE')"><i data-lucide="calendar-days"></i> HOJE</button>
                           <button class="btn btn-outline" onclick="window.atalhoRelFinanceiro('MES')"><i data-lucide="calendar-range"></i> MÊS ATUAL</button>
                           <button class="btn btn-primary" onclick="window.renderRelatorioFinanceiro()"><i data-lucide="search"></i> FILTRAR</button>
-                          <button class="btn btn-success" onclick="window.gerarPdfRelatorioFinanceiro()"><i data-lucide="file-down"></i> GERAR PDF</button>
+                          <button class="btn btn-success" onclick="window.gerarPdfRelatorioFinanceiro()"><i data-lucide="file-down"></i> GERAR PDF + TOTAIS</button>
                       </div>
                   </div>
 
@@ -1406,7 +1406,7 @@ import { getDatabase, ref, set, onValue } from "./marbe_mysql_db.js";
         const statusLabel = ({TODOS:'Todos', LIQUIDADO:'Liquidados', PENDENTE:'Pendentes', ATRASADO:'Atrasados', CANCELADO:'Cancelados', AGUARDANDO_PROGRAMACAO:'Aguardando programação'})[statusFiltro] || statusFiltro;
 
         doc.setFontSize(16);
-        doc.text('MARBE / SB BORRACHAS - RELATÓRIO FINANCEIRO', 14, 15);
+        doc.text('MARBE / SB BORRACHAS - RELATÓRIO FINANCEIRO + TOTAIS', 14, 15);
 
         doc.setFontSize(8.5);
         doc.setTextColor(80,80,80);
@@ -1414,6 +1414,10 @@ import { getDatabase, ref, set, onValue } from "./marbe_mysql_db.js";
             `Período: ${fmtPeriodo(ini) || 'início'} a ${fmtPeriodo(fim) || 'fim'} | Tipo: ${tipoLabel} | Situação: ${statusLabel} | Gerado em ${new Date().toLocaleString('pt-BR')}`,
             14, 21
         );
+        doc.setTextColor(0,0,0);
+        doc.setFontSize(7);
+        doc.setTextColor(90,90,90);
+        doc.text('MODELO PDF: TOTALIZADO V2', 247, 21, {align:'right'});
         doc.setTextColor(0,0,0);
 
         // Bloco REALIZADO
