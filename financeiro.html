@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Módulo Financeiro - ERP Marbe</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Financeiro TESTE V4 - ERP Marbe</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -252,7 +255,7 @@ import { getDatabase, ref, set, onValue } from "./marbe_mysql_db.js";
 
   <main class="main-wrapper">
       <header class="topbar">
-          <div class="view-title"><i data-lucide="wallet" style="color:var(--fin);"></i> Controle Financeiro Central</div>
+          <div class="view-title"><i data-lucide="wallet" style="color:var(--fin);"></i> Controle Financeiro Central <span style="font-size:11px;background:#7c3aed;color:#fff;padding:4px 7px;border-radius:999px;margin-left:8px;">TESTE V4</span></div>
           <div class="user-profile">
               <div class="avatar">AD</div>
               <div class="user-info"><span class="user-name">Administrador</span><span class="user-role">Acesso Total</span></div>
@@ -449,7 +452,7 @@ import { getDatabase, ref, set, onValue } from "./marbe_mysql_db.js";
                           <button class="btn btn-outline" onclick="window.atalhoRelFinanceiro('HOJE')"><i data-lucide="calendar-days"></i> HOJE</button>
                           <button class="btn btn-outline" onclick="window.atalhoRelFinanceiro('MES')"><i data-lucide="calendar-range"></i> MÊS ATUAL</button>
                           <button class="btn btn-primary" onclick="window.renderRelatorioFinanceiro()"><i data-lucide="search"></i> FILTRAR</button>
-                          <button class="btn btn-success" onclick="window.gerarPdfRelatorioFinanceiro()"><i data-lucide="file-down"></i> GERAR PDF + TOTAIS V3</button>
+                          <button class="btn btn-success" onclick="window.gerarPdfRelatorioFinanceiro()"><i data-lucide="file-down"></i> GERAR PDF — TESTE V4</button>
                       </div>
                   </div>
 
@@ -1362,113 +1365,93 @@ import { getDatabase, ref, set, onValue } from "./marbe_mysql_db.js";
     };
 
     window.gerarPdfRelatorioFinanceiro = function() {
+        // Garante que os cards e a tabela da tela estejam atualizados com os filtros atuais.
+        window.renderRelatorioFinanceiro();
+
         const rows = window.obterLinhasRelFinanceiro();
         if(!rows.length) return alert('Não há lançamentos no filtro atual para gerar PDF.');
         if(!window.jspdf?.jsPDF) return alert('Gerador de PDF não carregado. Atualize a página e tente novamente.');
+
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({orientation:'landscape'});
+
         const ini = document.getElementById('relFinInicio').value;
         const fim = document.getElementById('relFinFim').value;
         const tipoFiltro = document.getElementById('relFinTipo').value;
         const statusFiltro = document.getElementById('relFinStatus').value;
 
-        // Resumo financeiro usa exatamente a mesma regra da tela:
-        // liquidado = realizado; pendente/atrasado = em aberto; cancelado = auditoria, sem somar.
-        let entradasLiquidadas = 0;
-        let saidasLiquidadas = 0;
-        let aReceber = 0;
-        let aPagar = 0;
-        let qtdCancelados = 0;
-        let valorCancelados = 0;
+        const fmt = v => window.fmtMoney(Number(v) || 0);
+        const parseBRL = txt => {
+            const limpo = String(txt || '')
+                .replace(/\s/g,'')
+                .replace('R$','')
+                .replace(/\./g,'')
+                .replace(',','.')
+                .replace(/[^\d.-]/g,'');
+            return Number(limpo) || 0;
+        };
 
+        // FONTE PRINCIPAL: exatamente os números que o usuário vê nos cards da tela.
+        const entradasTela = parseBRL(document.getElementById('relFinEntradas')?.innerText);
+        const saidasTela = parseBRL(document.getElementById('relFinSaidas')?.innerText);
+        const aReceberTela = parseBRL(document.getElementById('relFinAReceber')?.innerText);
+        const aPagarTela = parseBRL(document.getElementById('relFinAPagar')?.innerText);
+
+        // Segunda conferência independente, diretamente nas linhas filtradas.
+        let entradasCalc=0, saidasCalc=0, aReceberCalc=0, aPagarCalc=0, cancelados=0;
         rows.forEach(t => {
             const st = relFinStatusEfetivo(t);
             const val = Number(t.valor) || 0;
-
+            if(st === 'CANCELADO') { cancelados += val; return; }
             if(st === 'LIQUIDADO') {
-                if(t.tipo === 'ENTRADA') entradasLiquidadas += val;
-                if(t.tipo === 'SAIDA') saidasLiquidadas += val;
-            } else if(st === 'PENDENTE' || st === 'ATRASADO') {
-                if(t.tipo === 'ENTRADA') aReceber += val;
-                if(t.tipo === 'SAIDA') aPagar += val;
-            } else if(st === 'CANCELADO') {
-                qtdCancelados++;
-                valorCancelados += val;
+                if(t.tipo === 'ENTRADA') entradasCalc += val;
+                if(t.tipo === 'SAIDA') saidasCalc += val;
+            }
+            if(st === 'PENDENTE' || st === 'ATRASADO') {
+                if(t.tipo === 'ENTRADA') aReceberCalc += val;
+                if(t.tipo === 'SAIDA') aPagarCalc += val;
             }
         });
 
-        const saldoRealizado = entradasLiquidadas - saidasLiquidadas;
-        const saldoPrevisto = aReceber - aPagar;
+        // Se houver qualquer diferença, o PDF usa os valores da TELA e registra a conferência.
+        const saldoRealizado = entradasTela - saidasTela;
+        const saldoAberto = aReceberTela - aPagarTela;
 
-        const fmt = v => window.fmtMoney(Number(v) || 0);
-        const fmtPeriodo = d => d ? d.split('-').reverse().join('/') : null;
-        const tipoLabel = ({TODOS:'Todos', ENTRADA:'Entradas', SAIDA:'Saídas'})[tipoFiltro] || tipoFiltro;
-        const statusLabel = ({TODOS:'Todos', LIQUIDADO:'Liquidados', PENDENTE:'Pendentes', ATRASADO:'Atrasados', CANCELADO:'Cancelados', AGUARDANDO_PROGRAMACAO:'Aguardando programação'})[statusFiltro] || statusFiltro;
+        const tipoLabel = ({TODOS:'Todos',ENTRADA:'Receitas / Entradas',SAIDA:'Despesas / Saídas'})[tipoFiltro] || tipoFiltro;
+        const statusLabel = ({
+            TODOS:'Todas',
+            LIQUIDADO:'Pagos / Recebidos',
+            PENDENTE:'Pendentes',
+            ATRASADO:'Atrasados',
+            AGUARDANDO_PROGRAMACAO:'Aguardando programação',
+            CANCELADO:'Cancelados'
+        })[statusFiltro] || statusFiltro;
+
+        const fmtData = d => d ? d.split('-').reverse().join('/') : '-';
 
         doc.setFontSize(16);
-        doc.text('MARBE / SB BORRACHAS - RELATÓRIO FINANCEIRO + TOTAIS V3', 14, 15);
-
+        doc.text('MARBE / SB BORRACHAS - RELATÓRIO FINANCEIRO', 14, 15);
         doc.setFontSize(8.5);
-        doc.setTextColor(80,80,80);
-        doc.text(
-            `Período: ${fmtPeriodo(ini) || 'início'} a ${fmtPeriodo(fim) || 'fim'} | Tipo: ${tipoLabel} | Situação: ${statusLabel} | Gerado em ${new Date().toLocaleString('pt-BR')}`,
-            14, 21
-        );
-        doc.setTextColor(0,0,0);
+        doc.text(`Período: ${fmtData(ini)} a ${fmtData(fim)} | Tipo: ${tipoLabel} | Situação: ${statusLabel}`,14,21);
         doc.setFontSize(7);
         doc.setTextColor(90,90,90);
-        doc.text('MODELO PDF: TOTALIZADO V3', 247, 21, {align:'right'});
+        doc.text('TESTE V4 — TOTAIS COPIADOS DOS CARDS DA TELA', 282, 21, {align:'right'});
         doc.setTextColor(0,0,0);
 
-        // Bloco REALIZADO
-        doc.setFillColor(236, 253, 245);
-        doc.roundedRect(14, 26, 126, 25, 2, 2, 'F');
+        // Resumo visível ANTES da tabela
+        doc.setFillColor(238,242,255);
+        doc.roundedRect(14, 27, 268, 31, 2, 2, 'F');
+        doc.setFont(undefined,'bold');
         doc.setFontSize(9);
-        doc.setFont(undefined, 'bold');
-        doc.text('REALIZADO / LIQUIDADO', 18, 32);
-        doc.setFontSize(8.5);
-        doc.setFont(undefined, 'normal');
-        doc.text(`Entradas recebidas: ${fmt(entradasLiquidadas)}`, 18, 38);
-        doc.text(`Saídas pagas: ${fmt(saidasLiquidadas)}`, 18, 44);
-        doc.setFont(undefined, 'bold');
-        doc.text(`SALDO REALIZADO: ${fmt(saldoRealizado)}`, 76, 44);
+        doc.text('RESUMO DO FILTRO',18,33);
 
-        // Bloco EM ABERTO
-        doc.setFillColor(255, 247, 237);
-        doc.roundedRect(146, 26, 136, 25, 2, 2, 'F');
-        doc.setFontSize(9);
-        doc.setFont(undefined, 'bold');
-        doc.text('EM ABERTO / PREVISTO', 150, 32);
-        doc.setFontSize(8.5);
-        doc.setFont(undefined, 'normal');
-        doc.text(`A receber: ${fmt(aReceber)}`, 150, 38);
-        doc.text(`A pagar: ${fmt(aPagar)}`, 150, 44);
-        doc.setFont(undefined, 'bold');
-        doc.text(`SALDO PREVISTO: ${fmt(saldoPrevisto)}`, 210, 44);
-
-        doc.setFont(undefined, 'normal');
-        doc.setFontSize(7.5);
-        doc.setTextColor(95, 95, 95);
-        const auditoriaTxt = qtdCancelados
-            ? `${rows.length} lançamento(s) no relatório. ${qtdCancelados} cancelado(s), somando ${fmt(valorCancelados)}, exibido(s) apenas para auditoria e fora dos totais.`
-            : `${rows.length} lançamento(s) no relatório. Cancelados, quando existentes, são exibidos apenas para auditoria e não entram nos totais.`;
-        doc.text(auditoriaTxt, 14, 56);
-        doc.setTextColor(0,0,0);
-
-        // TOTAL GERAL do que está visível no relatório.
-        // Cancelados ficam no histórico/auditoria, mas não entram nas somas.
-        let totalEntradasRelatorio = 0;
-        let totalSaidasRelatorio = 0;
-
-        rows.forEach(t => {
-            const st = relFinStatusEfetivo(t);
-            const val = Number(t.valor) || 0;
-            if(st === 'CANCELADO') return;
-            if(t.tipo === 'ENTRADA') totalEntradasRelatorio += val;
-            if(t.tipo === 'SAIDA') totalSaidasRelatorio += val;
-        });
-
-        const saldoGeralRelatorio = totalEntradasRelatorio - totalSaidasRelatorio;
+        doc.setFont(undefined,'normal');
+        doc.text(`ENTRADAS LIQUIDADAS: ${fmt(entradasTela)}`,18,40);
+        doc.text(`SAÍDAS LIQUIDADAS: ${fmt(saidasTela)}`,86,40);
+        doc.text(`SALDO REALIZADO: ${fmt(saldoRealizado)}`,165,40);
+        doc.text(`A RECEBER: ${fmt(aReceberTela)}`,18,49);
+        doc.text(`A PAGAR: ${fmt(aPagarTela)}`,86,49);
+        doc.text(`SALDO EM ABERTO: ${fmt(saldoAberto)}`,165,49);
 
         const body = rows.map(t => {
             const d = relFinDataReferencia(t);
@@ -1479,82 +1462,75 @@ import { getDatabase, ref, set, onValue } from "./marbe_mysql_db.js";
                 t.descricao || '',
                 t.categoria || '',
                 relFinLabelStatus(st),
-                fmt(Number(t.valor) || 0)
+                fmt(Number(t.valor)||0)
             ];
         });
 
-        // A partir daqui os totais são LINHAS DA PRÓPRIA TABELA.
-        // Isso garante que eles saiam no final junto com os lançamentos.
+        // Totais como linhas da própria tabela
         const detalheCount = body.length;
-
         body.push(
-            ['', '', 'RESUMO FINANCEIRO DO PERÍODO / FILTRO', '', '', ''],
-            ['', '', 'TOTAL GERAL DE ENTRADAS', '', '', fmt(totalEntradasRelatorio)],
-            ['', '', 'TOTAL GERAL DE SAÍDAS', '', '', fmt(totalSaidasRelatorio)],
-            ['', '', 'SALDO GERAL (ENTRADAS - SAÍDAS)', '', '', fmt(saldoGeralRelatorio)],
-            ['', '', 'Entradas RECEBIDAS / liquidadas', '', '', fmt(entradasLiquidadas)],
-            ['', '', 'Saídas PAGAS / liquidadas', '', '', fmt(saidasLiquidadas)],
+            ['', '', 'RESUMO FINAL', '', '', ''],
+            ['', '', 'ENTRADAS LIQUIDADAS', '', '', fmt(entradasTela)],
+            ['', '', 'SAÍDAS LIQUIDADAS', '', '', fmt(saidasTela)],
             ['', '', 'SALDO REALIZADO', '', '', fmt(saldoRealizado)],
-            ['', '', 'A RECEBER em aberto', '', '', fmt(aReceber)],
-            ['', '', 'A PAGAR em aberto', '', '', fmt(aPagar)],
-            ['', '', 'SALDO PREVISTO EM ABERTO', '', '', fmt(saldoPrevisto)]
+            ['', '', 'A RECEBER', '', '', fmt(aReceberTela)],
+            ['', '', 'A PAGAR', '', '', fmt(aPagarTela)],
+            ['', '', 'SALDO EM ABERTO', '', '', fmt(saldoAberto)]
         );
 
-        if(qtdCancelados) {
-            body.push(
-                ['', '', `CANCELADOS - somente auditoria (${qtdCancelados} lançamento(s))`, '', '', fmt(valorCancelados)]
-            );
-        }
-
         doc.autoTable({
-            startY: 61,
+            startY:64,
             head:[['Data','Tipo','Descrição','Categoria','Situação','Valor']],
             body,
-            styles:{fontSize:8, cellPadding:2.2},
+            styles:{fontSize:8,cellPadding:2.1},
             headStyles:{fillColor:[30,41,59]},
             columnStyles:{5:{halign:'right'}},
-            didParseCell: function(data) {
+            didParseCell:function(data){
                 if(data.section !== 'body') return;
-
-                if(data.column.index === 5) {
-                    data.cell.styles.fontStyle = 'bold';
-                }
-
-                if(data.row.index >= detalheCount) {
-                    data.cell.styles.fontStyle = 'bold';
-                    data.cell.styles.fillColor = [241,245,249];
-                    data.cell.styles.textColor = [15,23,42];
-
-                    // Cabeçalho do resumo
-                    if(data.row.index === detalheCount) {
-                        data.cell.styles.fillColor = [30,41,59];
-                        data.cell.styles.textColor = [255,255,255];
-                    }
-
-                    // Três totais principais
-                    if(
-                        data.row.index === detalheCount + 1 ||
-                        data.row.index === detalheCount + 2 ||
-                        data.row.index === detalheCount + 3
-                    ) {
-                        data.cell.styles.fontSize = 9;
+                if(data.column.index === 5) data.cell.styles.fontStyle='bold';
+                if(data.row.index >= detalheCount){
+                    data.cell.styles.fontStyle='bold';
+                    data.cell.styles.fillColor=[241,245,249];
+                    if(data.row.index === detalheCount){
+                        data.cell.styles.fillColor=[30,41,59];
+                        data.cell.styles.textColor=[255,255,255];
                     }
                 }
             }
         });
 
-        // Numeração e identificação em TODAS as páginas.
-        const totalPages = doc.internal.getNumberOfPages();
-        for(let p = 1; p <= totalPages; p++) {
-            doc.setPage(p);
-            const ph = doc.internal.pageSize.getHeight();
-            doc.setFontSize(6.5);
-            doc.setTextColor(110,110,110);
-            doc.text(`MARBE ERP • PDF TOTALIZADO V3 • Página ${p}/${totalPages}`, 282, ph - 5, {align:'right'});
-        }
-        doc.setTextColor(0,0,0);
+        // Auditoria técnica no rodapé: tela x cálculo independente
+        const conferem =
+            Math.abs(entradasTela-entradasCalc)<0.01 &&
+            Math.abs(saidasTela-saidasCalc)<0.01 &&
+            Math.abs(aReceberTela-aReceberCalc)<0.01 &&
+            Math.abs(aPagarTela-aPagarCalc)<0.01;
 
-        doc.save(`MARBE_RELATORIO_FINANCEIRO_${ini||'inicio'}_${fim||'fim'}.pdf`);
+        const totalPages=doc.internal.getNumberOfPages();
+        for(let p=1;p<=totalPages;p++){
+            doc.setPage(p);
+            const ph=doc.internal.pageSize.getHeight();
+            doc.setFontSize(6);
+            doc.setTextColor(100,100,100);
+            doc.text(`MARBE ERP • TESTE V4 • Página ${p}/${totalPages}`,282,ph-5,{align:'right'});
+        }
+
+        // Na última página registra a checagem sem poluir o relatório.
+        doc.setPage(totalPages);
+        const y=(doc.lastAutoTable?.finalY||70)+6;
+        const ph=doc.internal.pageSize.getHeight();
+        if(y < ph-10){
+            doc.setFontSize(6);
+            doc.setTextColor(conferem?60:160, conferem?120:60, 70);
+            doc.text(
+                conferem
+                    ? 'Conferência interna: valores da tela e soma das linhas filtradas coincidem.'
+                    : `ATENÇÃO: divergência detectada entre cards e linhas. Cards: E ${fmt(entradasTela)} / S ${fmt(saidasTela)} / AR ${fmt(aReceberTela)} / AP ${fmt(aPagarTela)}. Linhas: E ${fmt(entradasCalc)} / S ${fmt(saidasCalc)} / AR ${fmt(aReceberCalc)} / AP ${fmt(aPagarCalc)}.`,
+                14,y
+            );
+        }
+
+        doc.save(`MARBE_FINANCEIRO_TESTE_V4_${ini||'inicio'}_${fim||'fim'}.pdf`);
     };
 
     // --- LANÇAMENTO MANUAL ---
