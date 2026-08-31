@@ -449,7 +449,7 @@ import { getDatabase, ref, set, onValue } from "./marbe_mysql_db.js";
                           <button class="btn btn-outline" onclick="window.atalhoRelFinanceiro('HOJE')"><i data-lucide="calendar-days"></i> HOJE</button>
                           <button class="btn btn-outline" onclick="window.atalhoRelFinanceiro('MES')"><i data-lucide="calendar-range"></i> MÊS ATUAL</button>
                           <button class="btn btn-primary" onclick="window.renderRelatorioFinanceiro()"><i data-lucide="search"></i> FILTRAR</button>
-                          <button class="btn btn-success" onclick="window.gerarPdfRelatorioFinanceiro()"><i data-lucide="file-down"></i> GERAR PDF + TOTAIS</button>
+                          <button class="btn btn-success" onclick="window.gerarPdfRelatorioFinanceiro()"><i data-lucide="file-down"></i> GERAR PDF + TOTAIS V3</button>
                       </div>
                   </div>
 
@@ -1406,7 +1406,7 @@ import { getDatabase, ref, set, onValue } from "./marbe_mysql_db.js";
         const statusLabel = ({TODOS:'Todos', LIQUIDADO:'Liquidados', PENDENTE:'Pendentes', ATRASADO:'Atrasados', CANCELADO:'Cancelados', AGUARDANDO_PROGRAMACAO:'Aguardando programação'})[statusFiltro] || statusFiltro;
 
         doc.setFontSize(16);
-        doc.text('MARBE / SB BORRACHAS - RELATÓRIO FINANCEIRO + TOTAIS', 14, 15);
+        doc.text('MARBE / SB BORRACHAS - RELATÓRIO FINANCEIRO + TOTAIS V3', 14, 15);
 
         doc.setFontSize(8.5);
         doc.setTextColor(80,80,80);
@@ -1417,7 +1417,7 @@ import { getDatabase, ref, set, onValue } from "./marbe_mysql_db.js";
         doc.setTextColor(0,0,0);
         doc.setFontSize(7);
         doc.setTextColor(90,90,90);
-        doc.text('MODELO PDF: TOTALIZADO V2', 247, 21, {align:'right'});
+        doc.text('MODELO PDF: TOTALIZADO V3', 247, 21, {align:'right'});
         doc.setTextColor(0,0,0);
 
         // Bloco REALIZADO
@@ -1455,6 +1455,21 @@ import { getDatabase, ref, set, onValue } from "./marbe_mysql_db.js";
         doc.text(auditoriaTxt, 14, 56);
         doc.setTextColor(0,0,0);
 
+        // TOTAL GERAL do que está visível no relatório.
+        // Cancelados ficam no histórico/auditoria, mas não entram nas somas.
+        let totalEntradasRelatorio = 0;
+        let totalSaidasRelatorio = 0;
+
+        rows.forEach(t => {
+            const st = relFinStatusEfetivo(t);
+            const val = Number(t.valor) || 0;
+            if(st === 'CANCELADO') return;
+            if(t.tipo === 'ENTRADA') totalEntradasRelatorio += val;
+            if(t.tipo === 'SAIDA') totalSaidasRelatorio += val;
+        });
+
+        const saldoGeralRelatorio = totalEntradasRelatorio - totalSaidasRelatorio;
+
         const body = rows.map(t => {
             const d = relFinDataReferencia(t);
             const st = relFinStatusEfetivo(t);
@@ -1468,50 +1483,75 @@ import { getDatabase, ref, set, onValue } from "./marbe_mysql_db.js";
             ];
         });
 
+        // A partir daqui os totais são LINHAS DA PRÓPRIA TABELA.
+        // Isso garante que eles saiam no final junto com os lançamentos.
+        const detalheCount = body.length;
+
+        body.push(
+            ['', '', 'RESUMO FINANCEIRO DO PERÍODO / FILTRO', '', '', ''],
+            ['', '', 'TOTAL GERAL DE ENTRADAS', '', '', fmt(totalEntradasRelatorio)],
+            ['', '', 'TOTAL GERAL DE SAÍDAS', '', '', fmt(totalSaidasRelatorio)],
+            ['', '', 'SALDO GERAL (ENTRADAS - SAÍDAS)', '', '', fmt(saldoGeralRelatorio)],
+            ['', '', 'Entradas RECEBIDAS / liquidadas', '', '', fmt(entradasLiquidadas)],
+            ['', '', 'Saídas PAGAS / liquidadas', '', '', fmt(saidasLiquidadas)],
+            ['', '', 'SALDO REALIZADO', '', '', fmt(saldoRealizado)],
+            ['', '', 'A RECEBER em aberto', '', '', fmt(aReceber)],
+            ['', '', 'A PAGAR em aberto', '', '', fmt(aPagar)],
+            ['', '', 'SALDO PREVISTO EM ABERTO', '', '', fmt(saldoPrevisto)]
+        );
+
+        if(qtdCancelados) {
+            body.push(
+                ['', '', `CANCELADOS - somente auditoria (${qtdCancelados} lançamento(s))`, '', '', fmt(valorCancelados)]
+            );
+        }
+
         doc.autoTable({
             startY: 61,
             head:[['Data','Tipo','Descrição','Categoria','Situação','Valor']],
             body,
-            styles:{fontSize:8},
+            styles:{fontSize:8, cellPadding:2.2},
             headStyles:{fillColor:[30,41,59]},
             columnStyles:{5:{halign:'right'}},
             didParseCell: function(data) {
-                if(data.section === 'body' && data.column.index === 5) {
+                if(data.section !== 'body') return;
+
+                if(data.column.index === 5) {
                     data.cell.styles.fontStyle = 'bold';
+                }
+
+                if(data.row.index >= detalheCount) {
+                    data.cell.styles.fontStyle = 'bold';
+                    data.cell.styles.fillColor = [241,245,249];
+                    data.cell.styles.textColor = [15,23,42];
+
+                    // Cabeçalho do resumo
+                    if(data.row.index === detalheCount) {
+                        data.cell.styles.fillColor = [30,41,59];
+                        data.cell.styles.textColor = [255,255,255];
+                    }
+
+                    // Três totais principais
+                    if(
+                        data.row.index === detalheCount + 1 ||
+                        data.row.index === detalheCount + 2 ||
+                        data.row.index === detalheCount + 3
+                    ) {
+                        data.cell.styles.fontSize = 9;
+                    }
                 }
             }
         });
 
-        // Totais repetidos ao final da listagem para conferência/assinatura.
-        let y = (doc.lastAutoTable?.finalY || 61) + 7;
-        const pageHeight = doc.internal.pageSize.getHeight();
-        if(y > pageHeight - 35) {
-            doc.addPage();
-            y = 18;
+        // Numeração e identificação em TODAS as páginas.
+        const totalPages = doc.internal.getNumberOfPages();
+        for(let p = 1; p <= totalPages; p++) {
+            doc.setPage(p);
+            const ph = doc.internal.pageSize.getHeight();
+            doc.setFontSize(6.5);
+            doc.setTextColor(110,110,110);
+            doc.text(`MARBE ERP • PDF TOTALIZADO V3 • Página ${p}/${totalPages}`, 282, ph - 5, {align:'right'});
         }
-
-        doc.setDrawColor(180,180,180);
-        doc.line(14, y, 282, y);
-        y += 6;
-
-        doc.setFont(undefined, 'bold');
-        doc.setFontSize(9);
-        doc.text('TOTAIS DO PERÍODO / FILTRO', 14, y);
-        y += 6;
-
-        doc.setFontSize(8.5);
-        doc.text(`Entradas liquidadas: ${fmt(entradasLiquidadas)}`, 14, y);
-        doc.text(`Saídas liquidadas: ${fmt(saidasLiquidadas)}`, 94, y);
-        doc.text(`Saldo realizado: ${fmt(saldoRealizado)}`, 188, y);
-        y += 6;
-        doc.text(`A receber: ${fmt(aReceber)}`, 14, y);
-        doc.text(`A pagar: ${fmt(aPagar)}`, 94, y);
-        doc.text(`Saldo previsto: ${fmt(saldoPrevisto)}`, 188, y);
-
-        doc.setFont(undefined, 'normal');
-        doc.setFontSize(7);
-        doc.setTextColor(100,100,100);
-        doc.text('Observação: valores cancelados não compõem entradas, saídas ou saldos. O relatório respeita os filtros selecionados na tela.', 14, y + 7);
         doc.setTextColor(0,0,0);
 
         doc.save(`MARBE_RELATORIO_FINANCEIRO_${ini||'inicio'}_${fim||'fim'}.pdf`);
