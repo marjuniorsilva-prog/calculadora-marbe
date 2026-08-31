@@ -16,33 +16,22 @@
     <script src="marbe_guard.js"></script>
 
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-    import { requireAuthorizedUser, applyUserProfile, redirectToLogin } from "./marbe_auth.js";
+import { getDatabase, ref, set, onValue } from "./marbe_mysql_db.js";
+    import { requireAuthorizedUser, applyUserProfile, redirectToLogin } from "./marbe_mysql_auth.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyATu_V6e1shKRpgBOkX1lw2beyzUEZUCo0",
-      authDomain: "marbeapp-e2db8.firebaseapp.com",
-      projectId: "marbeapp-e2db8",
-      storageBucket: "marbeapp-e2db8.firebasestorage.app",
-      messagingSenderId: "435226749841",
-      appId: "1:435226749841:web:c2b5f5dee676412b228830"
-    };
-
-    const app = initializeApp(firebaseConfig);
     try {
-      const marbeUser = await requireAuthorizedUser(app);
-      window.MarbeCurrentUser = { email: marbeUser.email, displayName: marbeUser.displayName, uid: marbeUser.uid };
+      const marbeUser = await requireAuthorizedUser();
+      window.MarbeCurrentUser = { email: marbeUser.email, displayName: marbeUser.displayName, uid: marbeUser.uid, role: marbeUser.role };
       if (window.MarbeGuard) window.MarbeGuard.markLoggedIn();
       applyUserProfile(marbeUser);
     } catch (authError) {
-      console.warn('Acesso Firebase bloqueado:', authError);
+      console.warn('Acesso ao servidor MySQL bloqueado:', authError);
       if (window.MarbeGuard) window.MarbeGuard.logout();
-      redirectToLogin(authError?.code === 'marbe/not-authorized' ? 'denied' : 'required');
+      redirectToLogin('required');
       throw authError;
     }
 
-    const db = getDatabase(app);
+    const db = getDatabase();
     window.marbeDB = null;
 
     onValue(ref(db, 'sistema/'), (snapshot) => {
@@ -52,8 +41,9 @@
           
           if (!window.marbeDB.financeiro) window.marbeDB.financeiro = { transacoes: [] };
           if (!window.marbeDB.financeiro.transacoes) window.marbeDB.financeiro.transacoes = [];
+          if (!Array.isArray(window.marbeDB.financeiro.auditoria)) window.marbeDB.financeiro.auditoria = [];
           
-          // Armadura anti-falhas do Firebase (Força a ser um Array)
+          // Armadura anti-falhas dos dados (Força a ser um Array)
           if (!Array.isArray(window.marbeDB.financeiro.transacoes)) {
               window.marbeDB.financeiro.transacoes = Object.values(window.marbeDB.financeiro.transacoes);
           }
@@ -79,10 +69,10 @@
     });
 
     window.salvarNuvem = function(silencioso = false) {
-        if (window.MarbeGuard && !window.MarbeGuard.ensureWritable()) return; 
-        set(ref(db, 'sistema/'), window.marbeDB)
-            .then(() => { if(!silencioso) alert("Financeiro atualizado com sucesso!"); })
-            .catch((error) => { alert("Erro ao salvar: " + error.message); });
+        if (window.MarbeGuard && !window.MarbeGuard.ensureWritable()) return Promise.reject(new Error('Sistema em modo somente leitura.'));
+        return set(ref(db, 'sistema/'), window.marbeDB)
+            .then((result) => { if(!silencioso) alert("Financeiro atualizado com sucesso!"); return result; })
+            .catch((error) => { if(!silencioso) alert("Erro ao salvar: " + error.message); throw error; });
     };
 
     window.fmtMoney = (v) => { return parseFloat(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
@@ -90,6 +80,14 @@
     document.addEventListener("DOMContentLoaded", () => {
         let hoje = new Date();
         document.getElementById('filtroMesAno').value = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+        const provIni = document.getElementById('provInicio');
+        const provFim = document.getElementById('provFim');
+        if(provIni && provFim) {
+            const ini = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+            const fim = new Date(hoje.getFullYear(), hoje.getMonth()+1, 0);
+            const f = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            provIni.value = f(ini); provFim.value = f(fim);
+        }
     });
   </script>
 
@@ -186,6 +184,7 @@
 
     @media (max-width: 1024px) { .row { flex-direction: column; gap: 0; } .bill-card { flex-direction:column; align-items:flex-start; gap:15px;} .bill-actions { width:100%; display:flex; gap:10px;} .bill-actions button {flex:1;} }
   </style>
+  <link rel="stylesheet" href="marbe_responsive.css">
 </head>
 <body>
 
@@ -225,6 +224,9 @@
               </button>
               <button class="tab-btn" onclick="window.tabFin('tab-pagar', this)">
                   <i data-lucide="arrow-down-circle"></i> <span>Contas a Pagar</span>
+              </button>
+              <button class="tab-btn" onclick="window.tabFin('tab-provisao', this)">
+                  <i data-lucide="calendar-search"></i> <span>Provisão a Pagar</span>
               </button>
               <button class="tab-btn" onclick="window.tabFin('tab-receber', this)">
                   <i data-lucide="arrow-up-circle"></i> <span>Contas a Receber</span>
@@ -331,6 +333,38 @@
               </div>
           </div>
 
+          <!-- PROVISÃO DE CONTAS A PAGAR -->
+          <div id="tab-provisao" class="section">
+              <div class="card-panel">
+                  <div class="card-header"><i data-lucide="calendar-search"></i> Provisão de Contas a Pagar</div>
+                  <p style="color:var(--text-muted); margin-top:-6px; line-height:1.55;">Use esta tela para saber quanto precisa deixar reservado para pagamentos futuros. Entram somente contas a pagar ainda pendentes com vencimento dentro do período escolhido.</p>
+                  <div class="row">
+                      <div class="col"><label>Data inicial</label><input type="date" id="provInicio"></div>
+                      <div class="col"><label>Data final</label><input type="date" id="provFim"></div>
+                      <div class="col"><label>Descrição / categoria / fornecedor</label><input type="text" id="provBusca" placeholder="Ex.: vale funcionário, fornecedor, imposto..."></div>
+                  </div>
+                  <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px;">
+                      <button class="btn btn-outline" onclick="window.atalhoProvisao('HOJE')"><i data-lucide="calendar-days"></i> HOJE</button>
+                      <button class="btn btn-outline" onclick="window.atalhoProvisao('AMANHA')"><i data-lucide="calendar-plus"></i> AMANHÃ</button>
+                      <button class="btn btn-outline" onclick="window.atalhoProvisao('MES')"><i data-lucide="calendar-range"></i> MÊS ATUAL</button>
+                      <button class="btn btn-primary" onclick="window.renderProvisao()"><i data-lucide="search"></i> GERAR PROVISÃO</button>
+                      <button class="btn btn-success" onclick="window.gerarPdfProvisao()"><i data-lucide="file-down"></i> IMPRIMIR / PDF</button>
+                  </div>
+                  <div class="dash-grid" style="margin-top:8px;">
+                      <div class="dash-card" style="border-bottom:4px solid var(--danger);"><h3>Total a reservar</h3><div class="value" id="provTotal" style="color:var(--danger); font-size:25px;">R$ 0,00</div></div>
+                      <div class="dash-card"><h3>Quantidade de títulos</h3><div class="value" id="provQtd" style="color:var(--primary); font-size:25px;">0</div></div>
+                      <div class="dash-card"><h3>Já vencidos no filtro</h3><div class="value" id="provVencidos" style="color:var(--warning); font-size:25px;">0</div></div>
+                  </div>
+                  <div class="table-container">
+                      <table>
+                          <thead><tr><th>Vencimento</th><th>Descrição / Categoria</th><th>Fornecedor / Referência</th><th>Situação</th><th style="text-align:right;">Valor</th></tr></thead>
+                          <tbody id="tabelaProvisao"></tbody>
+                      </table>
+                  </div>
+                  <p id="provResumo" style="color:var(--text-muted); margin:14px 0 0; font-size:12px;"></p>
+              </div>
+          </div>
+
           <!-- ABA 3: CONTAS A RECEBER (PENDENTES) -->
           <div id="tab-receber" class="section">
               <h2 class="view-title" style="color:var(--success); margin-bottom: 25px;"><i data-lucide="clock"></i> Títulos a Receber (Pendentes)</h2>
@@ -434,10 +468,39 @@
                   </div>
                   <p id="relFinResumo" style="color:var(--text-muted); margin:14px 0 0; font-size:12px;"></p>
               </div>
+
+              <div class="card-panel">
+                  <div class="card-header" style="color:var(--warning);"><i data-lucide="shield-check"></i> Auditoria de alterações financeiras</div>
+                  <p style="color:var(--text-muted); margin-top:-6px; line-height:1.55;">Registra estornos de pagamentos com data, usuário, motivo e dados anteriores. Este histórico é apenas para consulta.</p>
+                  <div class="table-container">
+                      <table>
+                          <thead><tr><th>Data / Hora</th><th>Usuário</th><th>Ação</th><th>Lançamento</th><th>Vencimento</th><th style="text-align:right;">Valor</th><th>Motivo</th></tr></thead>
+                          <tbody id="tabelaAuditoriaFinanceira"></tbody>
+                      </table>
+                  </div>
+              </div>
           </div>
 
       </div>
   </main>
+</div>
+
+<!-- Modal: estorno seguro de pagamento -->
+<div id="modalEstornoPagamento" style="position:fixed; inset:0; background:rgba(2,6,23,.92); display:none; z-index:10002; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(4px);">
+  <div style="background:var(--card-bg); width:min(560px,100%); max-height:92vh; overflow:auto; padding:30px; border-radius:16px; border:1px solid var(--border);">
+    <h3 style="margin:0 0 8px; color:var(--danger); font-size:21px;"><i data-lucide="undo-2"></i> Estornar pagamento</h3>
+    <div id="estornoResumo" style="padding:14px; background:var(--bg-color); border:1px solid var(--border); border-radius:8px; color:var(--text-muted); line-height:1.55; margin-bottom:18px;"></div>
+    <input type="hidden" id="estornoIdx">
+    <label>Motivo do estorno <span style="color:var(--danger);">*</span></label>
+    <textarea id="estornoMotivo" rows="3" placeholder="Ex.: Pagamento do mês seguinte marcado como pago por engano." style="width:100%; resize:vertical;"></textarea>
+    <label style="margin-top:14px;">Confirme sua senha de administrador <span style="color:var(--danger);">*</span></label>
+    <input type="password" id="estornoSenha" autocomplete="current-password" placeholder="Senha do seu usuário no MARBE ERP">
+    <div style="padding:11px 12px; margin-top:14px; border:1px solid var(--warning); border-radius:8px; background:rgba(245,158,11,.08); color:var(--text-muted); font-size:12px; line-height:1.5;">O lançamento não será apagado. A baixa será desfeita, o vencimento original será mantido e a alteração ficará registrada na auditoria.</div>
+    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+      <button class="btn btn-outline" onclick="window.fecharEstornoPagamento()">CANCELAR</button>
+      <button class="btn" id="btnConfirmarEstorno" style="background:var(--danger); color:#fff;" onclick="window.confirmarEstornoPagamento()"><i data-lucide="shield-check"></i> CONFIRMAR ESTORNO</button>
+    </div>
+  </div>
 </div>
 
 <!-- Modal: programar pagamento de NF recebida -->
@@ -519,6 +582,7 @@
         window.renderContasReceber();
         window.renderDRE();
         if(document.getElementById('relFinInicio')) window.renderRelatorioFinanceiro();
+        if(document.getElementById('provInicio')) window.renderProvisao();
         lucide.createIcons();
     };
 
@@ -635,7 +699,7 @@
                 <td style="text-align:center;"><span class="badge-status badge-pago"><i data-lucide="check" style="width:12px; vertical-align:middle;"></i> ${statusLabel}</span></td>
                 <td style="text-align:right; font-weight:800; font-size:15px; color:${corTexto};">${sinal} ${window.fmtMoney(val)}</td>
                 <td style="text-align:center;">
-                    <button class="btn btn-outline" style="padding:4px; color:var(--danger); border:none;" title="Cancelar lançamento" onclick="window.cancelarTransacao(${t.originalIdx})"><i data-lucide="ban" style="width:16px;"></i></button>
+                    ${t.tipo === 'SAIDA' ? `<button class="btn btn-outline" style="padding:6px 9px; color:var(--warning); border-color:var(--warning);" title="Estornar pagamento" onclick="window.abrirEstornoPagamento(${t.originalIdx})"><i data-lucide="undo-2" style="width:16px;"></i> ESTORNAR</button>` : `<button class="btn btn-outline" style="padding:4px; color:var(--danger); border:none;" title="Cancelar lançamento" onclick="window.cancelarTransacao(${t.originalIdx})"><i data-lucide="ban" style="width:16px;"></i></button>`}
                 </td>
             </tr>`;
         });
@@ -973,6 +1037,117 @@
         window.tabFin('tab-dre', document.querySelector('.local-menu .tab-btn'));
     };
 
+    // --- ESTORNO SEGURO DE PAGAMENTO (SOMENTE SAÍDAS PAGAS) ---
+    window.abrirEstornoPagamento = function(idx) {
+        const t = window.marbeDB?.financeiro?.transacoes?.[idx];
+        if(!t) return alert('Lançamento não encontrado. Atualize a tela e tente novamente.');
+        if(t.tipo !== 'SAIDA' || t.status !== 'PAGO') return alert('Somente contas a pagar já baixadas como PAGO podem ser estornadas por esta função.');
+        if(String(window.MarbeCurrentUser?.role || '').toUpperCase() !== 'ADMIN') return alert('Por segurança, somente um usuário ADMINISTRADOR pode estornar pagamentos.');
+        const venc = normalizarDataFinanceira(t.vencimento || t.data || '');
+        const pag = dataLiquidacaoFinanceira(t);
+        document.getElementById('estornoIdx').value = idx;
+        document.getElementById('estornoMotivo').value = '';
+        document.getElementById('estornoSenha').value = '';
+        document.getElementById('estornoResumo').innerHTML = `<strong style="color:var(--text-main);">${escHtml(t.descricao || 'Conta a pagar')}</strong><br>Valor: <strong style="color:var(--danger);">${window.fmtMoney(Number(t.valor)||0)}</strong><br>Vencimento original: <strong>${venc ? venc.split('-').reverse().join('/') : 'N/D'}</strong><br>Baixado como pago em: <strong>${pag ? pag.split('-').reverse().join('/') : 'N/D'}</strong>`;
+        document.getElementById('modalEstornoPagamento').style.display = 'flex';
+        setTimeout(() => document.getElementById('estornoMotivo')?.focus(), 80);
+        lucide.createIcons();
+    };
+
+    window.fecharEstornoPagamento = function() {
+        document.getElementById('modalEstornoPagamento').style.display = 'none';
+        document.getElementById('estornoSenha').value = '';
+    };
+
+    async function revalidarSenhaAdministrador(senha) {
+        const email = String(window.MarbeCurrentUser?.email || '').trim();
+        if(!email || !senha) throw new Error('Informe sua senha de administrador.');
+        if(String(window.MarbeCurrentUser?.role || '').toUpperCase() !== 'ADMIN') throw new Error('Seu usuário não é administrador.');
+        const resp = await fetch('servidor/api/login.php', {
+            method:'POST', credentials:'same-origin', cache:'no-store',
+            headers:{'Content-Type':'application/json'}, body:JSON.stringify({email,password:senha})
+        });
+        const data = await resp.json().catch(()=>null);
+        if(!resp.ok || !data?.ok) throw new Error(data?.error || 'Senha incorreta. Estorno não realizado.');
+        // O login renova a sessão/CSRF. Atualiza os dados locais antes de salvar o estorno.
+        const meResp = await fetch('servidor/api/me.php', {credentials:'same-origin', cache:'no-store'});
+        const me = await meResp.json().catch(()=>null);
+        if(!meResp.ok || !me?.ok) throw new Error('Não foi possível revalidar a sessão após confirmar a senha.');
+        if(String(me.user?.email || '').toLowerCase() !== email.toLowerCase() || String(me.user?.role || '').toUpperCase() !== 'ADMIN') throw new Error('A confirmação precisa ser feita pelo mesmo administrador que está logado.');
+        window.MarbeServerSession = {
+            user:{id:me.user.id,email:me.user.email,name:me.user.name,displayName:me.user.name||me.user.email,role:me.user.role,uid:String(me.user.id||'')},
+            csrf:me.csrf || ''
+        };
+        return true;
+    }
+
+    window.confirmarEstornoPagamento = async function() {
+        const idx = parseInt(document.getElementById('estornoIdx').value);
+        const motivo = String(document.getElementById('estornoMotivo').value || '').trim();
+        const senha = document.getElementById('estornoSenha').value;
+        const t = window.marbeDB?.financeiro?.transacoes?.[idx];
+        if(!t || t.tipo !== 'SAIDA' || t.status !== 'PAGO') return alert('Este pagamento já foi alterado. Atualize a tela e confira novamente.');
+        if(!motivo) return alert('Informe o motivo do estorno. Ele será gravado na auditoria.');
+        if(!senha) return alert('Digite sua senha de administrador para confirmar o estorno.');
+        if(!confirm(`ATENÇÃO: deseja realmente ESTORNAR este pagamento?\n\n${t.descricao || ''}\n${window.fmtMoney(Number(t.valor)||0)}\n\nA conta voltará para pendente mantendo o vencimento original.`)) return;
+
+        const btn = document.getElementById('btnConfirmarEstorno');
+        const textoOriginal = btn.innerHTML;
+        btn.disabled = true; btn.textContent = 'VALIDANDO SENHA...';
+        try {
+            await revalidarSenhaAdministrador(senha);
+            const vencimento = normalizarDataFinanceira(t.vencimento || t.data || '');
+            const pagamentoAnterior = dataLiquidacaoFinanceira(t);
+            const agora = new Date();
+            if(!Array.isArray(window.marbeDB.financeiro.auditoria)) window.marbeDB.financeiro.auditoria = [];
+            window.marbeDB.financeiro.auditoria.push({
+                id: Date.now() + Math.floor(Math.random()*1000),
+                acao: 'ESTORNO_PAGAMENTO',
+                lancamento_id: t.id || '',
+                descricao: t.descricao || '',
+                categoria: t.categoria || '',
+                valor: Number(t.valor)||0,
+                status_anterior: 'PAGO',
+                status_novo: 'PENDENTE',
+                vencimento: vencimento,
+                data_pagamento_anterior: pagamentoAnterior,
+                motivo: motivo,
+                usuario: window.MarbeCurrentUser?.email || '',
+                usuario_nome: window.MarbeCurrentUser?.displayName || '',
+                data_hora_iso: agora.toISOString(),
+                data_hora_local: agora.toLocaleString('pt-BR')
+            });
+            t.status = 'PENDENTE';
+            t.estornado_em = agora.toISOString();
+            t.estornado_por = window.MarbeCurrentUser?.email || '';
+            t.motivo_ultimo_estorno = motivo;
+            delete t.data_pagamento;
+            delete t.data_baixa;
+            delete t.dataBaixa;
+            delete t.dataPagamento;
+            delete t.baixado_por;
+
+            await window.salvarNuvem(true);
+            window.fecharEstornoPagamento();
+            window.updateUI();
+            const hoje = window.MarbeDate.today();
+            const situacao = vencimento && vencimento < hoje ? 'VENCIDA' : 'A VENCER';
+            alert(`Pagamento estornado com sucesso.\n\nA conta voltou para ${situacao} e a alteração foi registrada na auditoria financeira.`);
+        } catch(e) {
+            alert(e?.message || 'Não foi possível realizar o estorno.');
+        } finally {
+            btn.disabled = false; btn.innerHTML = textoOriginal; lucide.createIcons();
+            document.getElementById('estornoSenha').value = '';
+        }
+    };
+
+    window.renderAuditoriaFinanceira = function() {
+        const tbody = document.getElementById('tabelaAuditoriaFinanceira');
+        if(!tbody) return;
+        const lista = [...(window.marbeDB?.financeiro?.auditoria || [])].sort((a,b) => String(b.data_hora_iso||'').localeCompare(String(a.data_hora_iso||'')));
+        tbody.innerHTML = lista.map(a => `<tr><td>${escHtml(a.data_hora_local || '')}</td><td>${escHtml(a.usuario || '')}</td><td><strong style="color:var(--warning);">ESTORNO DE PAGAMENTO</strong></td><td><strong>${escHtml(a.descricao || '')}</strong><br><span style="font-size:11px;color:var(--text-muted);">ID: ${escHtml(String(a.lancamento_id || ''))}</span></td><td>${a.vencimento ? escHtml(a.vencimento.split('-').reverse().join('/')) : 'N/D'}</td><td style="text-align:right;font-weight:800;">${window.fmtMoney(Number(a.valor)||0)}</td><td>${escHtml(a.motivo || '')}</td></tr>`).join('') || '<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--text-muted);">Nenhum estorno registrado.</td></tr>';
+    };
+
     window.cancelarTransacao = function(idx) {
         const t = window.marbeDB.financeiro.transacoes[idx];
         if(!t) return alert('Lançamento não encontrado.');
@@ -999,6 +1174,99 @@
         window.salvarNuvem(true);
         alert('Lançamento cancelado e preservado para auditoria.');
         window.updateUI();
+    };
+
+    // --- PROVISÃO DE CONTAS A PAGAR ---
+    function dataVencimentoProvisao(t) {
+        return normalizarDataFinanceira(t.vencimento || t.data || '');
+    }
+
+    window.atalhoProvisao = function(tipo) {
+        const hoje = new Date();
+        const fmt = d => window.MarbeDate.date(d);
+        let ini, fim;
+        if(tipo === 'HOJE') {
+            ini = fim = window.MarbeDate.today();
+        } else if(tipo === 'AMANHA') {
+            const a = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()+1);
+            ini = fim = fmt(a);
+        } else {
+            ini = fmt(new Date(hoje.getFullYear(), hoje.getMonth(), 1));
+            fim = fmt(new Date(hoje.getFullYear(), hoje.getMonth()+1, 0));
+        }
+        document.getElementById('provInicio').value = ini;
+        document.getElementById('provFim').value = fim;
+        window.renderProvisao();
+    };
+
+    window.obterLinhasProvisao = function() {
+        if(!window.marbeDB?.financeiro) return [];
+        const ini = document.getElementById('provInicio')?.value || '';
+        const fim = document.getElementById('provFim')?.value || '';
+        const busca = (document.getElementById('provBusca')?.value || '').trim().toLowerCase();
+        return (window.marbeDB.financeiro.transacoes || [])
+            .filter(t => {
+                const status = String(t.status || '').toUpperCase();
+                const tipo = String(t.tipo || '').toUpperCase();
+                if(tipo !== 'SAIDA' || (status !== 'PENDENTE' && status !== 'ATRASADO')) return false;
+                const data = dataVencimentoProvisao(t);
+                if(!data) return false;
+                if(ini && data < ini) return false;
+                if(fim && data > fim) return false;
+                if(busca) {
+                    const alvo = `${t.descricao||''} ${t.categoria||''} ${t.fornecedor||''} ${t.nf||''} ${t.pc||''}`.toLowerCase();
+                    if(!alvo.includes(busca)) return false;
+                }
+                return true;
+            })
+            .map(t => ({...t, _provData:dataVencimentoProvisao(t)}))
+            .sort((a,b) => a._provData.localeCompare(b._provData) || String(a.descricao||'').localeCompare(String(b.descricao||'')));
+    };
+
+    window.renderProvisao = function() {
+        const tbody = document.getElementById('tabelaProvisao');
+        if(!tbody || !window.marbeDB?.financeiro) return;
+        const rows = window.obterLinhasProvisao();
+        const hoje = window.MarbeDate.today();
+        let total = 0, vencidos = 0, html = '';
+        rows.forEach(t => {
+            const valor = Number(t.valor)||0; total += valor;
+            const data = t._provData; const atrasado = data < hoje; if(atrasado) vencidos++;
+            const sit = atrasado ? 'VENCIDA' : (data === hoje ? 'VENCE HOJE' : 'A VENCER');
+            const cor = atrasado ? 'var(--danger)' : (data === hoje ? 'var(--warning)' : 'var(--primary)');
+            const ref = [t.fornecedor, t.nf ? `NF ${t.nf}` : '', t.pc ? `PC ${t.pc}` : ''].filter(Boolean).join(' · ') || '-';
+            html += `<tr><td style="font-weight:800;">${data.split('-').reverse().join('/')}</td><td><strong>${escHtml(t.descricao||'Conta a pagar')}</strong><br><span style="font-size:11px;color:var(--text-muted);">${escHtml(t.categoria||'Sem categoria')}</span></td><td>${escHtml(ref)}</td><td style="font-weight:800;color:${cor};">${sit}</td><td style="text-align:right;font-weight:800;color:var(--danger);">${window.fmtMoney(valor)}</td></tr>`;
+        });
+        document.getElementById('provTotal').innerText = window.fmtMoney(total);
+        document.getElementById('provQtd').innerText = String(rows.length);
+        document.getElementById('provVencidos').innerText = String(vencidos);
+        tbody.innerHTML = html || '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-muted);">Nenhuma conta a pagar pendente nesse período.</td></tr>';
+        const ini = document.getElementById('provInicio').value, fim = document.getElementById('provFim').value;
+        document.getElementById('provResumo').innerText = `${rows.length} título(s) · Total previsto a reservar: ${window.fmtMoney(total)} · Período: ${ini ? ini.split('-').reverse().join('/') : 'início'} a ${fim ? fim.split('-').reverse().join('/') : 'fim'}.`;
+        if(window.lucide) lucide.createIcons();
+    };
+
+    window.gerarPdfProvisao = function() {
+        const rows = window.obterLinhasProvisao();
+        if(!rows.length) return alert('Não há contas a pagar pendentes no período escolhido.');
+        if(!window.jspdf?.jsPDF) return alert('Gerador de PDF não carregado. Atualize a página e tente novamente.');
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({orientation:'landscape'});
+        const ini = document.getElementById('provInicio').value;
+        const fim = document.getElementById('provFim').value;
+        const hoje = window.MarbeDate.today();
+        const total = rows.reduce((s,t)=>s+(Number(t.valor)||0),0);
+        doc.setFontSize(16); doc.text('MARBE / SB BORRACHAS - PROVISÃO DE CONTAS A PAGAR', 14, 16);
+        doc.setFontSize(9);
+        doc.text(`Período: ${ini?ini.split('-').reverse().join('/'):'início'} a ${fim?fim.split('-').reverse().join('/'):'fim'} | Gerado em ${new Date().toLocaleString('pt-BR')}`,14,23);
+        doc.setFontSize(12); doc.text(`TOTAL A RESERVAR: ${window.fmtMoney(total)} | ${rows.length} título(s)`,14,31);
+        const body = rows.map(t => {
+            const sit = t._provData < hoje ? 'Vencida' : (t._provData === hoje ? 'Vence hoje' : 'A vencer');
+            const ref = [t.fornecedor, t.nf ? `NF ${t.nf}` : '', t.pc ? `PC ${t.pc}` : ''].filter(Boolean).join(' / ');
+            return [t._provData.split('-').reverse().join('/'), t.descricao||'', t.categoria||'', ref, sit, window.fmtMoney(Number(t.valor)||0)];
+        });
+        doc.autoTable({startY:37, head:[['Vencimento','Descrição','Categoria','Fornecedor / Referência','Situação','Valor']], body, styles:{fontSize:8}, headStyles:{fillColor:[30,41,59]}, columnStyles:{5:{halign:'right'}}});
+        doc.save(`MARBE_PROVISAO_CONTAS_PAGAR_${ini||'inicio'}_${fim||'fim'}.pdf`);
     };
 
     function relFinStatusEfetivo(t) {
@@ -1090,6 +1358,7 @@
         document.getElementById('relFinAPagar').innerText = window.fmtMoney(aPagar);
         document.getElementById('tabelaRelFinanceiro').innerHTML = html || '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-muted);">Nenhum lançamento encontrado para este filtro.</td></tr>';
         document.getElementById('relFinResumo').innerText = `${rows.length} lançamento(s) encontrado(s). Cancelados aparecem para auditoria, mas não entram nos totais.`;
+        window.renderAuditoriaFinanceira();
     };
 
     window.gerarPdfRelatorioFinanceiro = function() {
@@ -1100,13 +1369,147 @@
         const doc = new jsPDF({orientation:'landscape'});
         const ini = document.getElementById('relFinInicio').value;
         const fim = document.getElementById('relFinFim').value;
-        doc.setFontSize(16); doc.text('MARBE / SB BORRACHAS - RELATÓRIO FINANCEIRO', 14, 16);
-        doc.setFontSize(9); doc.text(`Período: ${ini ? ini.split('-').reverse().join('/') : 'início'} a ${fim ? fim.split('-').reverse().join('/') : 'fim'} | Gerado em ${new Date().toLocaleString('pt-BR')}`, 14, 23);
-        const body = rows.map(t => {
-            const d=relFinDataReferencia(t); const st=relFinStatusEfetivo(t);
-            return [d?d.split('-').reverse().join('/'):'N/D', t.tipo==='ENTRADA'?'Entrada':'Saída', t.descricao||'', t.categoria||'', relFinLabelStatus(st), window.fmtMoney(Number(t.valor)||0)];
+        const tipoFiltro = document.getElementById('relFinTipo').value;
+        const statusFiltro = document.getElementById('relFinStatus').value;
+
+        // Resumo financeiro usa exatamente a mesma regra da tela:
+        // liquidado = realizado; pendente/atrasado = em aberto; cancelado = auditoria, sem somar.
+        let entradasLiquidadas = 0;
+        let saidasLiquidadas = 0;
+        let aReceber = 0;
+        let aPagar = 0;
+        let qtdCancelados = 0;
+        let valorCancelados = 0;
+
+        rows.forEach(t => {
+            const st = relFinStatusEfetivo(t);
+            const val = Number(t.valor) || 0;
+
+            if(st === 'LIQUIDADO') {
+                if(t.tipo === 'ENTRADA') entradasLiquidadas += val;
+                if(t.tipo === 'SAIDA') saidasLiquidadas += val;
+            } else if(st === 'PENDENTE' || st === 'ATRASADO') {
+                if(t.tipo === 'ENTRADA') aReceber += val;
+                if(t.tipo === 'SAIDA') aPagar += val;
+            } else if(st === 'CANCELADO') {
+                qtdCancelados++;
+                valorCancelados += val;
+            }
         });
-        doc.autoTable({startY:29, head:[['Data','Tipo','Descrição','Categoria','Situação','Valor']], body, styles:{fontSize:8}, headStyles:{fillColor:[30,41,59]}});
+
+        const saldoRealizado = entradasLiquidadas - saidasLiquidadas;
+        const saldoPrevisto = aReceber - aPagar;
+
+        const fmt = v => window.fmtMoney(Number(v) || 0);
+        const fmtPeriodo = d => d ? d.split('-').reverse().join('/') : null;
+        const tipoLabel = ({TODOS:'Todos', ENTRADA:'Entradas', SAIDA:'Saídas'})[tipoFiltro] || tipoFiltro;
+        const statusLabel = ({TODOS:'Todos', LIQUIDADO:'Liquidados', PENDENTE:'Pendentes', ATRASADO:'Atrasados', CANCELADO:'Cancelados', AGUARDANDO_PROGRAMACAO:'Aguardando programação'})[statusFiltro] || statusFiltro;
+
+        doc.setFontSize(16);
+        doc.text('MARBE / SB BORRACHAS - RELATÓRIO FINANCEIRO', 14, 15);
+
+        doc.setFontSize(8.5);
+        doc.setTextColor(80,80,80);
+        doc.text(
+            `Período: ${fmtPeriodo(ini) || 'início'} a ${fmtPeriodo(fim) || 'fim'} | Tipo: ${tipoLabel} | Situação: ${statusLabel} | Gerado em ${new Date().toLocaleString('pt-BR')}`,
+            14, 21
+        );
+        doc.setTextColor(0,0,0);
+
+        // Bloco REALIZADO
+        doc.setFillColor(236, 253, 245);
+        doc.roundedRect(14, 26, 126, 25, 2, 2, 'F');
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'bold');
+        doc.text('REALIZADO / LIQUIDADO', 18, 32);
+        doc.setFontSize(8.5);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Entradas recebidas: ${fmt(entradasLiquidadas)}`, 18, 38);
+        doc.text(`Saídas pagas: ${fmt(saidasLiquidadas)}`, 18, 44);
+        doc.setFont(undefined, 'bold');
+        doc.text(`SALDO REALIZADO: ${fmt(saldoRealizado)}`, 76, 44);
+
+        // Bloco EM ABERTO
+        doc.setFillColor(255, 247, 237);
+        doc.roundedRect(146, 26, 136, 25, 2, 2, 'F');
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'bold');
+        doc.text('EM ABERTO / PREVISTO', 150, 32);
+        doc.setFontSize(8.5);
+        doc.setFont(undefined, 'normal');
+        doc.text(`A receber: ${fmt(aReceber)}`, 150, 38);
+        doc.text(`A pagar: ${fmt(aPagar)}`, 150, 44);
+        doc.setFont(undefined, 'bold');
+        doc.text(`SALDO PREVISTO: ${fmt(saldoPrevisto)}`, 210, 44);
+
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(95, 95, 95);
+        const auditoriaTxt = qtdCancelados
+            ? `${rows.length} lançamento(s) no relatório. ${qtdCancelados} cancelado(s), somando ${fmt(valorCancelados)}, exibido(s) apenas para auditoria e fora dos totais.`
+            : `${rows.length} lançamento(s) no relatório. Cancelados, quando existentes, são exibidos apenas para auditoria e não entram nos totais.`;
+        doc.text(auditoriaTxt, 14, 56);
+        doc.setTextColor(0,0,0);
+
+        const body = rows.map(t => {
+            const d = relFinDataReferencia(t);
+            const st = relFinStatusEfetivo(t);
+            return [
+                d ? d.split('-').reverse().join('/') : 'N/D',
+                t.tipo === 'ENTRADA' ? 'Entrada' : 'Saída',
+                t.descricao || '',
+                t.categoria || '',
+                relFinLabelStatus(st),
+                fmt(Number(t.valor) || 0)
+            ];
+        });
+
+        doc.autoTable({
+            startY: 61,
+            head:[['Data','Tipo','Descrição','Categoria','Situação','Valor']],
+            body,
+            styles:{fontSize:8},
+            headStyles:{fillColor:[30,41,59]},
+            columnStyles:{5:{halign:'right'}},
+            didParseCell: function(data) {
+                if(data.section === 'body' && data.column.index === 5) {
+                    data.cell.styles.fontStyle = 'bold';
+                }
+            }
+        });
+
+        // Totais repetidos ao final da listagem para conferência/assinatura.
+        let y = (doc.lastAutoTable?.finalY || 61) + 7;
+        const pageHeight = doc.internal.pageSize.getHeight();
+        if(y > pageHeight - 35) {
+            doc.addPage();
+            y = 18;
+        }
+
+        doc.setDrawColor(180,180,180);
+        doc.line(14, y, 282, y);
+        y += 6;
+
+        doc.setFont(undefined, 'bold');
+        doc.setFontSize(9);
+        doc.text('TOTAIS DO PERÍODO / FILTRO', 14, y);
+        y += 6;
+
+        doc.setFontSize(8.5);
+        doc.text(`Entradas liquidadas: ${fmt(entradasLiquidadas)}`, 14, y);
+        doc.text(`Saídas liquidadas: ${fmt(saidasLiquidadas)}`, 94, y);
+        doc.text(`Saldo realizado: ${fmt(saldoRealizado)}`, 188, y);
+        y += 6;
+        doc.text(`A receber: ${fmt(aReceber)}`, 14, y);
+        doc.text(`A pagar: ${fmt(aPagar)}`, 94, y);
+        doc.text(`Saldo previsto: ${fmt(saldoPrevisto)}`, 188, y);
+
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(100,100,100);
+        doc.text('Observação: valores cancelados não compõem entradas, saídas ou saldos. O relatório respeita os filtros selecionados na tela.', 14, y + 7);
+        doc.setTextColor(0,0,0);
+
         doc.save(`MARBE_RELATORIO_FINANCEIRO_${ini||'inicio'}_${fim||'fim'}.pdf`);
     };
 
@@ -1178,5 +1581,6 @@
     });
 
 </script>
+  <script src="marbe_responsive.js" defer></script>
 </body>
 </html>
